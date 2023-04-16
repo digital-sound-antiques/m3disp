@@ -1,0 +1,35 @@
+{
+  "name": "m3disp",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "server": "http-server -c-1 ./dist --ssl --key ./cert/localhost+2-key.pem --cert ./cert/localhost+2.pem"
+  },
+  "dependencies": {
+    "@emotion/react": "^11.10.6",
+    "@emotion/styled": "^11.10.6",
+    "@fontsource/roboto": "^4.5.8",
+    "@mui/icons-material": "^5.11.11",
+    "@mui/material": "^5.12.0",
+    "libkss-js": "^2.1.0",
+    "mgsc-js": "^2.0.0-beta.1",
+    "mgsrc-js": "^2.0.0",
+    "react": "^18.2.0",
+    "react-beautiful-dnd": "^13.1.1",
+    "react-dom": "^18.2.0",
+    "react-file-drop": "^3.1.6",
+    "webaudio-stream-player": "github:digital-sound-antiques/webaudio-stream-player"
+  },
+  "devDependencies": {
+    "@types/react": "^18.0.28",
+    "@types/react-beautiful-dnd": "^13.1.4",
+    "@types/react-dom": "^18.0.11",
+    "@vitejs/plugin-react": "^3.1.0",
+    "typescript": "^4.9.3",
+    "vite": "^4.2.0"
+  }
+}

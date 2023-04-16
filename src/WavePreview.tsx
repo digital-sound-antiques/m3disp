@@ -1,0 +1,225 @@
+import { useContext, useEffect, useRef, useState } from "react";
+import { PlayerContext } from "./PlayerContext";
+import { Box, Card, Stack, Typography, useTheme } from "@mui/material";
+import { WaveThumbnail } from "./kss/kss-player";
+
+function _drawWavePreview(canvas: HTMLCanvasElement, thumbnail: WaveThumbnail, color: string) {
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.beginPath();
+  ctx.fillStyle = color;
+
+  const cy = Math.floor(canvas.height / 2);
+  const step = 3;
+  const { data, min, max } = thumbnail;
+  const depth = Math.max(Math.abs(min), Math.abs(max));
+
+  for (let i = 0; i < data.length; i++) {
+    const x = Math.floor(canvas.width * (i / data.length));
+    const dx = x - (x % step);
+    const d = (data[i] ?? 0) / depth;
+    if (d >= 0) {
+      const h = Math.floor(d * cy);
+      ctx.rect(dx, cy - h, step - 1, h);
+    } else {
+      const h = Math.floor(-d * cy);
+      ctx.rect(dx, cy, step - 1, h);
+    }
+  }
+  ctx.fill();
+}
+
+function _drawCursor(canvas: HTMLCanvasElement, current: number, total: number, color: string) {
+  const ctx = canvas.getContext("2d")!;
+
+  ctx.strokeStyle = color;
+  ctx.lineWidth = 2.0;
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.beginPath();
+  const x = Math.round((canvas.width * current) / total);
+  ctx.moveTo(x, 0);
+  ctx.lineTo(x, canvas.height);
+  ctx.stroke();
+}
+
+type CursorCanvasProps = {
+  width: number;
+  height: number;
+  color: string;
+};
+
+function CursorCanvas(props: CursorCanvasProps) {
+  const context = useContext(PlayerContext);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+
+  useEffect(() => {
+    const canvas = canvasRef.current!;
+    canvas.width = props.width * devicePixelRatio;
+    canvas.height = props.height * devicePixelRatio;
+    canvas.style.width = `${props.width}px`;
+    canvas.style.height = `${props.height}px`;
+  }, [props.width, props.height]);
+
+  useEffect(() => {
+    const renderFrame = () => {
+      const canvas = canvasRef.current;
+      const { bufferedFrames, currentFrame } = context.player.progress.renderer;
+      if (canvas != null) {
+        requestAnimationFrame(renderFrame);
+        _drawCursor(canvas, currentFrame, bufferedFrames, props.color);
+      }
+    };
+    renderFrame();
+  }, []);
+
+  const seekToMousePos = (ev: React.MouseEvent) => {
+    const canvas = canvasRef.current;
+    if (canvas != null) {
+      const rect = canvas.getBoundingClientRect();
+      const dx = ev.clientX - rect.left;
+      const ratio = dx / canvas.width;
+      const pos = Math.round(context.player.progress.renderer.bufferedFrames * ratio);
+      context.player.seekInFrame(pos);
+    }
+  };
+
+  const onMouseDown = (ev: React.MouseEvent) => {
+    seekToMousePos(ev);
+  };
+
+  const onMouseMove = (ev: React.MouseEvent) => {
+    if (ev.buttons != 0) {
+      seekToMousePos(ev);
+    }
+  };
+
+  return <canvas ref={canvasRef} onMouseDown={onMouseDown} onMouseMove={onMouseMove} />;
+}
+
+type WaveCanvasProps = {
+  width: number;
+  height: number;
+  color: string;
+};
+
+function WaveCanvas(props: WaveCanvasProps) {
+  const context = useContext(PlayerContext);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const frameCounterRef = useRef(0);
+  const previewLengthRef = useRef(0);
+  const colorRef = useRef(props.color);
+
+  useEffect(() => {
+    const canvas = canvasRef.current!;
+    canvas.width = props.width * devicePixelRatio;
+    canvas.height = props.height * devicePixelRatio;
+    canvas.style.width = `${props.width}px`;
+    canvas.style.height = `${props.height}px`;
+    previewLengthRef.current = 0;
+    colorRef.current  = props.color;
+  }, [props.width, props.height, props.color]);
+
+  useEffect(() => {
+    const renderFrame = () => {
+      const canvas = canvasRef.current;
+      const thumbnail = context.player.thumbnail;
+      if (canvas != null) {
+        requestAnimationFrame(renderFrame);
+        if (thumbnail.length != previewLengthRef.current) {
+          if (frameCounterRef.current % 12 == 0) {
+            _drawWavePreview(canvas, thumbnail, colorRef.current);
+            previewLengthRef.current = thumbnail.length;
+          }
+        }
+        frameCounterRef.current = frameCounterRef.current + 1;
+      }
+    };
+    renderFrame();
+  }, []);
+
+  return <canvas ref={canvasRef} />;
+}
+
+type WavePreviewProps = {
+  height?: string | number | undefined;
+};
+
+export function WavePreview(props: WavePreviewProps) {
+  const theme = useTheme();
+  const boxRef = useRef<HTMLElement>(null);
+  const [size, setSize] = useState({ width: 0, height: 0 });
+
+  const onResize = () => {
+    setSize({
+      width: boxRef.current!.clientWidth,
+      height: boxRef.current!.clientHeight,
+    });
+  };
+  const resizeObserver = new ResizeObserver(onResize);
+
+  useEffect(() => {
+    resizeObserver.observe(boxRef.current!);
+    return () => {
+      resizeObserver.disconnect();
+    };
+  }, []);
+
+  return (
+    <Box
+      ref={boxRef}
+      sx={{
+        position: "relative",
+        width: "100%",
+        height: props.height ?? "48px",
+      }}
+    >
+      <WaveCanvas width={size.width} height={size.height} color={theme.palette.primary.main} />
+      <Box sx={{ position: "absolute", top: 0, height: `${size.height + 4}px` }}>
+        <CursorCanvas width={size.width} height={size.height + 4} color={theme.palette.secondary.main} />
+      </Box>
+    </Box>
+  );
+}
+
+function _toTimeString(ms: number): string {
+  const sec = Math.floor(ms / 1000);
+  const m = Math.floor(sec / 60);
+  const s = sec % 60;
+  const mm = m < 10 ? `0${m}` : `${m}`;
+  const ss = s < 10 ? `0${s}` : `${s}`;
+  return `${mm}:${ss}`;
+}
+
+export function WaveSlider() {
+  const context = useContext(PlayerContext);
+  const [progress, setProgress] = useState({ currentTime: 0, bufferedTime: 0 });
+
+  useEffect(() => {
+    const timerId = setTimeout(() => {
+      const progress = context.player.progress.renderer;
+      setProgress(progress);
+    }, 100);
+    return () => {
+      clearTimeout(timerId);
+    };
+  });
+
+  return (
+    <Box sx={{ display: "flex", flexDirection: "column", padding: 2 }}>
+      <WavePreview />
+      <Stack direction="row" justifyContent="space-between" sx={{ mt: 1 }}>
+        <Typography variant="caption">{_toTimeString(progress.currentTime)}</Typography>
+        <Typography variant="caption">{_toTimeString(progress.bufferedTime)}</Typography>
+      </Stack>
+    </Box>
+  );
+}
+
+export function WaveSliderCard() {
+  return (
+    <Card sx={{ height: "100px" }}>
+      <WaveSlider />
+    </Card>
+  );
+}
