@@ -42,8 +42,8 @@ const appTheme = createTheme({
       main: "#FF66BA",
     },
     background: {
-      default: "#121212",
-      paper: "#404040",
+      default: "#223",
+      paper: "#444",
     },
   },
   breakpoints: {
@@ -74,9 +74,9 @@ export function App() {
 function AppRootMobile() {
   return (
     <FileDropContext>
-      <Box sx={{ position: "absolute", top: 0, bottom: 0, left: 0, right: 0, margin: 2 }}>
-        <Card sx={{ height: "100%", borderRadius: "22px" }}>
-          <Toolbar variant="dense">
+      <Box sx={{ position: "absolute", top: 0, bottom: 0, left: 0, right: 0, margin: 0 }}>
+        <Card sx={{ width: "100%", height: "100%" }}>
+          <Toolbar>
             <IconButton edge="start" color="inherit" aria-label="menu" sx={{ mr: 2 }}>
               <MenuIcon />
             </IconButton>
@@ -100,7 +100,7 @@ function AppRootMobile() {
             }}
           >
             <KeyboardList spacing={0} />
-            <TimeSlider/>
+            <TimeSlider />
             <PlayControl small={true} />
             <Box sx={{ pt: 2 }} />
             <Divider />
@@ -170,27 +170,27 @@ function AppRootDesktop() {
         <Toolbar />
         <FileDropContext>
           <Grid container spacing={gap} sx={{ height: "100%" }}>
-            <Grid xs={12} sm={7} md={8}>
+            <Grid xs={12} sm={7} md={8} lg={8.5} xl={9}>
               <Stack ref={leftPaneRef} sx={{ gap }}>
                 <KeyboardList spacing={gap} />
-                <WaveSliderCard />
               </Stack>
             </Grid>
-            <Grid xs={12} sm={5} md={4}>
+            <Grid xs={12} sm={5} md={4} lg={3.5} xl={3}>
               <Stack
                 sx={{
                   gap,
                   height: panelHeight,
                 }}
               >
-                <VolumeCard />
+                <WaveSliderCard />
                 <PlayControlCard />
+                <VolumeCard />
                 <PlayListCard />
               </Stack>
             </Grid>
           </Grid>
         </FileDropContext>
-        <Divider sx={{ marginY: 2 }} />
+        <Divider sx={{ mt: 4, mb: 2 }} />
         <Box
           component="footer"
           sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}

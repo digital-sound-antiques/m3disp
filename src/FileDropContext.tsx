@@ -66,8 +66,6 @@ export function FileDropContext(props: PropsWithChildren) {
     <FileDrop ref={fileDropRef} {...fileDropProps}>
       <Box
         sx={{
-          margin: -1,
-          padding: 1,
           outline: outline,
           outlineColor: theme.palette.secondary.main,
           borderRadius: "8px",

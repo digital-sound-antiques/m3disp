@@ -6,32 +6,48 @@ export type ChannelStatus = {
   vol: number;
   mode?: string | null;
   keyKeepFrames?: number | null;
-  voice?: string | number[] | null;
+  voice?: string | Uint8Array | null;
 };
+
+function createPSGVoiceName(ton: boolean, non: boolean) {
+  if (ton && non) {
+    return 'Tone+Noise';
+  } else if (ton) {
+    return 'Tone';
+  } else if (non) {
+    return 'Noise';
+  } else {
+    return 'Muted';
+  }
+}
 
 /// ch 0,1,2: tone
 /// ch 3,4,5: noise
 function createPSGStatus(regs: Uint8Array, ch: number): ChannelStatus {
   if (ch < 3) {
     const fdiv = ((regs[ch * 2 + 1] & 0xff) << 8) | regs[ch * 2];
-    const freq = 3579545 / 2 / 16 / 2 / fdiv;
-    const vol = regs[8 + ch] & 0x0f;
+    const vol = Math.min(15, regs[8 + ch]);    
     const A4 = 440.0;
-    const on = (regs[7] & (1 << ch)) == 0;
-    if (on && vol > 0 && freq > 0) {
+    const ton = (regs[7] & (1 << ch)) == 0;
+    const non = (regs[7] & (8 << ch)) == 0;
+    const voice = createPSGVoiceName(ton, non);
+    const freq = fdiv > 0 ? 3579545 / 2 / 16 / 2 / fdiv : 0;
+    if (ton && vol > 0 && freq != 0) {
       const kcode = 57 + Math.round(Math.log2(freq / A4) * 12);
-      return { freq, kcode, vol };
+      return { freq, kcode, vol, voice };
     } else {
-      return { freq, vol };
+      return { freq, vol, voice };
     }
   } else {
     const freq = regs[6];
-    const vol = regs[8 + (ch - 3)] & 0x0f;
-    const on = (regs[7] & (8 << (ch - 3))) == 0;
-    if (on && vol > 0) {
-      return { freq, kcode: freq, vol, mode: "noise" };
+    const vol = Math.min(15, regs[8 + (ch - 3)]);
+    const ton = (regs[7] & (1 << (ch - 3))) == 0;
+    const non = (regs[7] & (8 << (ch - 3))) == 0;
+    const voice = createPSGVoiceName(ton, non);
+    if (non && vol > 0) {
+      return { freq, kcode: freq, vol, mode: "noise", voice };
     } else {
-      return { freq, vol, mode: "noise" };
+      return { freq, vol, mode: "noise", voice };
     }
   }
 }
@@ -41,11 +57,15 @@ function createSCCStatus(regs: Uint8Array, ch: number): ChannelStatus {
   const freq = 3579545 / 2 / 16 / 2 / fdiv;
   const vol = regs[0xd0 + ch] & 0x0f;
   const A4 = 440.0;
+
+  const vch = ch < 5 ? ch : 4;
+  const voice = new Uint8Array(regs.buffer, regs.byteOffset + vch * 32, 32);
+
   if (vol > 0 && freq > 0) {
     const kcode = 57 + Math.round(Math.log2(freq / A4) * 12);
-    return { freq, kcode, vol };
+    return { freq, kcode, vol, voice };
   } else {
-    return { freq, vol };
+    return { freq, vol, voice };
   }
 }
 
