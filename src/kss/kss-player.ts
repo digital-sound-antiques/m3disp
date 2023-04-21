@@ -1,5 +1,5 @@
 import { AudioPlayer, AudioRendererType, MonoWaveBuffer } from "webaudio-stream-player";
-import { type KSSDecoderDeviceSnapshot } from "./kss-decoder-worker";
+import { KSSDecoderStartOptions, type KSSDecoderDeviceSnapshot } from "./kss-decoder-worker";
 
 import workletUrl from "./renderer-worklet.ts?worker&url";
 import { getChannelStatus, ChannelId, ChannelStatus } from "./channel-status";
@@ -49,9 +49,6 @@ export class WaveThumbnail {
     return this._dataCache;
   }
 }
-
-export type KSSDeviceName = "psg" | "scc" | "opll";
-
 export class KSSPlayer extends AudioPlayer {
   constructor(rendererType: AudioRendererType) {
     super({
@@ -88,17 +85,29 @@ export class KSSPlayer extends AudioPlayer {
 
   thumbnail = new WaveThumbnail();
 
+  outputLatencyOverride: number | null = null;
+
   findSnapshotAt(frame: number): KSSDecoderDeviceSnapshot | undefined {
-    return this._snapshots[Math.floor(frame / 735)];
+    const latency = this.outputLatencyOverride ?? this.outputLatency;
+    const latencyInFrame = (this.audioContext?.sampleRate ?? 0) * latency;
+    const fixedFrame = Math.max(0, frame - latencyInFrame);
+    const ntscFrame = Math.floor(fixedFrame / 735);
+    return this._snapshots[ntscFrame];
   }
 
-  override async play(args: any) {
+  override async play(args: KSSDecoderStartOptions) {
     this._snapshots = [];
     this.thumbnail.clear();
-    super.play(args);
+    await super.play(args);
   }
 
-  getTrackStatus(id: ChannelId): ChannelStatus {
+  override async abort() {
+    this._snapshots = [];
+    await super.abort();
+    this.thumbnail.clear();
+  }
+
+  getChannelStatus(id: ChannelId): ChannelStatus | null {
     return getChannelStatus(this, id);
   }
 }

@@ -23,9 +23,12 @@ export function VolumeIndicator(props: VolumeIndicatorProps) {
   const [size, setSize] = useState({ width: 0, height: 0 });
 
   const updateSize = () => {
-    const box = boxRef.current!;
-    setSize({ width: box.clientWidth, height: box.clientHeight });
+    const box = boxRef.current;
+    if (box != null) {
+      setSize({ width: box.clientWidth, height: box.clientHeight });
+    }
   };
+
   const resizeObserver = new ResizeObserver(updateSize);
   useEffect(() => {
     const canvas = canvasRef.current!;
@@ -47,7 +50,7 @@ export function VolumeIndicator(props: VolumeIndicatorProps) {
     context.beginPath();
     let v;
     if (props.keyKeepFrames != null) {
-      const decayCycle = props.kcode != null ? 60 : 5;
+      const decayCycle = props.kcode != null ? 90 : 15;
       const elapsedCycle = Math.min(props.keyKeepFrames / 735, decayCycle);
       const att = (decayCycle - elapsedCycle) / decayCycle;
       v = Math.round(props.volume * att);
@@ -99,7 +102,7 @@ export function VolumeIndicator(props: VolumeIndicatorProps) {
 }
 
 type WaveIndicatorProps = {
-  wave: Uint8Array | ArrayLike<number> | number[];
+  wave?: Uint8Array | ArrayLike<number> | number[] | null;
   color: string;
 };
 
@@ -109,8 +112,10 @@ export function WaveIndicator(props: WaveIndicatorProps) {
   const [size, setSize] = useState({ width: 0, height: 0 });
 
   const updateSize = () => {
-    const box = boxRef.current!;
-    setSize({ width: box.clientWidth, height: box.clientHeight });
+    const box = boxRef.current;
+    if (box != null) {
+      setSize({ width: box.clientWidth, height: box.clientHeight });
+    }
   };
   const resizeObserver = new ResizeObserver(updateSize);
   useEffect(() => {
@@ -126,23 +131,22 @@ export function WaveIndicator(props: WaveIndicatorProps) {
   useEffect(() => {
     const context = canvasRef.current!.getContext("2d")!;
     const canvas = context.canvas;
-
-    const step = canvas.width / props.wave.length;
     context.clearRect(0, 0, canvas.width, canvas.height);
-    context.fillStyle = props.color + "20";
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    context.fillStyle = props.color + "c0";
-    context.beginPath();
-    for (let i = 0; i < props.wave.length; i++) {
-      const a = props.wave[i];
-      if (a < 128) {
-        context.rect(i * step, 127 - a, step - 2, a);
-      } else {
-        const xa = -(255 - a + 1);
-        context.rect(i * step, 127, step - 2, -xa);
+    if (props.wave != null) {
+      const step = canvas.width / props.wave.length;
+      context.fillStyle = props.color + "c0";
+      context.beginPath();
+      for (let i = 0; i < props.wave.length; i++) {
+        const a = props.wave[i];
+        if (a < 128) {
+          context.rect(i * step, 127 - a, step - 2, a);
+        } else {
+          const xa = -(255 - a + 1);
+          context.rect(i * step, 127, step - 2, -xa);
+        }
       }
+      context.fill();
     }
-    context.fill();
   }, [props.wave, props.color]);
 
   return (
@@ -165,7 +169,6 @@ export function WaveIndicator(props: WaveIndicatorProps) {
         style={{
           width: size.width + "px",
           height: size.height - 2 + "px",
-          border: "1px solid #333",
         }}
       />
     </Box>
@@ -176,17 +179,15 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
   const theme = useTheme();
   const context = useContext(PlayerContext);
 
-  const [status, setStatus] = useState<ChannelStatus>({ freq: 0, kcode: 0, vol: 0 });
+  const [status, setStatus] = useState<ChannelStatus | null>(null);
   const rootRef = useRef(null);
 
   const renderFrame = () => {
     if (rootRef.current != null) {
       requestAnimationFrame(renderFrame);
       for (const target of props.targets) {
-        const status = context.player.getTrackStatus(target);
-        if (status.kcode != null) {
-          setStatus(status);
-        }
+        const status = context.player.getChannelStatus(target);
+        setStatus(status);
       }
     }
   };
@@ -195,27 +196,31 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
     renderFrame();
   }, []);
 
-  let voiceNode;
-  let volHeight = "45%";
-  let voiceHeight = "45%";
+  let voiceNode = null;
+  let volHeight;
+  let voiceHeight;
 
-  if (typeof status.voice === "string") {
-    voiceNode = (
-      <Typography
-        color="#ccc"
-        variant="caption"
-        textAlign="right"
-        fontSize={{ md: "7px", lg: "10px" }}
-      >
-        {status.voice.toUpperCase()}
-      </Typography>
-    );
-  } else if (status.voice instanceof Uint8Array) {
-    voiceNode = <WaveIndicator wave={status.voice} color={theme.palette.primary.main} />;
+  if (props.targets[0].device != "scc") {
+    if (typeof status?.voice == "string") {
+      voiceNode = (
+        <Typography
+          color="#ccc"
+          variant="caption"
+          textAlign="right"
+          fontSize={{ md: "7px", lg: "10px" }}
+        >
+          {status.voice.toUpperCase()}
+        </Typography>
+      );
+    }
+    volHeight = "45%";
+    voiceHeight = "40%";
+  } else {
+    if (status?.voice instanceof Uint8Array) {
+      voiceNode = <WaveIndicator wave={status?.voice} color={theme.palette.primary.main} />;
+    }
     volHeight = "30%";
     voiceHeight = "70%";
-  } else {
-    voiceNode = null;
   }
 
   return (
@@ -274,9 +279,9 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
             }}
           >
             <VolumeIndicator
-              volume={status.vol}
-              kcode={status.kcode}
-              keyKeepFrames={status.keyKeepFrames}
+              volume={status?.vol ?? 0}
+              kcode={status?.kcode}
+              keyKeepFrames={status?.keyKeepFrames ?? 0}
               primaryColor={theme.palette.primary.main}
               secondaryColor={theme.palette.secondary.main}
             />

@@ -7,6 +7,11 @@ function _drawWavePreview(canvas: HTMLCanvasElement, thumbnail: WaveThumbnail, c
   const ctx = canvas.getContext("2d")!;
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (thumbnail.length == 0) {
+    return;
+  }
+
   ctx.beginPath();
   ctx.fillStyle = color;
 
@@ -52,14 +57,19 @@ type CursorCanvasProps = {
 function CursorCanvas(props: CursorCanvasProps) {
   const context = useContext(PlayerContext);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const colorRef = useRef(props.color);
+
+  const pixelRatio = Math.min(devicePixelRatio, 2.0);
 
   useEffect(() => {
     const canvas = canvasRef.current!;
-    canvas.width = props.width * devicePixelRatio;
-    canvas.height = props.height * devicePixelRatio;
+    canvas.width = props.width * pixelRatio;
+    canvas.height = props.height * pixelRatio;
     canvas.style.width = `${props.width}px`;
     canvas.style.height = `${props.height}px`;
-  }, [props.width, props.height]);
+    colorRef.current  = props.color;
+  }, [props.width, props.height, props.color]);  
+
 
   useEffect(() => {
     const renderFrame = () => {
@@ -67,7 +77,7 @@ function CursorCanvas(props: CursorCanvasProps) {
       const { bufferedFrames, currentFrame } = context.player.progress.renderer;
       if (canvas != null) {
         requestAnimationFrame(renderFrame);
-        _drawCursor(canvas, currentFrame, bufferedFrames, props.color);
+        _drawCursor(canvas, currentFrame, bufferedFrames, colorRef.current!);
       }
     };
     renderFrame();
@@ -78,9 +88,12 @@ function CursorCanvas(props: CursorCanvasProps) {
     if (canvas != null) {
       const rect = canvas.getBoundingClientRect();
       const dx = ev.clientX - rect.left;
-      const ratio = dx / canvas.width;
+      const ratio = dx / (canvas.width / pixelRatio);
       const pos = Math.round(context.player.progress.renderer.bufferedFrames * ratio);
       context.player.seekInFrame(pos);
+      if (context.player.state == 'paused' || context.player.state == 'stopped') {
+        context.player.resume();
+      }
     }
   };
 
@@ -110,10 +123,12 @@ function WaveCanvas(props: WaveCanvasProps) {
   const previewLengthRef = useRef(0);
   const colorRef = useRef(props.color);
 
+  const pixelRatio = Math.min(devicePixelRatio, 2.0);
+
   useEffect(() => {
     const canvas = canvasRef.current!;
-    canvas.width = props.width * devicePixelRatio;
-    canvas.height = props.height * devicePixelRatio;
+    canvas.width = props.width * pixelRatio;
+    canvas.height = props.height * pixelRatio;
     canvas.style.width = `${props.width}px`;
     canvas.style.height = `${props.height}px`;
     previewLengthRef.current = 0;
@@ -127,7 +142,7 @@ function WaveCanvas(props: WaveCanvasProps) {
       if (canvas != null) {
         requestAnimationFrame(renderFrame);
         if (thumbnail.length != previewLengthRef.current) {
-          if (frameCounterRef.current % 12 == 0) {
+          if (frameCounterRef.current % 15 == 0) {
             _drawWavePreview(canvas, thumbnail, colorRef.current);
             previewLengthRef.current = thumbnail.length;
           }

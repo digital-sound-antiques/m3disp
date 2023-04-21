@@ -8,22 +8,14 @@ import {
   Card,
   Typography,
   Button,
-  Toolbar,
   Stack,
   useTheme,
   SxProps,
   Theme,
 } from "@mui/material";
-import {
-  Delete,
-  DeleteSweepOutlined,
-  Pause,
-  PlayArrow,
-  PlaylistAdd,
-  Remove,
-} from "@mui/icons-material";
+import { DeleteSweepOutlined, Pause, PlayArrow, PlaylistAdd, Remove } from "@mui/icons-material";
 
-import { Fragment, Ref, useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 
 import { parseMGSTitle } from "mgsrc-js";
 import { PlayerContext, PlayListEntry } from "./PlayerContext";
@@ -31,7 +23,7 @@ import { DragDropContext, Draggable, DropResult } from "react-beautiful-dnd";
 import { StrictModeDroppable as Droppable } from "./StrictModeDroppable";
 
 import { FileDrop } from "react-file-drop";
-import { FileDropContext, useFileDrop } from "./FileDropContext";
+import { useFileDrop } from "./FileDropContext";
 
 async function loadEntries(urls: string[]): Promise<PlayListEntry[]> {
   const entries: PlayListEntry[] = [];
@@ -126,13 +118,13 @@ export function PlayListBody(props: { deleteMode: boolean; sx?: SxProps<Theme> |
                           disablePadding
                           secondaryAction={secondaryAction}
                         >
-                          <ListItemButton selected={selected}>
-                            <ListItemText
-                              disableTypography={true}
-                              onClick={() => {
-                                _play(index);
-                              }}
-                            >
+                          <ListItemButton
+                            selected={selected}
+                            onClick={() => {
+                              _play(index);
+                            }}
+                          >
+                            <ListItemText disableTypography={true}>
                               <Typography
                                 sx={{ fontWeight: "bold", fontSize: "0.9rem" }}
                                 noWrap={true}
@@ -306,7 +298,7 @@ export function PlayList(props: { toolbarAlignment?: "top" | "bottom" }) {
           deleteMode={deleteMode}
           setDeleteMode={setDeleteMode}
           onAddClick={onTargetClick}
-          sx={barSx}
+          sx={{ boxShadow: "0 0 2px 0 #00000080", ...barSx }}
         />
         <PlayListBody deleteMode={deleteMode} sx={bodySx} />
       </FileDrop>

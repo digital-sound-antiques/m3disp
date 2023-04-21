@@ -58,7 +58,7 @@ function DeviceCard(props: DeviceCardProps) {
 export function KeyboardList(props: { spacing?: any }) {
   const theme = useTheme();
   const isSmall = useMediaQuery(theme.breakpoints.down("md"));
-  const aspect = "640/28";
+  const aspect = isSmall ? "640/24" : "640/28";
   return (
     <Stack spacing={props.spacing}>
       <DeviceCard

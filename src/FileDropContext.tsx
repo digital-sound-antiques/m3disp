@@ -22,7 +22,6 @@ export function useFileDrop(playOnDrop: boolean, clearOnDrop: boolean = false) {
       setDraggingOver(false);
     },
     onDrop: (files: FileList | null, ev: React.DragEvent<HTMLDivElement>) => {
-      console.log("onDrop " + playOnDrop);
       setDraggingOver(false);
       if (ev.defaultPrevented) {
         return;

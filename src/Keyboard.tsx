@@ -239,7 +239,7 @@ function BlackKeysOverlay(props: {
         const kcodes = [];
         const colors = [];
         for (const target of props.targets) {
-          const channel = playerContext.player.getTrackStatus(target);
+          const channel = playerContext.player.getChannelStatus(target);
           if (channel != null && channel.kcode != null) {
             kcodes.push(channel.kcode);
             colors.push(

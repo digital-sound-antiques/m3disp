@@ -3,6 +3,9 @@ import { KSSPlayer } from "./kss/kss-player";
 import { MGSC, detectEncoding } from "mgsc-js";
 import { AudioPlayerState } from "webaudio-stream-player";
 import { KSS, KSSPlay } from "libkss-js";
+import { isIOS, isSafari } from "./utils/platform-detect";
+import { unmuteAudio } from "./utils/unmute";
+import { KSSChannelMask, KSSDeviceName } from "./kss/kss-device";
 
 export type PlayListEntry = {
   name: string;
@@ -20,9 +23,11 @@ export interface PlayerContextData {
   selectedIndex: number;
   entries: PlayListEntry[];
   isPlaying: boolean;
+  channelMask: KSSChannelMask;
   setMasterGain(value: number): void;
   setRepeatMode(mode: RepeatMode): Promise<void> | void;
   setSelectedIndex(index: number): Promise<void> | void;
+  setChannelMask(channelMask: KSSChannelMask): void;
   setEntries(
     entries: PlayListEntry[],
     selectedIndex?: number | null,
@@ -51,11 +56,23 @@ const emptyProgress = {
   isFulFilled: false,
 };
 
+function autoResumeAudioContext(audioContext: AudioContext) {
+  if (isIOS && isSafari) {
+    document.addEventListener("visibilitychange", () => {
+      console.debug(`${audioContext.state}`);
+      if ((audioContext.state as any) == "interrupted") {
+        console.debug("resume AudioContext");
+        /* unawaited */ audioContext.resume();
+      }
+    });
+  }
+}
+
 const createDefaultContextData = () => {
   const noop = (...args: any) => {
     throw new Error("Operation ndt attached");
   };
-  const audioContext = new AudioContext({sampleRate: 44100});
+  const audioContext = new AudioContext({ sampleRate: 44100, latencyHint: "interactive" });
   const model: PlayerContextData = {
     audioContext: audioContext,
     gainNode: new GainNode(audioContext),
@@ -64,7 +81,13 @@ const createDefaultContextData = () => {
     selectedIndex: 0,
     entries: [],
     isPlaying: false,
-    masterGain: 2.0,
+    masterGain: 4.0,
+    channelMask: {
+      psg: 0,
+      opl: 0,
+      opll: 0,
+      scc: 0,
+    },
     setMasterGain: noop,
     setRepeatMode: noop,
     setSelectedIndex: noop,
@@ -72,6 +95,7 @@ const createDefaultContextData = () => {
     setPlaying: noop,
     reorderEntry: noop,
     loadFiles: noop,
+    setChannelMask: noop,
     play: noop,
     pause: noop,
     resume: noop,
@@ -82,6 +106,8 @@ const createDefaultContextData = () => {
   model.gainNode.gain.value = model.masterGain;
   model.gainNode.connect(model.audioContext.destination);
   model.player.connect(model.gainNode);
+  autoResumeAudioContext(model.audioContext);
+
   return model;
 };
 
@@ -106,18 +132,18 @@ export class PlayerContextProvider extends React.Component<React.PropsWithChildr
 
   setMasterGain = (value: number) => {
     this.state.gainNode.gain.value = value;
-    this.setState({ ...this.state, masterGain: value });
+    this.setState((oldState) => ({ ...oldState, masterGain: value }));
   };
 
   setPlaying = (value: boolean) => {
     if (this.state.isPlaying != value) {
-      this.setState({ ...this.state, isPlaying: value });
+      this.setState((oldState) => ({ ...oldState, isPlaying: value }));
     }
   };
 
   setSelectedIndex = (value: number) => {
     if (this.state.selectedIndex != value) {
-      this.setState({ ...this.state, selectedIndex: value });
+      this.setState((oldState) => ({ ...oldState, selectedIndex: value }));
     }
   };
 
@@ -127,7 +153,10 @@ export class PlayerContextProvider extends React.Component<React.PropsWithChildr
     playIndex?: number | null
   ) => {
     await new Promise<void>((resolve) => {
-      this.setState({ ...this.state, entries, selectedIndex }, () => resolve());
+      this.setState(
+        (oldState) => ({ ...oldState, entries, selectedIndex }),
+        () => resolve()
+      );
     });
     if (playIndex != null) {
       await this.play(playIndex);
@@ -136,7 +165,7 @@ export class PlayerContextProvider extends React.Component<React.PropsWithChildr
 
   setRepeatMode = (value: RepeatMode) => {
     if (this.state.repeatMode != value) {
-      this.setState({ ...this.state, repeatMode: value });
+      this.setState((oldState) => ({ ...oldState, repeatMode: value }));
     }
   };
 
@@ -163,10 +192,16 @@ export class PlayerContextProvider extends React.Component<React.PropsWithChildr
     newEntries.splice(dstIndex, 0, removed);
 
     if (this.state.selectedIndex == srcIndex) {
-      this.setState({ ...this.state, entries: newEntries, selectedIndex: dstIndex });
+      this.setState((oldState) => ({ ...oldState, entries: newEntries, selectedIndex: dstIndex }));
     } else {
-      this.setState({ ...this.state, entries: newEntries });
+      this.setState((oldState) => ({ ...oldState, entries: newEntries }));
     }
+  };
+
+  setChannelMask = (channelMask: KSSChannelMask) => {
+    this.setState((oldState: PlayerContextData) => {
+      return { ...oldState, channelMask };
+    });
   };
 
   loadFiles = async (
@@ -183,9 +218,9 @@ export class PlayerContextProvider extends React.Component<React.PropsWithChildr
         const base64EncodedData = btoa(String.fromCharCode.apply(null, u8 as any));
         const mimeType = "application/octet-binary";
         const dataURI = `data:${mimeType};base64,${base64EncodedData}`;
-        const kss = new KSS(u8, '');
+        const kss = new KSS(u8, "");
         let name = kss.getTitle();
-        if (name == '') name = 'No Title';
+        if (name == "") name = "No Title";
         kss.release();
         incomingEntries.push({ name, url: dataURI });
       } catch (e) {
@@ -214,6 +249,12 @@ export class PlayerContextProvider extends React.Component<React.PropsWithChildr
   };
 
   play = async (index?: number | null) => {
+    unmuteAudio();
+
+    if (this.state.audioContext.state != "running") {
+      await this.state.audioContext.resume();
+    }
+
     if (index != null) {
       this.setSelectedIndex(index);
     }
@@ -221,14 +262,11 @@ export class PlayerContextProvider extends React.Component<React.PropsWithChildr
     if (url == null) {
       return;
     }
-    this.state.audioContext.resume();
     const res = await fetch(url);
     const data = await res.arrayBuffer();
-    await this.state.player.play({ data });
-    this.setState({
-      ...this.state,
-      isPlaying: true,
-    });
+    await this.state.player.play({ data, channelMask: this.state.channelMask });
+
+    this.setState((oldState) => ({ ...oldState, isPlaying: true }));
   };
 
   pause = async () => {
@@ -255,6 +293,7 @@ export class PlayerContextProvider extends React.Component<React.PropsWithChildr
 
   stop = async () => {
     await this.state.player.abort();
+    this.setState((oldState) => ({ ...oldState, isPlaying: false }));
   };
 
   render() {
@@ -268,6 +307,7 @@ export class PlayerContextProvider extends React.Component<React.PropsWithChildr
           setRepeatMode: this.setRepeatMode,
           setEntries: this.setEntries,
           reorderEntry: this.reorderEntry,
+          setChannelMask: this.setChannelMask,
           loadFiles: this.loadFiles,
           play: this.play,
           pause: this.pause,

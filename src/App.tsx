@@ -1,9 +1,7 @@
-import * as React from "react";
-import { ThemeProvider, createTheme } from "@mui/material/styles";
-import { useTheme } from "@mui/material/styles";
-import useMediaQuery from "@mui/material/useMediaQuery";
-import { default as MenuIcon } from "@mui/icons-material/Menu";
-import { KSSPlayer } from "./kss/kss-player";
+import { ThemeProvider, useTheme } from "@mui/material/styles";
+
+import MenuIcon from "@mui/icons-material/Menu";
+
 import {
   AppBar,
   Box,
@@ -14,8 +12,8 @@ import {
   Typography,
   Unstable_Grid2 as Grid,
   Stack,
-  Card,
   Divider,
+  useMediaQuery,
 } from "@mui/material";
 
 import "./App.css";
@@ -25,108 +23,122 @@ import { KeyboardList } from "./KeyboardList";
 import { WaveSliderCard } from "./WavePreview";
 import { FileDropContext } from "./FileDropContext";
 import { MoreVert } from "@mui/icons-material";
-import { VolumeCard } from "./VolumeCard";
-import { TimeSlider } from "./TimeSlider";
-
-const context = new AudioContext();
-const player = new KSSPlayer("worklet");
-
-const appTheme = createTheme({
-  palette: {
-    mode: "dark",
-    primary: {
-      main: "#00D0BE",
-      // main: "#0080FF",
-    },
-    secondary: {
-      main: "#FF66BA",
-    },
-    background: {
-      default: "#223",
-      paper: "#444",
-    },
-  },
-  breakpoints: {
-    values: {
-      xs: 0,
-      sm: 600,
-      md: 960,
-      lg: 1200,
-      xl: 1536,
-    },
-  },
-});
+import { VolumeControl } from "./VolumeControl";
+import { PlayerContext } from "./PlayerContext";
+import { SettingsDialog } from "./SettingsDialog";
+import { AppContext } from "./AppContext";
+import { Fragment, useContext, useEffect, useRef, useState } from "react";
+import { OptionMenu } from "./OptionMenu";
 
 const gap = { xs: 0, sm: 1, md: 1.5, lg: 2 };
 
 export function App() {
+  const app = useContext(AppContext);
+  return (
+    <ThemeProvider theme={app.theme}>
+      <CssBaseline />
+      <AppRoot />
+    </ThemeProvider>
+  );
+}
+
+function AppRoot() {
   const theme = useTheme();
   const isXs = useMediaQuery(theme.breakpoints.down("sm"));
+  return (
+    <Fragment>
+      <SettingsDialog id="settings-dialog" />
+      <OptionMenu id="option-menu" />
+      {isXs ? <AppRootMobile /> : <AppRootDesktop />};
+    </Fragment>
+  );
+}
+
+function MobileAppBar() {
+  const theme = useTheme();
+  const app = useContext(AppContext);
+  const moreIconRef = useRef(null);
 
   return (
-    <ThemeProvider theme={appTheme}>
-      <CssBaseline />
-      {isXs ? <AppRootMobile /> : <AppRootDesktop />}
-    </ThemeProvider>
+    <AppBar component="nav" sx={{ backgroundColor: theme.palette.background.default }}>
+      <Toolbar>
+        <IconButton edge="start" color="inherit" aria-label="menu" sx={{ mr: 2 }}>
+          <MenuIcon />
+        </IconButton>
+        <Box sx={{ flexGrow: 1 }}></Box>
+        <Box sx={{ width: "128px", mx: 2 }}>
+          <VolumeControl />
+        </Box>
+        <IconButton
+          ref={moreIconRef}
+          edge="end"
+          onClick={() => {
+            app.openPopup("option-menu", moreIconRef.current!);
+          }}
+        >
+          <MoreVert />
+        </IconButton>
+      </Toolbar>
+    </AppBar>
   );
 }
 
 function AppRootMobile() {
   return (
-    <FileDropContext>
-      <Box sx={{ position: "absolute", top: 0, bottom: 0, left: 0, right: 0, margin: 0 }}>
-        <Card sx={{ width: "100%", height: "100%" }}>
-          <Toolbar>
-            <IconButton edge="start" color="inherit" aria-label="menu" sx={{ mr: 2 }}>
-              <MenuIcon />
-            </IconButton>
-            <Typography variant="h6" color="inherit" component="div" sx={{ flexGrow: 1 }}>
-              M3disp
-            </Typography>
-            <IconButton edge="end">
-              <MoreVert />
-            </IconButton>
-          </Toolbar>
-          <Box
-            sx={{
-              display: "flex",
-              flexDirection: "column",
-              alignItems: "stretch",
-              position: "absolute",
-              top: 48,
-              left: 0,
-              right: 0,
-              bottom: 0,
-            }}
-          >
-            <KeyboardList spacing={0} />
-            <TimeSlider />
-            <PlayControl small={true} />
-            <Box sx={{ pt: 2 }} />
-            <Divider />
-            <Box sx={{ position: "relative", flexGrow: 1 }}>
-              <PlayList toolbarAlignment="bottom" />
-            </Box>
-          </Box>
-        </Card>
+    <Box sx={{ position: "absolute", top: 0, bottom: 0, left: 0, right: 0 }}>
+      <MobileAppBar />
+      <Box
+        sx={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "stretch",
+          position: "absolute",
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: "#444",
+        }}
+      >
+        <Toolbar />
+        <KeyboardList spacing={0} />
+        <Box sx={{ position: "relative", flexGrow: 1 }}>
+          <PlayList />
+        </Box>
+        <Box sx={{ p: 1, boxShadow: "0 0 2px 0px #00000080" }}>
+          <PlayControl small={true} />
+        </Box>
       </Box>
-    </FileDropContext>
+    </Box>
   );
 }
 
 function DesktopAppBar() {
+  const theme = useTheme();
+  const moreIconRef = useRef(null);
+  const app = useContext(AppContext);
+
   return (
-    <AppBar component="nav" sx={{ backgroundColor: appTheme.palette.background.default }}>
+    <AppBar component="nav" sx={{ backgroundColor: theme.palette.background.default }}>
       <Container maxWidth="xl" sx={{ minWidth: "320px" }}>
         <Toolbar variant="regular">
           <IconButton edge="start" color="inherit" aria-label="menu" sx={{ mr: 2 }}>
             <MenuIcon />
           </IconButton>
           <Typography variant="h6" color="inherit" component="div">
-            M3disp
+            M<sub>3</sub>disp
           </Typography>
           <Box sx={{ flexGrow: 1 }} />
-          <IconButton edge="end">
+          <Box sx={{ width: "128px", mx: 2 }}>
+            <VolumeControl />
+          </Box>
+          <IconButton
+            ref={moreIconRef}
+            edge="end"
+            onClick={() => {
+              app.openPopup("option-menu", moreIconRef.current!);
+            }}
+          >
             <MoreVert />
           </IconButton>
         </Toolbar>
@@ -136,12 +148,13 @@ function DesktopAppBar() {
 }
 
 function AppRootDesktop() {
-  const [panelHeight, setPanelHeight] = React.useState<number | null>(null);
-  const leftPaneRef = React.useRef<HTMLDivElement>(null);
+  const context = useContext(PlayerContext);
+  const [panelHeight, setPanelHeight] = useState<number | null>(null);
+  const leftPaneRef = useRef<HTMLDivElement>(null);
 
   const onResize = () => setPanelHeight(leftPaneRef.current!.clientHeight);
   const resizeObserver = new ResizeObserver(onResize);
-  React.useEffect(() => {
+  useEffect(() => {
     resizeObserver.observe(leftPaneRef.current!);
     return () => {
       resizeObserver.disconnect();
@@ -171,7 +184,7 @@ function AppRootDesktop() {
         <FileDropContext>
           <Grid container spacing={gap} sx={{ height: "100%" }}>
             <Grid xs={12} sm={7} md={8} lg={8.5} xl={9}>
-              <Stack ref={leftPaneRef} sx={{ gap }}>
+              <Stack ref={leftPaneRef} spacing={gap}>
                 <KeyboardList spacing={gap} />
               </Stack>
             </Grid>
@@ -179,12 +192,12 @@ function AppRootDesktop() {
               <Stack
                 sx={{
                   gap,
+                  minHeight: { sm: "580px", md: null },
                   height: panelHeight,
                 }}
               >
                 <WaveSliderCard />
                 <PlayControlCard />
-                <VolumeCard />
                 <PlayListCard />
               </Stack>
             </Grid>
@@ -195,9 +208,14 @@ function AppRootDesktop() {
           component="footer"
           sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}
         >
-          <Typography variant="caption">
-            M3disp - Copyright (C) 2023 Digital Sound Antiques.
-          </Typography>
+          <Stack direction="row" sx={{ width: "100%", justifyContent: "space-between" }}>
+            <Typography variant="caption">
+              M<sub>3</sub>disp - Copyright (C) 2023 Digital Sound Antiques.
+            </Typography>
+            <Typography variant="caption">
+              Speaker Latency: {context.player.outputLatency}ms
+            </Typography>
+          </Stack>
         </Box>
       </Container>
     </Box>

@@ -15,7 +15,7 @@
     "@fontsource/roboto": "^4.5.8",
     "@mui/icons-material": "^5.11.11",
     "@mui/material": "^5.12.0",
-    "libkss-js": "^2.1.0",
+    "libkss-js": "2.2.0-beta.0",
     "mgsc-js": "^2.0.0-beta.1",
     "mgsrc-js": "^2.0.0",
     "react": "^18.2.0",

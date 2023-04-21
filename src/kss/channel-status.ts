@@ -1,4 +1,5 @@
-import { KSSPlayer, KSSDeviceName } from "./kss-player";
+import { KSSPlayer } from "./kss-player";
+import { KSSDeviceName } from "./kss-device";
 
 export type ChannelStatus = {
   freq: number;
@@ -164,11 +165,11 @@ function createOPLLStatus(
   }
 }
 
-export function getChannelStatus(player: KSSPlayer, id: ChannelId): ChannelStatus {
+export function getChannelStatus(player: KSSPlayer, id: ChannelId): ChannelStatus | null {
   const currentFrame = player.progress?.renderer?.currentFrame ?? 0;
   const snapshot = player.findSnapshotAt(currentFrame);
-  if (snapshot == null || player.state == "stopped") {
-    return { freq: 0, vol: 0 };
+  if (snapshot == null || player.state == "stopped" || player.state == "aborted") {
+    return null;
   }
 
   switch (id.device) {

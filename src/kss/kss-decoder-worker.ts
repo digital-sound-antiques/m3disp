@@ -1,5 +1,6 @@
 import { KSS, KSSPlay } from "libkss-js";
 import { AudioDecoderWorker } from "webaudio-stream-player";
+import { KSSChannelMask } from "./kss-device";
 
 export type KSSDecoderStartOptions = {
   data: Uint8Array | ArrayBuffer | ArrayBufferLike | ArrayLike<number>;
@@ -14,6 +15,10 @@ export type KSSDecoderStartOptions = {
   };
   debug?: boolean | null;
   loop?: number | null;
+  channelMask?: KSSChannelMask;
+  opllMask?: number | null;
+  psgMask?: number | null;
+  sccMask?: number | null;
 };
 
 export type KSSDecoderDeviceSnapshot = {
@@ -65,6 +70,13 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     } else {
       this._kssplay.setRCF(0, 0);
     }
+
+    console.log(this._kssplay.setChannelMask);
+
+    this._kssplay.setChannelMask('psg', args.channelMask?.psg ?? 0);
+    this._kssplay.setChannelMask('scc', args.channelMask?.scc ?? 0);
+    this._kssplay.setChannelMask('opll', args.channelMask?.opll ?? 0);
+    this._kssplay.setChannelMask('opl', args.channelMask?.opl ?? 0);
 
     this._fadeDuration = args.fadeDuration ?? this._fadeDuration;
     this._maxDuration = args.duration ?? this._maxDuration;

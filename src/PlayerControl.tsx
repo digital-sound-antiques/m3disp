@@ -7,6 +7,7 @@ import {
   Repeat,
   SkipNext,
   RepeatOne,
+  Stop,
 } from "@mui/icons-material";
 import { PlayerContext, RepeatMode } from "./PlayerContext";
 import { useContext, useEffect, useState } from "react";
@@ -89,11 +90,18 @@ export function PlayControl(props: { small: boolean }) {
         </IconButton>
         <IconButton
           onClick={() => {
+            context.stop();
+          }}
+        >
+          <Stop/>
+        </IconButton>
+        {/* <IconButton
+          onClick={() => {
             context.setRepeatMode(getNextRepeatMode(context.repeatMode));
           }}
         >
           {getRepeatIcon(context.repeatMode)}
-        </IconButton>
+        </IconButton> */}
         <IconButton onClick={() => context.next()}>
           <SkipNext />
         </IconButton>
