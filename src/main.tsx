@@ -5,17 +5,20 @@ import "@fontsource/roboto/700.css";
 
 import React from "react";
 import ReactDOM from "react-dom/client";
-import { App } from "./App";
+import { App } from "./views/App";
 import "./index.css";
-import { PlayerContextProvider } from "./PlayerContext";
-import { AppContextProvider } from "./AppContext";
+import { PlayerContextProvider } from "./contexts/PlayerContext";
+import { AppContextProvider } from "./contexts/AppContext";
+import { AppProgressContextProvider } from "./contexts/AppProgressContext";
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
     <AppContextProvider>
-      <PlayerContextProvider>
-        <App />
-      </PlayerContextProvider>
+      <AppProgressContextProvider>
+        <PlayerContextProvider>
+          <App />
+        </PlayerContextProvider>
+      </AppProgressContextProvider>
     </AppContextProvider>
   </React.StrictMode>
 );

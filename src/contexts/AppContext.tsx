@@ -1,6 +1,7 @@
 import { Theme, createTheme } from "@mui/material";
 import { pink, teal } from "@mui/material/colors";
-import { PropsWithChildren, createContext, useState } from "react";
+import { PropsWithChildren, createContext, useEffect, useState } from "react";
+import AppGlobal from "./AppGlobal";
 
 const defaultTheme = createTheme({
   palette: {
@@ -11,11 +12,14 @@ const defaultTheme = createTheme({
     secondary: {
       main: pink['A200'],
     },
-    background: {
-      default: "#121212",
-      paper: "#333340",
-    },
+    // background: {
+    //   default: "#131313",
+    //   paper: "#222222",
+    // },
   },
+  // shape: {
+  //   borderRadius: 0,
+  // },
   breakpoints: {
     values: {
       xs: 0,
@@ -94,6 +98,7 @@ export function AppContextProvider(props: PropsWithChildren) {
       palette.primary.main = id;
       return { ...oldState, theme: { ...oldState.theme, palette } };
     });
+    localStorage.setItem("m3disp.palette.primary.main", id);
   };
 
   const setSecondaryColor = (id: string) => {
@@ -102,9 +107,24 @@ export function AppContextProvider(props: PropsWithChildren) {
       palette.secondary.main = id;
       return { ...oldState, theme: { ...oldState.theme, palette } };
     });
+    localStorage.setItem("m3disp.palette.secondary.main", id);
   };
 
   const [state, setState] = useState(defaultContextData);
+  const [initialized, setInitialized] = useState(false);
+
+  const initialize = async () => {
+    await AppGlobal.initialize();
+    setInitialized(true);
+  }
+
+  useEffect(() => {
+    console.log(`mount AppContextProvider`);
+    initialize();
+    state.theme.palette.primary.main = localStorage.getItem("m3disp.palette.primary.main") ?? teal[300];
+    state.theme.palette.secondary.main = localStorage.getItem("m3disp.palette.secondary.main") ?? pink[300];
+    return () => { console.log(`ummount AppContextProvider`); }
+  }, []);
 
   return (
     <AppContext.Provider
@@ -118,8 +138,8 @@ export function AppContextProvider(props: PropsWithChildren) {
         setPrimaryColor,
         setSecondaryColor,
       }}
-    >
-      {props.children}
+    >      
+      {initialized ? props.children : null}
     </AppContext.Provider>
   );
 }

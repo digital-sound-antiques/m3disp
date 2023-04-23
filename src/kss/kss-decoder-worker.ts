@@ -71,12 +71,10 @@ class KSSDecoderWorker extends AudioDecoderWorker {
       this._kssplay.setRCF(0, 0);
     }
 
-    console.log(this._kssplay.setChannelMask);
-
-    this._kssplay.setChannelMask('psg', args.channelMask?.psg ?? 0);
-    this._kssplay.setChannelMask('scc', args.channelMask?.scc ?? 0);
-    this._kssplay.setChannelMask('opll', args.channelMask?.opll ?? 0);
-    this._kssplay.setChannelMask('opl', args.channelMask?.opl ?? 0);
+    this._kssplay.setChannelMask("psg", args.channelMask?.psg ?? 0);
+    this._kssplay.setChannelMask("scc", args.channelMask?.scc ?? 0);
+    this._kssplay.setChannelMask("opll", args.channelMask?.opll ?? 0);
+    this._kssplay.setChannelMask("opl", args.channelMask?.opl ?? 0);
 
     this._fadeDuration = args.fadeDuration ?? this._fadeDuration;
     this._maxDuration = args.duration ?? this._maxDuration;
@@ -110,14 +108,29 @@ class KSSDecoderWorker extends AudioDecoderWorker {
           this._opllKeyStatus[ch] = newKeyStatus;
           this._opllKeyEdgeHints[ch] = true;
         }
-      } else if (this._opllAdr == 0x0e) {
-        for (let ch = 9; ch <= 13; ch++) {
-          const newKeyStatus = (d & (0x10 >> (ch - 9))) != 0;
+      }
+      if (this._opllAdr == 0x0e) {
+        for (let ch = 9; ch < 14; ch++) {
+          let newKeyStatus = (d & 0x20) != 0;
+
+          if (ch == 9) {
+            newKeyStatus &&= (d & 0x10) != 0 || this._opllKeyStatus[6];
+          }
+          if (ch == 10) {
+            newKeyStatus &&= (d & 0x8) != 0 || this._opllKeyStatus[7];
+          }
+          if (ch == 11) {
+            newKeyStatus &&= (d & 0x4) == 0 || this._opllKeyStatus[8];
+          }
+          if (ch == 12) {
+            newKeyStatus &&= (d & 0x2) == 0 || this._opllKeyStatus[8];
+          }
+          if (ch == 13) {
+            newKeyStatus &&= (d & 0x1) == 0 || this._opllKeyStatus[7];
+          }
           if (newKeyStatus != this._opllKeyStatus[ch]) {
             this._opllKeyStatus[ch] = newKeyStatus;
-            if (!newKeyStatus) {
-              this._opllKeyEdgeHints[ch] = true;
-            }
+            this._opllKeyEdgeHints[ch] = true;
           }
         }
       }
@@ -142,7 +155,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
 
   _updateKeyOnFrames(step: number) {
     for (let i = 0; i < 14; i++) {
-      if (this._opllKeyEdgeHints[i] == true) {
+      if (this._opllKeyEdgeHints[i]) {
         this._opllKeyKeepFrames[i] = 0;
       } else {
         this._opllKeyKeepFrames[i] += step;

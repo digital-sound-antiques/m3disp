@@ -1,26 +1,21 @@
-import React, { Fragment, RefObject, useContext, useState } from "react";
 import {
-  useTheme,
   Box,
+  Button,
+  Checkbox,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  Divider,
   Tab,
   Tabs,
   Typography,
-  Button,
-  Dialog,
-  DialogContent,
-  DialogActions,
-  Checkbox,
-  Divider,
-  List,
-  ListItem,
-  Switch,
-  ListItemText,
+  useTheme
 } from "@mui/material";
-import { AppContext } from "./AppContext";
-import { ColorSelector } from "./ColorSelector";
 import Grid2 from "@mui/material/Unstable_Grid2/Grid2";
-import { SettingsContext, SettingsContextProvider } from "./SettingsContext";
-import { ArrowDropDown } from "@mui/icons-material";
+import React, { Fragment, useContext, useState } from "react";
+import { AppContext } from "../contexts/AppContext";
+import { SettingsContext, SettingsContextProvider } from "../contexts/SettingsContext";
+import { ColorSelector } from "../widgets/ColorSelector";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -81,22 +76,7 @@ function ChannelMaskSheet(props: {
 function MaskPanel(props: TabPanelProps) {
   const psgs = ["PSG1", "PSG2", "PSG3"];
   const sccs = ["SCC1", "SCC2", "SCC3", "SCC4", "SCC5"];
-  const oplls = [
-    "OPLL1",
-    "OPLL2",
-    "OPLL3",
-    "OPLL4",
-    "OPLL5",
-    "OPLL6",
-    "OPLL7",
-    "OPLL8",
-    "OPLL9",
-    "BD",
-    "SD",
-    "TOM",
-    "CYM",
-    "HH",
-  ];
+  const oplls = ["OPLL1", "OPLL2", "OPLL3", "OPLL4", "OPLL5", "OPLL6", "OPLL7", "OPLL8", "OPLL9"];
 
   const context = useContext(SettingsContext);
 
@@ -106,6 +86,32 @@ function MaskPanel(props: TabPanelProps) {
       newMask = context.channelMask.opll &= ~(1 << ch);
     } else {
       newMask = context.channelMask.opll |= 1 << ch;
+    }
+    /* Copy FM mask to rhythm mask. */
+    if (ch == 6) {
+      // copy bit6 to bit 13
+      const m = (1 << 13);
+      if (newMask & (1 << 6)) {
+        newMask |= m;
+      } else {
+        newMask &= ~m;
+      }
+    } else if (ch == 7) {
+      // copy bit7 to bit 9, 12 (HH/SD)
+      const m = (1<<9) | (1<<12);
+      if (newMask & (1 << 7)) {
+        newMask |= m;
+      } else {
+        newMask &= ~m;
+      } 
+    } else if (ch == 8) {
+      // copy bit8 to bit 10, 11 (CYM/TOM)
+      const m = (1<<10) | (1<<11);
+      if (newMask & (1 << 8)) {
+        newMask |= m;
+      } else {
+        newMask &= ~m;
+      } 
     }
     context.setChannelMask({ ...context.channelMask, opll: newMask });
   };
@@ -194,6 +200,7 @@ function SettingsDialogBody(props: { id: string }) {
     app.setPrimaryColor(savedPrimaryColor);
     app.setSecondaryColor(savedSecondaryColor);
     app.closeDialog(props.id);
+    settings.revert();
   };
   const onOk = () => {
     app.closeDialog(props.id);

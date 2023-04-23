@@ -9,7 +9,7 @@ import {
   RepeatOne,
   Stop,
 } from "@mui/icons-material";
-import { PlayerContext, RepeatMode } from "./PlayerContext";
+import { PlayerContext, RepeatMode } from "../contexts/PlayerContext";
 import { useContext, useEffect, useState } from "react";
 import { AudioPlayerState } from "webaudio-stream-player";
 

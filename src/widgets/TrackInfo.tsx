@@ -1,12 +1,13 @@
 import { Box, Stack, SxProps, Theme, Typography, useTheme } from "@mui/material";
 import { useContext, useEffect, useRef, useState } from "react";
-import { ChannelId, ChannelStatus } from "./kss/channel-status";
-import { PlayerContext } from "./PlayerContext";
+import { ChannelId, ChannelStatus } from "../kss/channel-status";
+import { PlayerContext } from "../contexts/PlayerContext";
 
 type TrackInfoPanelProps = {
   title: string;
   targets: ChannelId[];
   sx?: SxProps<Theme> | null;
+  disabled: boolean;
 };
 
 type VolumeIndicatorProps = {
@@ -45,9 +46,10 @@ export function VolumeIndicator(props: VolumeIndicatorProps) {
     const canvas = context.canvas;
 
     const step = canvas.width / 15;
-    context.fillStyle = "#333";
+    context.fillStyle = "#223";
     context.fillRect(0, 0, canvas.width, canvas.height);
     context.beginPath();
+
     let v;
     if (props.keyKeepFrames != null) {
       const decayCycle = props.kcode != null ? 90 : 15;
@@ -58,12 +60,12 @@ export function VolumeIndicator(props: VolumeIndicatorProps) {
       v = props.volume;
     }
 
-    const cw = step / 3;
+    const cw = step / 2;
 
     for (let i = 1; i < 16; i++) {
       const dx = (i - 1) * step + cw;
       if (i == props.volume) {
-        context.fillStyle = `${props.primaryColor}e0`;
+        context.fillStyle = `${props.secondaryColor}e0`;
         context.fillRect(dx, 0, cw, canvas.height);
       } else if (i < v) {
         context.fillStyle = `${props.primaryColor}d0`;
@@ -78,7 +80,7 @@ export function VolumeIndicator(props: VolumeIndicatorProps) {
     <Box
       ref={boxRef}
       sx={{
-        position: "absolute",
+        position: "relative",
         display: "flex",
         flexDirection: "row",
         alignItems: "center",
@@ -86,15 +88,15 @@ export function VolumeIndicator(props: VolumeIndicatorProps) {
         bottom: 0,
         left: 0,
         right: 0,
-        mr: 1,
+        width: "100%",
+        height: "100%",
       }}
     >
       <canvas
         ref={canvasRef}
         style={{
           width: size.width + "px",
-          height: size.height - 2 + "px",
-          border: "1px solid #333",
+          height: size.height + "px",
         }}
       />
     </Box>
@@ -161,14 +163,13 @@ export function WaveIndicator(props: WaveIndicatorProps) {
         bottom: 0,
         left: 0,
         right: 0,
-        mr: 1,
       }}
     >
       <canvas
         ref={canvasRef}
         style={{
           width: size.width + "px",
-          height: size.height - 2 + "px",
+          height: size.height + "px",
         }}
       />
     </Box>
@@ -181,127 +182,152 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
 
   const [status, setStatus] = useState<ChannelStatus | null>(null);
   const rootRef = useRef(null);
+  const disabledRef = useRef(props.disabled);
 
   const renderFrame = () => {
     if (rootRef.current != null) {
       requestAnimationFrame(renderFrame);
-      for (const target of props.targets) {
-        const status = context.player.getChannelStatus(target);
-        setStatus(status);
+      if (!disabledRef.current) {
+        for (const target of props.targets) {
+          const status = context.player.getChannelStatus(target);
+          if (status != null) {
+            setStatus(status);
+          }
+        }
+      } else {
+        setStatus({ freq: 0, vol: 0 });
       }
     }
   };
 
   useEffect(() => {
-    renderFrame();
-  }, []);
+    requestAnimationFrame(renderFrame);
+    disabledRef.current = props.disabled;
+  }, [props.disabled]);
 
   let voiceNode = null;
-  let volHeight;
-  let voiceHeight;
 
   if (props.targets[0].device != "scc") {
     if (typeof status?.voice == "string") {
       voiceNode = (
         <Typography
-          color="#ccc"
-          variant="caption"
-          textAlign="right"
-          fontSize={{ md: "7px", lg: "10px" }}
+          color={theme.palette.primary.main + "c0"}
+          fontSize={{ sm: "7px", md: "9px", lg: "12px", xl: "13px" }}
+          fontWeight="bold"
         >
-          {status.voice.toUpperCase()}
+          {status.voice}
         </Typography>
       );
     }
-    volHeight = "45%";
-    voiceHeight = "40%";
   } else {
     if (status?.voice instanceof Uint8Array) {
       voiceNode = <WaveIndicator wave={status?.voice} color={theme.palette.primary.main} />;
     }
-    volHeight = "30%";
-    voiceHeight = "70%";
   }
 
   return (
-    <Stack
-      ref={rootRef}
-      direction="row"
-      sx={{
-        minWidth: "128px",
-        width: "20%",
-        gap: 0,
-        ...props.sx,
-      }}
-    >
+    <Box ref={rootRef} sx={{ display: "flex", position: "relative", width: "15%" }}>
       <Box
         sx={{
+          flex: 1,
           position: "relative",
-          p: { md: 0.5, lg: 1 },
-          flex: 0,
-          flexBasis: { md: "48px", lg: "64px" },
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "start",
+          p: { sm: 0.5, xl: 1 },
         }}
       >
         <Box
           sx={{
-            display: "flex",
-            height: "100%",
-            justifyContent: "center",
-            alignItems: "center",
-            backgroundColor: "#333",
-            borderRadius: "2px",
+            fontSize: { sm: "6px", lg: "8px", xl: "10px" },
+            fontWeight: "bold",
+            color: "#c0c0c0",
           }}
         >
-          <Box
-            sx={{
-              color: theme.palette.primary.main,
-              opacity: 0.66,
-              fontWeight: "bold",
-              fontSize: { md: "10px", lg: "13px" },
-            }}
-          >
-            {props.title}
-          </Box>
+          {props.title}
+        </Box>
+        <Box
+          sx={{
+            display: "flex",
+            position: "relative",
+            width: "100%",
+            height: "100%",
+            justifyContent: "start",
+            alignItems: "start",
+          }}
+        >
+          {voiceNode}
         </Box>
       </Box>
-      <Box sx={{ position: "relative", py: { md: 0.5, lg: 1 }, flex: 1 }}>
-        <Box sx={{ display: "flex", position: "relative", width: "100%", height: "100%" }}>
-          <Box
-            sx={{
-              display: "flex",
-              position: "absolute",
-              left: 0,
-              right: 0,
-              top: 0,
-              height: volHeight,
-              justifyContent: "stretch",
-              alignItems: "stretch",
-            }}
-          >
-            <VolumeIndicator
-              volume={status?.vol ?? 0}
-              kcode={status?.kcode}
-              keyKeepFrames={status?.keyKeepFrames ?? 0}
-              primaryColor={theme.palette.primary.main}
-              secondaryColor={theme.palette.secondary.main}
-            />
-          </Box>
-          <Box
-            sx={{
-              display: "flex",
-              position: "absolute",
-              left: 0,
-              right: 0,
-              bottom: 0,
-              height: voiceHeight,
-              justifyContent: "start",
-              alignItems: "center",
-            }}
-          >
-            {voiceNode}
-          </Box>
-        </Box>
-      </Box>
-    </Stack>
+    </Box>
+  );
+}
+
+type VolumeInfoPanelProps = {
+  small?: boolean | null;
+  targets: ChannelId[];
+  sx?: SxProps<Theme> | null;
+  disabled: boolean;
+};
+
+export function VolumeInfoPanel(props: VolumeInfoPanelProps) {
+  const theme = useTheme();
+  const context = useContext(PlayerContext);
+
+  const [status, setStatus] = useState<ChannelStatus | null>(null);
+  const rootRef = useRef(null);
+  const disabledRef = useRef(props.disabled);
+
+  const renderFrame = () => {
+    if (rootRef.current != null) {
+      requestAnimationFrame(renderFrame);
+      if (!disabledRef.current) {
+        let nextStatus: ChannelStatus = { freq: 0, vol: 0 };
+        for (const target of props.targets) {
+          const newStatus = context.player.getChannelStatus(target);
+          if (newStatus != null) {
+            if (nextStatus.vol < newStatus.vol) {
+              nextStatus.vol = newStatus.vol;
+            }
+            if (
+              nextStatus.keyKeepFrames == null ||
+              nextStatus.keyKeepFrames > (newStatus.keyKeepFrames ?? 0)
+            ) {
+              nextStatus.keyKeepFrames = newStatus.keyKeepFrames ?? 0;
+            }
+          }
+        }
+        setStatus(nextStatus);
+      } else {
+        setStatus({ freq: 0, vol: 0 });
+      }
+    }
+  };
+
+  useEffect(() => {
+    requestAnimationFrame(renderFrame);
+    disabledRef.current = props.disabled;
+  }, [props.disabled]);
+
+  return (
+    <Box
+      ref={rootRef}
+      sx={{
+        display: "flex",
+        position: "releative",
+        width: props.small ? "32px" : "64px",
+        height: "100%",
+        justifyContent: "stretch",
+        alignItems: "stretch",
+      }}
+    >
+      <VolumeIndicator
+        volume={status?.vol ?? 0}
+        kcode={status?.kcode}
+        keyKeepFrames={status?.keyKeepFrames ?? 0}
+        primaryColor={theme.palette.primary.main}
+        secondaryColor={theme.palette.secondary.main}
+      />
+    </Box>
   );
 }

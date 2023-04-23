@@ -1,5 +1,5 @@
 import { useContext } from "react";
-import { PlayerContext } from "./PlayerContext";
+import { PlayerContext } from "../contexts/PlayerContext";
 import { Card, Slider, Stack } from "@mui/material";
 import { VolumeDown, VolumeUp } from "@mui/icons-material";
 

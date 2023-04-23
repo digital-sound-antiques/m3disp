@@ -15,45 +15,18 @@ import {
 } from "@mui/material";
 import { DeleteSweepOutlined, Pause, PlayArrow, PlaylistAdd, Remove } from "@mui/icons-material";
 
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useRef, useState } from "react";
 
-import { parseMGSTitle } from "mgsrc-js";
-import { PlayerContext, PlayListEntry } from "./PlayerContext";
+import { PlayerContext } from "../contexts/PlayerContext";
 import { DragDropContext, Draggable, DropResult } from "react-beautiful-dnd";
-import { StrictModeDroppable as Droppable } from "./StrictModeDroppable";
+import { StrictModeDroppable as Droppable } from "../widgets/StrictModeDroppable";
 
 import { FileDrop } from "react-file-drop";
-import { useFileDrop } from "./FileDropContext";
-
-async function loadEntries(urls: string[]): Promise<PlayListEntry[]> {
-  const entries: PlayListEntry[] = [];
-  for (const url of urls) {
-    const res = await fetch(url);
-    let name = parseMGSTitle(await res.arrayBuffer());
-    if (name == "") {
-      name = url.split("/").pop() ?? "Uknown Title"!;
-    }
-    entries.push({ name, url });
-  }
-  return entries;
-}
-
-const mgsUrls = [
-  "./mgs/captain.mgs",
-  "./mgs/captain2.mgs",
-  "./mgs/car.mgs",
-  "./mgs/imastown.mgs",
-  "./mgs/blue_skies.mgs",
-  "./mgs/act13_ex.mgs",
-  "./mgs/xak_30.mgs",
-];
+import { useFileDrop } from "../contexts/FileDropContext";
+import { Marquee } from "../widgets/Marquee";
 
 export function PlayListBody(props: { deleteMode: boolean; sx?: SxProps<Theme> | null }) {
   const context = useContext(PlayerContext);
-
-  const _init = async () => {
-    await context.setEntries(await loadEntries(mgsUrls));
-  };
 
   const _play = async (index: number) => {
     context.play(index);
@@ -64,12 +37,6 @@ export function PlayListBody(props: { deleteMode: boolean; sx?: SxProps<Theme> |
     entries.splice(index, 1);
     context.setEntries(entries);
   };
-
-  useEffect(() => {
-    if (context.entries.length == 0) {
-      _init();
-    }
-  }, []);
 
   const [isListItemDragging, setListItemDragging] = useState(false);
 
@@ -90,7 +57,7 @@ export function PlayListBody(props: { deleteMode: boolean; sx?: SxProps<Theme> |
     <Box sx={{ flex: 1, overflow: "auto", ...props.sx }}>
       <DragDropContext onDragStart={onListItemDragStart} onDragEnd={onListItemDragEnd}>
         <Droppable droppableId="dnd-list">
-          {(provided, snapshot) => {
+          {(provided) => {
             return (
               <List ref={provided.innerRef} {...provided.droppableProps}>
                 {context.entries.map((e, index) => {
@@ -108,9 +75,10 @@ export function PlayListBody(props: { deleteMode: boolean; sx?: SxProps<Theme> |
                           _play(index);
                         }
                   );
+
                   return (
                     <Draggable key={index} draggableId={`${index}`} index={index}>
-                      {(provided, snapshot) => (
+                      {(provided) => (
                         <ListItem
                           ref={provided.innerRef}
                           {...provided.draggableProps}
@@ -125,12 +93,17 @@ export function PlayListBody(props: { deleteMode: boolean; sx?: SxProps<Theme> |
                             }}
                           >
                             <ListItemText disableTypography={true}>
-                              <Typography
-                                sx={{ fontWeight: "bold", fontSize: "0.9rem" }}
-                                noWrap={true}
-                              >
-                                {e.name}
-                              </Typography>
+                              <Marquee play={selected}>
+                                <Typography
+                                  sx={{
+                                    fontWeight: "bold",
+                                    fontSize: { xs: "1rem", sm: "0.8rem" },
+                                  }}
+                                  noWrap={true}
+                                >
+                                  {e.title}
+                                </Typography>
+                              </Marquee>
                             </ListItemText>
                           </ListItemButton>
                         </ListItem>
@@ -260,7 +233,7 @@ function createSecondaryAction(
   );
 }
 
-export function PlayList(props: { toolbarAlignment?: "top" | "bottom" }) {
+export function PlayListView(props: { toolbarAlignment?: "top" | "bottom" }) {
   const { fileDropRef, fileDropProps, isDraggingOver, onFileInputChange } = useFileDrop(false);
   const border = isDraggingOver ? `2px solid` : null;
   const [deleteMode, setDeleteMode] = useState(false);
@@ -326,7 +299,7 @@ export function PlayListCard() {
         alignItems: "stretch",
       }}
     >
-      <PlayList />
+      <PlayListView />
     </Card>
   );
 }

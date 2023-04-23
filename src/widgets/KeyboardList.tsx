@@ -1,8 +1,10 @@
-import { Box, Card, Stack, SxProps, Typography, useMediaQuery, useTheme } from "@mui/material";
+import { Card, Stack, useMediaQuery, useTheme } from "@mui/material";
 import { Keyboard } from "./Keyboard";
-import { TrackInfoPanel } from "./TrackInfo";
-import { KSSDeviceName } from "./kss/kss-player";
-import { ChannelId } from "./kss/channel-status";
+import { TrackInfoPanel, VolumeInfoPanel } from "./TrackInfo";
+import { ChannelId } from "../kss/channel-status";
+import { KSSDeviceName } from "../kss/kss-device";
+import { useContext } from "react";
+import { PlayerContext } from "../contexts/PlayerContext";
 
 type DeviceCardProps = {
   name: string;
@@ -13,8 +15,16 @@ type DeviceCardProps = {
 };
 
 function DeviceCard(props: DeviceCardProps) {
+
+  const context = useContext(PlayerContext);
+
+  const masks = context.channelMask[props.device];
+  
   const res = [];
-  for (let i = 0; i < props.targets.length; i++) {
+  for (let i = 0; i < props.targets.length; i++) {    
+
+    const mask = (masks & (1 << i)) != 0;
+
     let target = props.targets[i];
     if (typeof target == "number") {
       target = [target];
@@ -32,10 +42,12 @@ function DeviceCard(props: DeviceCardProps) {
           width: "100%",
           overflow: "hidden",
           borderBottom: "1px solid #383838",
+          opacity: mask ? 0.5 : 1.0,
         }}
       >
-        {props.small ? undefined : <TrackInfoPanel title={props.name} targets={channels} />}
-        <Keyboard targets={channels} />
+        {props.small ? undefined : <TrackInfoPanel title={props.name} targets={channels} disabled={mask}/>}
+        <Keyboard targets={channels} disabled={mask}/>
+        <VolumeInfoPanel small={props.small} targets={channels} disabled={mask}/>
       </Stack>
     );
   }
@@ -58,7 +70,8 @@ function DeviceCard(props: DeviceCardProps) {
 export function KeyboardList(props: { spacing?: any }) {
   const theme = useTheme();
   const isSmall = useMediaQuery(theme.breakpoints.down("md"));
-  const aspect = isSmall ? "640/24" : "640/28";
+  const aspect = isSmall ? "640/22" : "640/28";
+
   return (
     <Stack spacing={props.spacing}>
       <DeviceCard

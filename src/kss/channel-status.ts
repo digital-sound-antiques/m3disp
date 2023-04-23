@@ -12,13 +12,13 @@ export type ChannelStatus = {
 
 function createPSGVoiceName(ton: boolean, non: boolean) {
   if (ton && non) {
-    return 'Tone+Noise';
+    return "Tone+Noise";
   } else if (ton) {
-    return 'Tone';
+    return "Tone";
   } else if (non) {
-    return 'Noise';
+    return "Noise";
   } else {
-    return 'Muted';
+    return "Muted";
   }
 }
 
@@ -27,7 +27,7 @@ function createPSGVoiceName(ton: boolean, non: boolean) {
 function createPSGStatus(regs: Uint8Array, ch: number): ChannelStatus {
   if (ch < 3) {
     const fdiv = ((regs[ch * 2 + 1] & 0xff) << 8) | regs[ch * 2];
-    const vol = Math.min(15, regs[8 + ch]);    
+    const vol = Math.min(15, regs[8 + ch]);
     const A4 = 440.0;
     const ton = (regs[7] & (1 << ch)) == 0;
     const non = (regs[7] & (8 << ch)) == 0;
@@ -76,7 +76,7 @@ function createOPLLStatus(
   /// 0-8: FM1-9, 9:BD, 10:SD, 11:TOM, 12:CYM, 13:HH
   ch: number,
   keyKeepFrames: ArrayLike<number> | Array<number>
-): ChannelStatus {
+): ChannelStatus | null {
   const rflag = (regs[0x0e] & 32) != 0;
 
   let mode: string | null = null;
@@ -96,7 +96,6 @@ function createOPLLStatus(
 
   let fnum = ((regs[0x20 + pch] & 0x1) << 8) | regs[0x10 + pch];
   let blk = (regs[0x20 + pch] & 0xe) >> 1;
-  let fmul = 1;
 
   let kon = false;
   let vol: number = 0;
@@ -107,47 +106,54 @@ function createOPLLStatus(
   } else {
     mode = "rch";
     if (rflag) {
-      const ron = (regs[0x0e] & (0x10 >> (ch - 9))) != 0;
-      if (ron && 0 < keyKeepFrames[ch] && keyKeepFrames[ch] <= 735 * 8) {
-        kon = true;
-      }
-
+      let ron;
       if (ch == 9) {
+        // BD
+        ron = regs[0x0e] & 0x10 || regs[0x26] & 0x10;
         vol = 0x0f - (regs[0x38] & 0xf);
       }
       if (ch == 10) {
+        // SD
+        ron = regs[0x0e] & 0x8 || regs[0x27] & 0x10;
         vol = 0x0f - (regs[0x37] & 0xf);
       }
       if (ch == 11) {
         // TOM
+        ron = regs[0x0e] & 0x4 || regs[0x28] & 0x10;
         vol = 0x0f - ((regs[0x38] >> 4) & 0xf);
       }
       if (ch == 12) {
         // CYM
+        ron = regs[0x0e] & 0x2 || regs[0x28] & 0x10;
         vol = 0x0f - (regs[0x38] & 0xf);
         blk = Math.max(regs[0x27] & 0xe, regs[0x28] & 0xe) >> 1;
         fnum = ((regs[0x27] & 0x1) << 8) | regs[0x17];
       }
       if (ch == 13) {
         // HH
+        ron = regs[0x0e] & 0x1 || regs[0x27] & 0x10;
         vol = 0x0f - ((regs[0x37] >> 4) & 0xf);
         blk = Math.max(regs[0x27] & 0xe, regs[0x28] & 0xe) >> 1;
         fnum = ((regs[0x28] & 0x1) << 8) | regs[0x18];
       }
+      // MGSDRV keeps key status for rhythm channels until next key-on.
+      // Here only 8 frames is used to avoid the status is not visually changed on display.
+      if (ron && 0 < keyKeepFrames[ch] && keyKeepFrames[ch] <= 735 * 8) {
+        kon = true;
+      }
     } else {
-      kon = false;
-      vol = 0;
+      return null;
     }
   }
 
   let voice;
   if (pch >= 6 && rflag) {
     if (pch == 6) {
-      voice = "B.D";
+      voice = "Bass Drum";
     } else if (pch == 7) {
-      voice = "S.D/H.H";
+      voice = "Snare & Hi-Hat";
     } else if (pch == 8) {
-      voice = "TOM/CYM";
+      voice = "Tom & Cymbal";
     }
   } else {
     voice = toOpllVoiceName((regs[0x30 + pch] >> 4) & 0x0f);
@@ -158,7 +164,7 @@ function createOPLLStatus(
   const A4 = 440.0;
 
   if (kon) {
-    const kcode = 57 + Math.round(Math.log2((freq * fmul) / A4) * 12);
+    const kcode = 57 + Math.round(Math.log2(freq / A4) * 12);
     return { freq, kcode, vol, mode, keyKeepFrames: keyKeepFrames[ch], voice };
   } else {
     return { freq, vol, mode, keyKeepFrames: keyKeepFrames[ch], voice };
@@ -218,11 +224,11 @@ function toOpllVoiceName(n: number): string {
     case 12:
       return "Vibraphone";
     case 13:
-      return "S.Bass";
+      return "Synth Bass";
     case 14:
-      return "W.Bass";
+      return "Wood Bass";
     case 15:
-      return "E.Bass";
+      return "Electric Bass";
     default:
       throw new Error();
   }

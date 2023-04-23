@@ -1,8 +1,7 @@
 import { Box, Stack, useMediaQuery, useTheme } from "@mui/material";
 import React, { ReactNode, useContext, useEffect, useRef, useState } from "react";
-import { PlayerContext } from "./PlayerContext";
-import { ChannelId, getChannelStatus } from "./kss/channel-status";
-import { KSSDeviceName } from "./kss/kss-player";
+import { PlayerContext } from "../contexts/PlayerContext";
+import { ChannelId, getChannelStatus } from "../kss/channel-status";
 
 export type KeyboardPainterArgs = {
   whiteKeyWidth: number;
@@ -20,13 +19,13 @@ export type KeyboardPainterArgs = {
 const defaultKeyboardLayout: KeyboardPainterArgs = {
   whiteKeyWidth: 12,
   whiteKeyHeight: 48,
-  whiteKeyRadii: [ 0, 0, 0.5, 0.5],
+  whiteKeyRadii: [0, 0, 0.5, 0.5],
   blackKeyWidth: 9,
   blackKeyHeight: 32,
-  blackKeyRadii: [ 0, 0, 0.5, 0.5],
+  blackKeyRadii: [0, 0, 0.5, 0.5],
   keyMargin: 1,
   numberOfWhiteKeys: 56,
-  whiteKeyColor: "#efefe8",
+  whiteKeyColor: "#e8e8e0",
   blackKeyColor: "#303000",
 };
 
@@ -93,7 +92,7 @@ export class KeyboardPainter {
       if (key != null) {
         const oct = Math.floor(kcode / 12);
         const dx = (key + oct * 7) * step;
-        ctx.fillStyle = color;
+        ctx.fillStyle = color + "80";
         ctx.fillRect(dx + 1, 1, w - 2, h - 2);
       }
     }
@@ -115,7 +114,7 @@ export class KeyboardPainter {
         const oct = Math.floor(kcode / 12);
         const dx = (key + oct * 7) * step;
         for (const color of [this.args.whiteKeyColor, colors[i]]) {
-          ctx.fillStyle = color;
+          ctx.fillStyle = color + "80";
           ctx.fillRect(x + dx + 1, 1, w - 2, h - 2);
         }
       }
@@ -260,6 +259,7 @@ function BlackKeysOverlay(props: {
 type KeyboardProps = {
   painter?: KeyboardPainter | null;
   targets: ChannelId[];
+  disabled?: boolean | null;
 };
 
 const defaultPainter = new KeyboardPainter();
@@ -298,19 +298,23 @@ export function Keyboard(props: KeyboardProps) {
       }}
     >
       <WhiteKeys painter={painter} width={size.width} height={size.height} />
-      <WhiteKeysOverlay
-        painter={painter}
-        targets={targets}
-        width={size.width}
-        height={size.height}
-      />
+      {props.disabled != true ? (
+        <WhiteKeysOverlay
+          painter={painter}
+          targets={targets}
+          width={size.width}
+          height={size.height}
+        />
+      ) : undefined}
       <BlackKeys painter={painter} width={size.width} height={size.height} />
-      <BlackKeysOverlay
-        painter={painter}
-        targets={targets}
-        width={size.width}
-        height={size.height}
-      />
+      {props.disabled != true ? (
+        <BlackKeysOverlay
+          painter={painter}
+          targets={targets}
+          width={size.width}
+          height={size.height}
+        />
+      ) : undefined}
     </Box>
   );
 }

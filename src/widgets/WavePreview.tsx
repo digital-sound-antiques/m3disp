@@ -1,7 +1,7 @@
 import { useContext, useEffect, useRef, useState } from "react";
-import { PlayerContext } from "./PlayerContext";
+import { PlayerContext } from "../contexts/PlayerContext";
 import { Box, Card, Stack, Typography, useTheme } from "@mui/material";
-import { WaveThumbnail } from "./kss/kss-player";
+import { WaveThumbnail } from "../kss/kss-player";
 
 function _drawWavePreview(canvas: HTMLCanvasElement, thumbnail: WaveThumbnail, color: string) {
   const ctx = canvas.getContext("2d")!;
@@ -66,7 +66,7 @@ function CursorCanvas(props: CursorCanvasProps) {
     canvas.width = props.width * pixelRatio;
     canvas.height = props.height * pixelRatio;
     canvas.style.width = `${props.width}px`;
-    canvas.style.height = `${props.height}px`;
+    canvas.style.height = `${props.height}px`; 
     colorRef.current  = props.color;
   }, [props.width, props.height, props.color]);  
 
