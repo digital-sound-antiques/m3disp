@@ -1,28 +1,20 @@
 import { ThemeProvider, useTheme } from "@mui/material/styles";
 
-import MenuIcon from "@mui/icons-material/Menu";
-
 import {
   AppBar,
   Box,
   Container,
   CssBaseline,
   Divider,
-  Drawer,
   Unstable_Grid2 as Grid,
   IconButton,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
   Stack,
   Toolbar,
   Typography,
   useMediaQuery,
 } from "@mui/material";
 
-import { Info, MoreVert } from "@mui/icons-material";
+import { MoreVert } from "@mui/icons-material";
 import { Fragment, useContext, useEffect, useRef, useState } from "react";
 import { AppContext } from "../contexts/AppContext";
 import { FileDropContext } from "../contexts/FileDropContext";
@@ -37,8 +29,6 @@ import { PlayControl, PlayControlCard } from "./PlayerControl";
 import { AppProgressDialog } from "./ProgressDialog";
 import { SettingsDialog } from "./SettingsDialog";
 
-import logo from "..//assets/m3disp.svg";
-import { AppProgressContextProvider } from "../contexts/AppProgressContext";
 import { AboutDialog } from "./AboutDialog";
 
 const gap = { xs: 0, sm: 1, md: 1.5, lg: 2 };
@@ -53,40 +43,6 @@ export function App() {
   );
 }
 
-function AppDrawer({ id }: { id: string }) {
-  const app = useContext(AppContext);
-  return (
-    <Drawer
-      anchor="left"
-      open={app.isOpen(id)}
-      onClose={() => app.closeDialog(id)}
-      sx={{ minWidth: "388px" }}
-    >
-      <List disablePadding>
-        <Box
-          sx={{
-            py: 1,
-            display: "flex",
-            justifyContent: "center",
-            aspectRatio: "16/9",
-            backgroundColor: "background.default",
-          }}
-        >
-          <img src={logo} alt="m3disp" />
-        </Box>
-        <ListItem key="about" disablePadding>
-          <ListItemButton>
-            <ListItemIcon>
-              <Info />
-            </ListItemIcon>
-            <ListItemText>About</ListItemText>
-          </ListItemButton>
-        </ListItem>
-      </List>
-    </Drawer>
-  );
-}
-
 function AppRoot() {
   const theme = useTheme();
   const isXs = useMediaQuery(theme.breakpoints.down("sm"));
@@ -97,7 +53,6 @@ function AppRoot() {
       <AboutDialog />
       <AppProgressDialog />
       {isXs ? <AppRootMobile /> : <AppRootDesktop />}
-      <AppDrawer id="app-drawer" />
     </Fragment>
   );
 }
@@ -110,19 +65,12 @@ function MobileAppBar() {
   return (
     <AppBar component="nav" sx={{ backgroundColor: theme.palette.background.default }}>
       <Toolbar>
-        <IconButton
-          edge="start"
-          color="inherit"
-          aria-label="menu"
-          sx={{ mr: 2 }}
-          onClick={() => app.openDialog("app-drawer")}
-        >
-          <MenuIcon />
-        </IconButton>
-        <Box sx={{ flexGrow: 1 }}></Box>
+        <Typography variant="h6" component="div">
+          M<sub>3</sub>disp
+        </Typography>
+        <Box sx={{ flexGrow: 1 }} />
         <IconButton
           ref={moreIconRef}
-          edge="end"
           onClick={() => {
             app.openPopup("option-menu", moreIconRef.current!);
           }}
@@ -173,15 +121,6 @@ function DesktopAppBar() {
     <AppBar component="nav" sx={{ backgroundColor: theme.palette.background.default }}>
       <Container maxWidth="xl" sx={{ minWidth: "320px" }}>
         <Toolbar variant="regular">
-          <IconButton
-            edge="start"
-            color="inherit"
-            aria-label="menu"
-            sx={{ mr: 2 }}
-            onClick={() => app.openDialog("app-drawer")}
-          >
-            <MenuIcon />
-          </IconButton>
           <Typography variant="h6" color="inherit" component="div">
             M<sub>3</sub>disp
           </Typography>
@@ -266,11 +205,9 @@ function AppRootDesktop() {
           sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}
         >
           <Stack direction="row" sx={{ width: "100%", justifyContent: "space-between" }}>
+            <Box sx={{ flex: 1 }}></Box>
             <Typography variant="caption">
-              M<sub>3</sub>disp - Copyright (C) 2023 Digital Sound Antiques.
-            </Typography>
-            <Typography variant="caption">
-              Audio Latency: {context.player.outputLatency}ms
+              Output Latency: {context.player.outputLatency}ms
             </Typography>
           </Stack>
         </Box>

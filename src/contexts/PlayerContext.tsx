@@ -133,7 +133,6 @@ const defaultContextData: PlayerContextData = createDefaultContextData();
 export const PlayerContext = React.createContext(defaultContextData);
 
 export function PlayerContextProvider(props: React.PropsWithChildren) {
-
   const [state, setState] = useState(defaultContextData);
   const [initialized, setInitialized] = useState(false);
 
@@ -224,7 +223,7 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
       selectedIndex: selectedIndex ?? oldState.selectedIndex,
     }));
     if (playIndex != null) {
-      await play(playIndex);
+      await play(entries[playIndex].dataId);
     }
   };
 
@@ -354,20 +353,23 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
     setEntries(newEntries, newSelectedIndex, playIndex);
   };
 
-  const play = async (index?: number | null) => {
+  const play = async (indexOrDataId?: number | string | null) => {
     unmuteAudio();
 
     if (state.audioContext.state != "running") {
       await state.audioContext.resume();
     }
 
-    if (index != null) {
-      setSelectedIndex(index);
-    }
-    const dataId = state.entries[index ?? state.selectedIndex]?.dataId;
-    if (dataId == null) {
+    let dataId;
+    if (typeof indexOrDataId === "number") {
+      setSelectedIndex(indexOrDataId);
+      dataId = state.entries[indexOrDataId ?? state.selectedIndex]?.dataId;
+    } else if (typeof indexOrDataId === "string") {
+      dataId = indexOrDataId;
+    } else {
       return;
     }
+
     const data = await state.storage.get(dataId);
     await state.player.play({ data, channelMask: state.channelMask });
 

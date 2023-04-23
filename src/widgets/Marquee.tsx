@@ -32,7 +32,7 @@ export function Marquee({ play, children }: MarqueeProps) {
     calculateWidth();
   }, [children]);
 
-  const speed = 20;
+  const speed = 25;
   const active = play && marqueeWidth > containerWidth;
   const duration = marqueeWidth / speed;
 
@@ -74,7 +74,7 @@ const marqueeStyle: CSSProperties = {
 const keyframes = `
 @keyframes scroll {
   0% {
-      transform: translateX(0%);
+      transform: translateX(100%);
   }
   100% {
       transform: translateX(-100%);

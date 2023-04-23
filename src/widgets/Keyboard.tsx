@@ -1,5 +1,5 @@
-import { Box, Stack, useMediaQuery, useTheme } from "@mui/material";
-import React, { ReactNode, useContext, useEffect, useRef, useState } from "react";
+import { Box, useTheme } from "@mui/material";
+import { useContext, useEffect, useRef, useState } from "react";
 import { PlayerContext } from "../contexts/PlayerContext";
 import { ChannelId, getChannelStatus } from "../kss/channel-status";
 
@@ -12,7 +12,6 @@ export type KeyboardPainterArgs = {
   whiteKeyHeight: number;
   blackKeyHeight: number;
   numberOfWhiteKeys: number;
-  whiteKeyColor: string;
   blackKeyColor: string;
 };
 
@@ -25,8 +24,7 @@ const defaultKeyboardLayout: KeyboardPainterArgs = {
   blackKeyRadii: [0, 0, 0.5, 0.5],
   keyMargin: 1,
   numberOfWhiteKeys: 56,
-  whiteKeyColor: "#e8e8e0",
-  blackKeyColor: "#303000",
+  blackKeyColor: "#222",
 };
 
 export class KeyboardPainter {
@@ -48,17 +46,26 @@ export class KeyboardPainter {
     return this.args.whiteKeyHeight;
   }
 
-  paintWhiteKeys(ctx: CanvasRenderingContext2D) {
+  paintWhiteKeys(ctx: CanvasRenderingContext2D, color: string) {
     let x = 0;
     const w = this.args.whiteKeyWidth;
     const h = this.args.whiteKeyHeight;
     const step = w + this.args.keyMargin;
-    ctx.fillStyle = this.args.whiteKeyColor;
+
+    ctx.fillStyle = "#ffffffe8";
     for (let i = 0; i < this.args.numberOfWhiteKeys; i++) {
       ctx.rect(x, 0, w, h);
       x += step;
     }
     ctx.fill();
+
+    ctx.fillStyle = color + "10";
+    for (let i = 0; i < this.args.numberOfWhiteKeys; i++) {
+      ctx.rect(x, 0, w, h);
+      x += step;
+    }
+    ctx.fill();
+
   }
 
   paintBlackKeys(ctx: CanvasRenderingContext2D) {
@@ -113,7 +120,7 @@ export class KeyboardPainter {
       if (key != null) {
         const oct = Math.floor(kcode / 12);
         const dx = (key + oct * 7) * step;
-        for (const color of [this.args.whiteKeyColor, colors[i]]) {
+        for (const color of ['#ffffff', colors[i]]) {
           ctx.fillStyle = color + "80";
           ctx.fillRect(x + dx + 1, 1, w - 2, h - 2);
         }
@@ -128,13 +135,14 @@ function WhiteKeys(props: {
   painter: KeyboardPainter;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const theme = useTheme();
   useEffect(() => {
     const canvas = canvasRef.current!;
     canvas.width = props.painter.width;
     canvas.height = props.painter.height;
     canvas.style.width = `${props.width}px`;
     canvas.style.height = `${props.height}px`;
-    props.painter.paintWhiteKeys(canvas.getContext("2d")!);
+    props.painter.paintWhiteKeys(canvas.getContext("2d")!, theme.palette.primary.main);
   }, [props.width, props.height]);
   return <canvas ref={canvasRef} style={{ position: "absolute", top: 0, left: 0 }}></canvas>;
 }

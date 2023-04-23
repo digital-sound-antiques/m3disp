@@ -93,17 +93,15 @@ export function PlayListBody(props: { deleteMode: boolean; sx?: SxProps<Theme> |
                             }}
                           >
                             <ListItemText disableTypography={true}>
-                              <Marquee play={selected}>
-                                <Typography
-                                  sx={{
-                                    fontWeight: "bold",
-                                    fontSize: { xs: "1rem", sm: "0.8rem" },
-                                  }}
-                                  noWrap={true}
-                                >
-                                  {e.title}
-                                </Typography>
-                              </Marquee>
+                              <Typography
+                                sx={{
+                                  fontWeight: "bold",
+                                  fontSize: { xs: "1rem", sm: "0.8rem" },
+                                }}
+                                noWrap={true}
+                              >
+                                {e.title}
+                              </Typography>
                             </ListItemText>
                           </ListItemButton>
                         </ListItem>

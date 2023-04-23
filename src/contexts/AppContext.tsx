@@ -10,7 +10,7 @@ const defaultTheme = createTheme({
       main: teal[300],
     },
     secondary: {
-      main: pink['A200'],
+      main: teal["A200"],
     },
     // background: {
     //   default: "#131313",
@@ -116,14 +116,18 @@ export function AppContextProvider(props: PropsWithChildren) {
   const initialize = async () => {
     await AppGlobal.initialize();
     setInitialized(true);
-  }
+  };
 
   useEffect(() => {
-    console.log(`mount AppContextProvider`);
     initialize();
-    state.theme.palette.primary.main = localStorage.getItem("m3disp.palette.primary.main") ?? teal[300];
-    state.theme.palette.secondary.main = localStorage.getItem("m3disp.palette.secondary.main") ?? pink[300];
-    return () => { console.log(`ummount AppContextProvider`); }
+    setState((oldState) => {
+      const palette = Object.assign({}, oldState.theme.palette);
+      palette.primary.main =
+        localStorage.getItem("m3disp.palette.primary.main") ?? palette.primary.main;
+      palette.secondary.main =
+        localStorage.getItem("m3disp.palette.secondary.main") ?? palette.secondary.main;
+      return { ...oldState, theme: { ...oldState.theme, palette } };
+    });
   }, []);
 
   return (
@@ -138,7 +142,7 @@ export function AppContextProvider(props: PropsWithChildren) {
         setPrimaryColor,
         setSecondaryColor,
       }}
-    >      
+    >
       {initialized ? props.children : null}
     </AppContext.Provider>
   );

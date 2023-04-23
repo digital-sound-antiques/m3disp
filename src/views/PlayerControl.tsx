@@ -1,4 +1,4 @@
-import { Box, Card, IconButton, useMediaQuery, useTheme } from "@mui/material";
+import { Box, Card, IconButton, Typography, useMediaQuery, useTheme } from "@mui/material";
 import {
   SkipPrevious,
   Replay,
@@ -12,6 +12,7 @@ import {
 import { PlayerContext, RepeatMode } from "../contexts/PlayerContext";
 import { useContext, useEffect, useState } from "react";
 import { AudioPlayerState } from "webaudio-stream-player";
+import { Marquee } from "../widgets/Marquee";
 
 export function PlayControl(props: { small: boolean }) {
   const context = useContext(PlayerContext);
@@ -50,7 +51,27 @@ export function PlayControl(props: { small: boolean }) {
   }
 
   return (
-    <Box sx={{ display: "flex", justifyContent: "center" }}>
+    <Box
+      sx={{
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        ...(props.small ? undefined : { p: 2, gap: 2 }),
+      }}
+    >
+      {props.small ? null : (
+        <Marquee play={true}>
+          <Typography
+            sx={{
+              fontWeight: "bold",
+              fontSize: "0.9rem",
+            }}
+            noWrap={true}
+          >
+            {context.entries[context.selectedIndex].title}
+          </Typography>
+        </Marquee>
+      )}
       <Box
         sx={{
           display: "flex",
@@ -93,15 +114,8 @@ export function PlayControl(props: { small: boolean }) {
             context.stop();
           }}
         >
-          <Stop/>
+          <Stop />
         </IconButton>
-        {/* <IconButton
-          onClick={() => {
-            context.setRepeatMode(getNextRepeatMode(context.repeatMode));
-          }}
-        >
-          {getRepeatIcon(context.repeatMode)}
-        </IconButton> */}
         <IconButton onClick={() => context.next()}>
           <SkipNext />
         </IconButton>
@@ -120,28 +134,9 @@ export function PlayControlCard() {
         justifyContent: "center",
         alignItems: "stretch",
         flexDirection: "column",
-        height: "100px",
       }}
     >
       <PlayControl small={false} />
     </Card>
   );
-}
-
-function getRepeatIcon(mode: RepeatMode) {
-  switch (mode) {
-    case "all":
-      return <Repeat />;
-    case "single":
-      return <RepeatOne />;
-  }
-}
-
-function getNextRepeatMode(mode: RepeatMode) {
-  switch (mode) {
-    case "all":
-      return "single";
-    case "single":
-      return "all";
-  }
 }
