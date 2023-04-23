@@ -1,7 +1,7 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
 
 import { Slider } from "@mui/material";
-import { PlayerContext, PlayerContextData } from "./PlayerContext";
+import { PlayerContext, PlayerContextData } from "../contexts/PlayerContext";
 import { AudioPlayerProgress } from "webaudio-stream-player";
 
 import { styled } from "@mui/material/styles";
