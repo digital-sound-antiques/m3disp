@@ -36,7 +36,17 @@ export function PlayListBody(props: { editMode: boolean; sx?: SxProps<Theme> | n
   const context = useContext(PlayerContext);
 
   const _play = async (index: number) => {
-    context.play(index);
+    if (context.selectedIndex == index) {
+      if (context.player.state == "paused") {
+        context.resume();
+      } else if (context.player.state == "playing") {
+        context.pause();
+      } else {
+        context.play(index);
+      }
+    } else {
+      context.play(index);
+    }
   };
 
   const _delete = async (index: number) => {

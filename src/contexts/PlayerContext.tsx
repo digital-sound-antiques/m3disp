@@ -55,6 +55,7 @@ export interface PlayerContextData {
 function autoResumeAudioContext(audioContext: AudioContext) {
   if (isIOS && isSafari) {
     document.addEventListener("visibilitychange", () => {
+      console.log(`visibility change / state=${audioContext.state}`);
       if ((audioContext.state as any) == "interrupted") {
         /* unawaited */ audioContext.resume();
       }
@@ -299,9 +300,7 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
     let title = kss.getTitle();
     if (title == "") title = filename;
     kss.release();
-    let start = Date.now();
     const dataId = await state.storage.put(data);
-    console.log(`put: ${Date.now() - start}ms`);
     return {
       title,
       filename,
@@ -390,7 +389,7 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
   };
 
   const resume = async () => {
-    state.player.resume();
+    await state.player.resume();
     setPlaying(state.player.state == "playing");
   };
 

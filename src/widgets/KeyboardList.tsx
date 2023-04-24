@@ -48,7 +48,7 @@ function DeviceCard(props: DeviceCardProps) {
         )}
         <Keyboard targets={channels} disabled={mask} />
         {props.small ? undefined : (
-          <Box sx={{ width: "12px", my: "4px", mx: "8px" }}>
+          <Box sx={{ width: "14px", my: "4px", mx: "6px" }}>
             <VolumeInfoPanel
               variant="vertical"
               small={props.small}
