@@ -85,7 +85,7 @@ function MobileAppBar() {
 
 function AppRootMobile() {
   return (
-    <Box sx={{ position: "absolute", top: 0, bottom: 0, left: 0, right: 0 }}>
+    <Box sx={{ position: "fixed", top: 0, bottom: 0, left: 0, right: 0 }}>
       <MobileAppBar />
       <Box
         sx={{
@@ -97,27 +97,16 @@ function AppRootMobile() {
           left: 0,
           right: 0,
           bottom: 0,
-          backgroundColor: "#444",
         }}
       >
         <Toolbar />
         <KeyboardList spacing={0} />
-        <Box
-          sx={{
-            display: "flex",
-            height: "24px",
-            px: 2,
-            justifyContent: "center",
-            alignItems: "center",
-          }}
-        >
-          <TimeSlider />
-        </Box>
-        <Box sx={{ position: "relative", flexGrow: 1 }}>
-          <PlayListView />
-        </Box>
+        <TimeSlider />
         <Box sx={{ p: 1, boxShadow: "0 0 2px 0px #00000080" }}>
           <PlayControl small={true} />
+        </Box>
+        <Box sx={{ position: "relative", flexGrow: 1 }}>
+          <PlayListView toolbarAlignment="bottom" />
         </Box>
       </Box>
     </Box>

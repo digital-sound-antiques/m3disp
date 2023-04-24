@@ -1,31 +1,38 @@
 import {
+  DeleteSweepOutlined,
+  DragHandle,
+  Edit,
+  Pause,
+  PlayArrow,
+  PlaylistAdd,
+  Remove,
+} from "@mui/icons-material";
+import {
   Box,
+  Button,
+  Card,
   IconButton,
   List,
   ListItem,
   ListItemButton,
   ListItemText,
-  Card,
-  Typography,
-  Button,
   Stack,
-  useTheme,
   SxProps,
   Theme,
+  Typography,
+  useTheme,
 } from "@mui/material";
-import { DeleteSweepOutlined, Pause, PlayArrow, PlaylistAdd, Remove } from "@mui/icons-material";
 
 import { useContext, useRef, useState } from "react";
 
-import { PlayerContext } from "../contexts/PlayerContext";
 import { DragDropContext, Draggable, DropResult } from "react-beautiful-dnd";
+import { PlayerContext } from "../contexts/PlayerContext";
 import { StrictModeDroppable as Droppable } from "../widgets/StrictModeDroppable";
 
 import { FileDrop } from "react-file-drop";
 import { useFileDrop } from "../contexts/FileDropContext";
-import { Marquee } from "../widgets/Marquee";
 
-export function PlayListBody(props: { deleteMode: boolean; sx?: SxProps<Theme> | null }) {
+export function PlayListBody(props: { editMode: boolean; sx?: SxProps<Theme> | null }) {
   const context = useContext(PlayerContext);
 
   const _play = async (index: number) => {
@@ -66,8 +73,8 @@ export function PlayListBody(props: { deleteMode: boolean; sx?: SxProps<Theme> |
                   const secondaryAction = createSecondaryAction(
                     isListItemDragging,
                     isPlaying,
-                    props.deleteMode,
-                    props.deleteMode
+                    props.editMode,
+                    props.editMode
                       ? () => {
                           _delete(index);
                         }
@@ -77,7 +84,12 @@ export function PlayListBody(props: { deleteMode: boolean; sx?: SxProps<Theme> |
                   );
 
                   return (
-                    <Draggable key={index} draggableId={`${index}`} index={index}>
+                    <Draggable
+                      isDragDisabled={!props.editMode}
+                      key={index}
+                      draggableId={`${index}`}
+                      index={index}
+                    >
                       {(provided) => (
                         <ListItem
                           ref={provided.innerRef}
@@ -92,6 +104,7 @@ export function PlayListBody(props: { deleteMode: boolean; sx?: SxProps<Theme> |
                               _play(index);
                             }}
                           >
+                            {props.editMode ? <DragHandle sx={{ mr: 1 }} /> : null}
                             <ListItemText disableTypography={true}>
                               <Typography
                                 sx={{
@@ -121,7 +134,7 @@ export function PlayListBody(props: { deleteMode: boolean; sx?: SxProps<Theme> |
 
 export function PlayListToolBar(props: {
   deleteMode: boolean;
-  setDeleteMode: (flag: boolean) => void;
+  setEditMode: (flag: boolean) => void;
   onAddClick: () => void;
   sx?: SxProps<Theme> | null;
 }) {
@@ -149,7 +162,7 @@ export function PlayListToolBar(props: {
             color="error"
             onClick={() => {
               context.setEntries([]);
-              props.setDeleteMode(false);
+              props.setEditMode(false);
             }}
           >
             Clear all
@@ -157,7 +170,7 @@ export function PlayListToolBar(props: {
           <Button
             variant="outlined"
             onClick={() => {
-              props.setDeleteMode(false);
+              props.setEditMode(false);
             }}
           >
             Done
@@ -166,10 +179,10 @@ export function PlayListToolBar(props: {
       ) : (
         <IconButton
           onClick={() => {
-            props.setDeleteMode(true);
+            props.setEditMode(true);
           }}
         >
-          <DeleteSweepOutlined />
+          <Edit />
         </IconButton>
       )}
     </Box>
@@ -267,11 +280,11 @@ export function PlayListView(props: { toolbarAlignment?: "top" | "bottom" }) {
       <FileDrop ref={fileDropRef} {...fileDropProps}>
         <PlayListToolBar
           deleteMode={deleteMode}
-          setDeleteMode={setDeleteMode}
+          setEditMode={setDeleteMode}
           onAddClick={onTargetClick}
           sx={{ boxShadow: "0 0 2px 0 #00000080", ...barSx }}
         />
-        <PlayListBody deleteMode={deleteMode} sx={bodySx} />
+        <PlayListBody editMode={deleteMode} sx={bodySx} />
       </FileDrop>
       <input
         onChange={onFileInputChange}

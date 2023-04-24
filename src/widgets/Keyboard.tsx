@@ -98,7 +98,7 @@ export class KeyboardPainter {
       if (key != null) {
         const oct = Math.floor(kcode / 12);
         const dx = (key + oct * 7) * step;
-        ctx.fillStyle = color + "80";
+        ctx.fillStyle = color + "C0";
         ctx.fillRect(dx + 1, 1, w - 2, h - 2);
       }
     }
@@ -128,7 +128,7 @@ export class KeyboardPainter {
         ctx.fillStyle = whiteKeyColor;
         ctx.fillRect(x + dx + 1, 1, w - 2, h - 2);
 
-        ctx.fillStyle = colors[i] + "80";
+        ctx.fillStyle = colors[i] + "C0";
         ctx.fillRect(x + dx + 1, 1, w - 2, h - 2);
       }
     }

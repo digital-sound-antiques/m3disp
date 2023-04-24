@@ -1,82 +1,68 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
 
-import { Slider } from "@mui/material";
-import { PlayerContext, PlayerContextData } from "../contexts/PlayerContext";
+import { Box, LinearProgress } from "@mui/material";
 import { AudioPlayerProgress } from "webaudio-stream-player";
+import { PlayerContext } from "../contexts/PlayerContext";
 
-import { styled } from "@mui/material/styles";
-
-const CustomSlider = styled(Slider)(({ theme }) => ({
-  "& .MuiSlider-thumb": {
-    width: 8,
-    height: 8,
-    transition: "none",
-  },
-  "& .MuiSlider-thumb:hover": {
-    width: 12,
-    height: 12,
-  },
-  "& .MuiSlider-track": {
-    transition: "none",
-  },
-}));
-
-function valuetext(value: number) {
-  const seconds = Math.floor(value / 1000);
-  const mm = Math.floor(seconds / 60);
-  const ss = seconds % 60;
-  return `${mm < 10 ? `0${mm}` : mm}:${ss < 10 ? `0${ss}` : ss}`;
-}
-
-export class TimeSlider extends React.Component {
-  state = {
+export function TimeSlider() {
+  const [state, setState] = useState({
     currentTime: 0,
     bufferedTime: 0,
-  };
-  isChanging = false;
+    isFulFilled: false,
+  });
 
-  handleProgress = (ev: CustomEvent<AudioPlayerProgress>) => {
-    if (!this.isChanging) {
-      this.setState({
-        currentTime: ev.detail.renderer.currentTime,
-        bufferedTime: ev.detail.renderer.bufferedTime,
-      });
-    }
+  const context = useContext(PlayerContext);
+
+  const handleProgress = (ev: CustomEvent<AudioPlayerProgress>) => {
+    setState({
+      currentTime: ev.detail.renderer.currentTime,
+      bufferedTime: ev.detail.renderer.bufferedTime,
+      isFulFilled: ev.detail.renderer.isFulFilled,
+    });
   };
 
-  override componentDidMount() {
-    (this.context as PlayerContextData).player.addEventListener("progress", this.handleProgress);
+  useEffect(() => {
+    context.player.addEventListener("progress", handleProgress);
+    return () => {
+      context.player.removeEventListener("progress", handleProgress);
+    };
+  });
+
+  let value: number;
+  let valueBuffer: number;
+  let variant: "buffer" | "determinate" | "indeterminate";
+  if (state.bufferedTime == 0) {
+    value = 0;
+    valueBuffer = 0;
+    variant = "determinate";
+  } else if (state.isFulFilled) {
+    value = (100 * state.currentTime) / state.bufferedTime;
+    valueBuffer = 100;
+    variant = "determinate";
+  } else {
+    const max = Math.max(state.bufferedTime * 1.5, 60 * 1000);
+    value = (100 * state.currentTime) / max;
+    valueBuffer = (100 * state.bufferedTime) / max;
+    variant = "buffer";
   }
 
-  override componentWillUnmount(): void {
-    (this.context as PlayerContextData).player.removeEventListener("progress", this.handleProgress);
-  }
+  const progressRef = useRef<HTMLDivElement>(null);
 
-  handleChangeCommitted = (value: number) => {
-    (this.context as any).player.seekInTime(value);
-    this.isChanging = false;
+  const onClick = (ev: React.MouseEvent<HTMLDivElement>) => {
+    const target = ev.target as HTMLDivElement;
+    const pos = (ev.clientX / target.clientWidth) * state.bufferedTime;
+    context.player.seekInTime(pos);
   };
 
-  handleChange = (value: number) => {
-    this.isChanging = true;
-    this.setState({ currentTime: value });
-  };
-
-  render() {
-    return (
-      <CustomSlider
-        sx={{ height: "3px" }}
-        size="small"
-        value={this.state.currentTime}
-        min={0}
-        max={this.state.bufferedTime}
-        onChangeCommitted={(_, value) => this.handleChangeCommitted(value as number)}
-        onChange={(_, value) => this.handleChange(value as number)}
-        valueLabelDisplay="auto"
-        valueLabelFormat={valuetext}
+  return (
+    <Box sx={{ py: 1 }} onClick={onClick}>
+      <LinearProgress
+        ref={progressRef}
+        variant={variant}
+        color="secondary"
+        value={value}
+        valueBuffer={valueBuffer}
       />
-    );
-  }
+    </Box>
+  );
 }
-
-TimeSlider.contextType = PlayerContext;

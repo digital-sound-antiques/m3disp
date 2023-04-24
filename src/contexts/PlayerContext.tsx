@@ -72,7 +72,7 @@ const createDefaultContextData = () => {
     gainNode: new GainNode(audioContext),
     storage: new BinaryDataStorage(),
     player: new KSSPlayer("worklet"),
-    repeatMode: "all",
+    repeatMode: "none",
     selectedIndex: null,
     entries: [],
     isPlaying: false,
@@ -238,12 +238,15 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
   const onPlayerStateChange = (ev: CustomEvent<AudioPlayerState>) => {
     if (ev.detail == "stopped") {
       setPlaying(false);
-      switch (state.repeatMode) {
+      switch (stateRef.current.repeatMode) {
         case "single":
           play();
           break;
         case "all":
           next(true);
+          break;
+        default:
+          next(false);
           break;
       }
     }

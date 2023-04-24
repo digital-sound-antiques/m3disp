@@ -1,15 +1,18 @@
 import {
   Pause,
   PlayArrow,
+  Repeat,
+  RepeatOn,
+  RepeatOneOn,
   Replay,
   SkipNext,
   SkipPrevious,
-  Stop
+  Stop,
 } from "@mui/icons-material";
 import { Box, Card, IconButton, Typography, useTheme } from "@mui/material";
 import { useContext, useEffect, useState } from "react";
 import { AudioPlayerState } from "webaudio-stream-player";
-import { PlayerContext } from "../contexts/PlayerContext";
+import { PlayerContext, RepeatMode } from "../contexts/PlayerContext";
 import { Marquee } from "../widgets/Marquee";
 
 export function PlayControl(props: { small: boolean }) {
@@ -48,6 +51,19 @@ export function PlayControl(props: { small: boolean }) {
     playIcon = withCircle(playIcon);
   }
 
+  const toggleRepeatMode = () => {
+    const modes: RepeatMode[] = ["none", "all", "single"];
+    const index = modes.indexOf(context.repeatMode);
+    const next = modes[(index + 1) % modes.length];
+    context.setRepeatMode(next);
+  };
+
+  const repeatModeIcon = {
+    none: <Repeat />,
+    all: <RepeatOn />,
+    single: <RepeatOneOn />,
+  }[context.repeatMode];
+
   return (
     <Box
       sx={{
@@ -66,7 +82,7 @@ export function PlayControl(props: { small: boolean }) {
             }}
             noWrap={true}
           >
-            {context.entries[context.selectedIndex ?? -1]?.title ?? '-'}
+            {context.entries[context.selectedIndex ?? -1]?.title ?? "-"}
           </Typography>
         </Marquee>
       )}
@@ -83,7 +99,8 @@ export function PlayControl(props: { small: boolean }) {
         <IconButton onClick={() => context.prev()}>
           <SkipPrevious />
         </IconButton>
-        <IconButton
+        <IconButton onClick={toggleRepeatMode}>{repeatModeIcon}</IconButton>
+        {/* <IconButton
           onClick={() => {
             context.player.seekInTime(0);
             if (playState == "paused") {
@@ -92,7 +109,7 @@ export function PlayControl(props: { small: boolean }) {
           }}
         >
           <Replay />
-        </IconButton>
+        </IconButton> */}
         <IconButton
           sx={{ p: 0 }}
           onClick={() => {

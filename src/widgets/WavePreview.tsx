@@ -3,10 +3,16 @@ import { PlayerContext } from "../contexts/PlayerContext";
 import { Box, Card, Stack, Typography, useTheme } from "@mui/material";
 import { WaveThumbnail } from "../kss/kss-player";
 
-function _drawWavePreview(canvas: HTMLCanvasElement, thumbnail: WaveThumbnail, color: string) {
+function _drawWavePreview(
+  canvas: HTMLCanvasElement,
+  thumbnail: WaveThumbnail,
+  total: number,
+  color: string
+) {
   const ctx = canvas.getContext("2d")!;
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+  ctx.beginPath();
   if (thumbnail.length == 0) {
     return;
   }
@@ -19,7 +25,7 @@ function _drawWavePreview(canvas: HTMLCanvasElement, thumbnail: WaveThumbnail, c
 
   ctx.fillStyle = color;
   for (let i = 0; i < data.length; i++) {
-    const x = Math.floor(canvas.width * (i / data.length));
+    const x = Math.floor((canvas.width * i) / total);
     const dx = x - (x % step);
     const d = (data[i] ?? 0) / depth;
     if (d >= 0) {
@@ -64,10 +70,9 @@ function CursorCanvas(props: CursorCanvasProps) {
     canvas.width = props.width * pixelRatio;
     canvas.height = props.height * pixelRatio;
     canvas.style.width = `${props.width}px`;
-    canvas.style.height = `${props.height}px`; 
-    colorRef.current  = props.color;
-  }, [props.width, props.height, props.color]);  
-
+    canvas.style.height = `${props.height}px`;
+    colorRef.current = props.color;
+  }, [props.width, props.height, props.color]);
 
   useEffect(() => {
     const renderFrame = () => {
@@ -89,7 +94,7 @@ function CursorCanvas(props: CursorCanvasProps) {
       const ratio = dx / (canvas.width / pixelRatio);
       const pos = Math.round(context.player.progress.renderer.bufferedFrames * ratio);
       context.player.seekInFrame(pos);
-      if (context.player.state == 'paused' || context.player.state == 'stopped') {
+      if (context.player.state == "paused" || context.player.state == "stopped") {
         context.player.resume();
       }
     }
@@ -129,8 +134,8 @@ function WaveCanvas(props: WaveCanvasProps) {
     canvas.height = props.height * pixelRatio;
     canvas.style.width = `${props.width}px`;
     canvas.style.height = `${props.height}px`;
-    previewLengthRef.current = 0;
-    colorRef.current  = props.color;
+    previewLengthRef.current = -1;
+    colorRef.current = props.color;
   }, [props.width, props.height, props.color]);
 
   useEffect(() => {
@@ -139,13 +144,20 @@ function WaveCanvas(props: WaveCanvasProps) {
       const thumbnail = context.player.thumbnail;
       if (canvas != null) {
         requestAnimationFrame(renderFrame);
+        frameCounterRef.current = frameCounterRef.current + 1;
         if (thumbnail.length != previewLengthRef.current) {
           if (frameCounterRef.current % 15 == 0) {
-            _drawWavePreview(canvas, thumbnail, colorRef.current);
+            const { bufferedFrames, isFulFilled } = context.player.progress.renderer;
+            let total;
+            if (isFulFilled) {
+              total = bufferedFrames / 735;
+            } else {
+              total = Math.max(60 * 30, bufferedFrames / 735);
+            }
+            _drawWavePreview(canvas, thumbnail, total, colorRef.current);
             previewLengthRef.current = thumbnail.length;
           }
         }
-        frameCounterRef.current = frameCounterRef.current + 1;
       }
     };
     renderFrame();
@@ -189,7 +201,11 @@ export function WavePreview(props: WavePreviewProps) {
     >
       <WaveCanvas width={size.width} height={size.height} color={theme.palette.primary.main} />
       <Box sx={{ position: "absolute", top: 0, height: `${size.height + 4}px` }}>
-        <CursorCanvas width={size.width} height={size.height + 4} color={theme.palette.secondary.main} />
+        <CursorCanvas
+          width={size.width}
+          height={size.height + 4}
+          color={theme.palette.secondary.main}
+        />
       </Box>
     </Box>
   );
