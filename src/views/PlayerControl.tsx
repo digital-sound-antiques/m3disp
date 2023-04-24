@@ -1,17 +1,15 @@
-import { Box, Card, IconButton, Typography, useMediaQuery, useTheme } from "@mui/material";
 import {
-  SkipPrevious,
-  Replay,
   Pause,
   PlayArrow,
-  Repeat,
+  Replay,
   SkipNext,
-  RepeatOne,
-  Stop,
+  SkipPrevious,
+  Stop
 } from "@mui/icons-material";
-import { PlayerContext, RepeatMode } from "../contexts/PlayerContext";
+import { Box, Card, IconButton, Typography, useTheme } from "@mui/material";
 import { useContext, useEffect, useState } from "react";
 import { AudioPlayerState } from "webaudio-stream-player";
+import { PlayerContext } from "../contexts/PlayerContext";
 import { Marquee } from "../widgets/Marquee";
 
 export function PlayControl(props: { small: boolean }) {
@@ -68,7 +66,7 @@ export function PlayControl(props: { small: boolean }) {
             }}
             noWrap={true}
           >
-            {context.entries[context.selectedIndex].title}
+            {context.entries[context.selectedIndex ?? -1]?.title ?? '-'}
           </Typography>
         </Marquee>
       )}

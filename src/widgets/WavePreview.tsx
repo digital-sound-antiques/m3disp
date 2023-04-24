@@ -7,19 +7,17 @@ function _drawWavePreview(canvas: HTMLCanvasElement, thumbnail: WaveThumbnail, c
   const ctx = canvas.getContext("2d")!;
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-
   if (thumbnail.length == 0) {
     return;
   }
 
   ctx.beginPath();
-  ctx.fillStyle = color;
-
   const cy = Math.floor(canvas.height / 2);
   const step = 3;
   const { data, min, max } = thumbnail;
   const depth = Math.max(Math.abs(min), Math.abs(max));
 
+  ctx.fillStyle = color;
   for (let i = 0; i < data.length; i++) {
     const x = Math.floor(canvas.width * (i / data.length));
     const dx = x - (x % step);
@@ -39,7 +37,7 @@ function _drawCursor(canvas: HTMLCanvasElement, current: number, total: number, 
   const ctx = canvas.getContext("2d")!;
 
   ctx.strokeStyle = color;
-  ctx.lineWidth = 2.0;
+  ctx.lineWidth = 1.5;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.beginPath();
   const x = Math.round((canvas.width * current) / total);

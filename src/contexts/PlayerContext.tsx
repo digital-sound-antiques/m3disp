@@ -1,12 +1,12 @@
-import React, { useContext, useEffect, useRef, useState } from "react";
-import { KSSPlayer } from "../kss/kss-player";
+import { KSS } from "libkss-js";
 import { MGSC, detectEncoding } from "mgsc-js";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import { AudioPlayerState } from "webaudio-stream-player";
-import { KSS, KSSPlay } from "libkss-js";
+import { KSSChannelMask } from "../kss/kss-device";
+import { KSSPlayer } from "../kss/kss-player";
+import { BinaryDataStorage } from "../utils/binary-data-storage";
 import { isIOS, isSafari } from "../utils/platform-detect";
 import { unmuteAudio } from "../utils/unmute";
-import { KSSChannelMask } from "../kss/kss-device";
-import { BinaryDataStorage } from "../utils/binary-data-storage";
 import { AppProgressContext } from "./AppProgressContext";
 
 export type PlayListEntry = {
@@ -15,7 +15,7 @@ export type PlayListEntry = {
   dataId: string; // sha1 for data
 };
 
-export type RepeatMode = "all" | "single";
+export type RepeatMode = "none" | "all" | "single";
 
 export interface PlayerContextData {
   audioContext: AudioContext;
@@ -24,7 +24,7 @@ export interface PlayerContextData {
   masterGain: number;
   player: KSSPlayer;
   repeatMode: RepeatMode;
-  selectedIndex: number;
+  selectedIndex: number | null;
   entries: PlayListEntry[];
   isPlaying: boolean;
   channelMask: KSSChannelMask;
@@ -52,20 +52,10 @@ export interface PlayerContextData {
   stop(): Promise<void>;
 }
 
-const emptyProgress = {
-  currentFrame: 0,
-  currentTime: 0,
-  bufferedFrames: 0,
-  bufferedTime: 0,
-  isFulFilled: false,
-};
-
 function autoResumeAudioContext(audioContext: AudioContext) {
   if (isIOS && isSafari) {
     document.addEventListener("visibilitychange", () => {
-      console.debug(`${audioContext.state}`);
       if ((audioContext.state as any) == "interrupted") {
-        console.debug("resume AudioContext");
         /* unawaited */ audioContext.resume();
       }
     });
@@ -83,7 +73,7 @@ const createDefaultContextData = () => {
     storage: new BinaryDataStorage(),
     player: new KSSPlayer("worklet"),
     repeatMode: "all",
-    selectedIndex: 0,
+    selectedIndex: null,
     entries: [],
     isPlaying: false,
     masterGain: 4.0,
@@ -134,6 +124,7 @@ export const PlayerContext = React.createContext(defaultContextData);
 
 export function PlayerContextProvider(props: React.PropsWithChildren) {
   const [state, setState] = useState(defaultContextData);
+  const stateRef = useRef(state);
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
@@ -143,6 +134,10 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
       state.player.removeEventListener("statechange", onPlayerStateChange);
     };
   }, []);
+
+  useEffect(() => {
+    stateRef.current = state;
+  });
 
   useEffect(() => {
     if (initialized) {
@@ -168,12 +163,9 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
 
   const pruneEntries = async () => {
     const keys = await state.storage.getAllKeys();
-    console.log(`${keys.length} keys in indexedDB`);
     const ids = state.entries.map((e) => e.dataId);
     await state.storage.gc(ids);
-    console.log(`db=${state.storage.db}`);
     const entries = state.entries.filter((e) => keys.indexOf(e.dataId) >= 0);
-    console.log(`prune entries: ${state.entries.length} => ${entries.length}`);
     setState((oldState) => ({ ...oldState, entries }));
   };
 
@@ -217,13 +209,23 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
     selectedIndex?: number | null,
     playIndex?: number | null
   ) => {
+    if (entries.length == 0) {
+      setState((oldState) => ({
+        ...oldState,
+        entries,
+        selectedIndex: null,
+      }));
+    }
+
     setState((oldState) => ({
       ...oldState,
       entries,
       selectedIndex: selectedIndex ?? oldState.selectedIndex,
     }));
-    if (playIndex != null) {
-      await play(entries[playIndex].dataId);
+
+    if (playIndex != null && playIndex < entries.length) {
+      const { dataId } = entries[playIndex];
+      await play(dataId);
     }
   };
 
@@ -241,10 +243,7 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
           play();
           break;
         case "all":
-          if (state.entries.length >= 1) {
-            const nextIndex = (state.selectedIndex + 1) % state.entries.length;
-            play(nextIndex);
-          }
+          next(true);
           break;
       }
     }
@@ -333,19 +332,21 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
     }
     setProgress(null);
 
+    const state = stateRef.current!;
+
     let newEntries;
     let newSelectedIndex;
     let playIndex;
 
     if (options.clear) {
       newEntries = incomingEntries;
-      newSelectedIndex = 0;
-      playIndex = 0;
+      newSelectedIndex = incomingEntries.length > 0 ? 0 : null;
+      playIndex = newSelectedIndex;
     } else {
       newEntries = [...state.entries];
       newEntries.splice(insertionIndex, 0, ...incomingEntries);
       newSelectedIndex =
-        insertionIndex <= state.selectedIndex
+        state.selectedIndex != null && insertionIndex <= state.selectedIndex
           ? state.selectedIndex + incomingEntries.length
           : state.selectedIndex;
       playIndex = options.play ? insertionIndex : null;
@@ -354,18 +355,22 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
   };
 
   const play = async (indexOrDataId?: number | string | null) => {
+    const state = stateRef.current!;
     unmuteAudio();
 
     if (state.audioContext.state != "running") {
       await state.audioContext.resume();
     }
-
     let dataId;
     if (typeof indexOrDataId === "number") {
       setSelectedIndex(indexOrDataId);
       dataId = state.entries[indexOrDataId ?? state.selectedIndex]?.dataId;
     } else if (typeof indexOrDataId === "string") {
       dataId = indexOrDataId;
+    } else if (state.entries.length > 0) {
+      const index = state.selectedIndex ?? 0;
+      setSelectedIndex(index);
+      dataId = state.entries[index].dataId;
     } else {
       return;
     }
@@ -386,15 +391,25 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
     setPlaying(state.player.state == "playing");
   };
 
-  const next = async () => {
-    if (state.selectedIndex < state.entries.length - 1) {
-      await play(state.selectedIndex + 1);
+  const next = async (loop: boolean = false) => {
+    const state = stateRef.current!;
+    if (state.selectedIndex != null && state.entries.length > 0) {
+      if (loop) {
+        await play((state.selectedIndex + 1) % state.entries.length);
+      } else if (state.selectedIndex < state.entries.length - 1) {
+        await play(state.selectedIndex + 1);
+      }
     }
   };
 
-  const prev = async () => {
-    if (state.selectedIndex > 0) {
-      await play(state.selectedIndex - 1);
+  const prev = async (loop: boolean = false) => {
+    const state = stateRef.current!;
+    if (state.selectedIndex != null && state.entries.length > 0) {
+      if (loop) {
+        await play((state.selectedIndex + state.entries.length - 1) % state.entries.length);
+      } else if (state.selectedIndex > 0) {
+        await play(state.selectedIndex - 1);
+      }
     }
   };
 

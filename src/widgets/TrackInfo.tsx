@@ -16,6 +16,7 @@ type VolumeIndicatorProps = {
   keyKeepFrames?: number | null;
   primaryColor: string;
   secondaryColor: string;
+  variant: "vertical" | "horizontal";
 };
 
 export function VolumeIndicator(props: VolumeIndicatorProps) {
@@ -33,19 +34,23 @@ export function VolumeIndicator(props: VolumeIndicatorProps) {
   const resizeObserver = new ResizeObserver(updateSize);
   useEffect(() => {
     const canvas = canvasRef.current!;
-    canvas.width = 128;
-    canvas.height = 1;
+    if (props.variant == "horizontal") {
+      canvas.width = 128;
+      canvas.height = 1;
+    } else {
+      canvas.width = 1;
+      canvas.height = 128;
+    }
     resizeObserver.observe(boxRef.current!);
     return () => {
       resizeObserver.disconnect();
     };
-  }, []);
+  }, [props.variant]);
 
   useEffect(() => {
     const context = canvasRef.current!.getContext("2d")!;
     const canvas = context.canvas;
 
-    const step = canvas.width / 15;
     context.fillStyle = "#223";
     context.fillRect(0, 0, canvas.width, canvas.height);
     context.beginPath();
@@ -60,19 +65,37 @@ export function VolumeIndicator(props: VolumeIndicatorProps) {
       v = props.volume;
     }
 
-    const cw = step / 2;
-
-    for (let i = 1; i < 16; i++) {
-      const dx = (i - 1) * step + cw;
-      if (i == props.volume) {
-        context.fillStyle = `${props.secondaryColor}e0`;
-        context.fillRect(dx, 0, cw, canvas.height);
-      } else if (i < v) {
-        context.fillStyle = `${props.primaryColor}d0`;
-        context.fillRect(dx, 0, cw, canvas.height);
-      } else {
-        context.fillStyle = `${props.primaryColor}40`;
-        context.fillRect(dx, 0, cw, canvas.height);
+    if (props.variant == "horizontal") {
+      const step = canvas.width / 15;
+      const cw = step;
+      for (let i = 1; i < 16; i++) {
+        const dx = (i - 1) * step + cw;
+        if (i == props.volume) {
+          context.fillStyle = `${props.secondaryColor}90`;
+          context.fillRect(dx, 0, cw, canvas.height);
+        } else if (i < v) {
+          context.fillStyle = `${props.primaryColor}80`;
+          context.fillRect(dx, 0, cw, canvas.height);
+        } else {
+          context.fillStyle = `${props.primaryColor}30`;
+          context.fillRect(dx, 0, cw, canvas.height);
+        }
+      }
+    } else {
+      const step = canvas.height / 15;
+      const ch = step;
+      for (let i = 1; i < 16; i++) {
+        const dy = canvas.height - (i - 1) * step - ch;
+        if (i == props.volume) {
+          context.fillStyle = `${props.secondaryColor}90`;
+          context.fillRect(0, dy, canvas.width, ch);
+        } else if (i < v) {
+          context.fillStyle = `${props.primaryColor}80`;
+          context.fillRect(0, dy, canvas.width, ch);
+        } else {
+          context.fillStyle = `${props.primaryColor}30`;
+          context.fillRect(0, dy, canvas.width, ch);
+        }
       }
     }
   }, [props.volume, props.keyKeepFrames, props.primaryColor, props.secondaryColor]);
@@ -268,6 +291,7 @@ type VolumeInfoPanelProps = {
   targets: ChannelId[];
   sx?: SxProps<Theme> | null;
   disabled: boolean;
+  variant: "horizontal" | "vertical";
 };
 
 export function VolumeInfoPanel(props: VolumeInfoPanelProps) {
@@ -315,7 +339,7 @@ export function VolumeInfoPanel(props: VolumeInfoPanelProps) {
       sx={{
         display: "flex",
         position: "releative",
-        width: props.small ? "32px" : "64px",
+        width: "100%",
         height: "100%",
         justifyContent: "stretch",
         alignItems: "stretch",
@@ -327,6 +351,7 @@ export function VolumeInfoPanel(props: VolumeInfoPanelProps) {
         keyKeepFrames={status?.keyKeepFrames ?? 0}
         primaryColor={theme.palette.primary.main}
         secondaryColor={theme.palette.secondary.main}
+        variant={props.variant}
       />
     </Box>
   );

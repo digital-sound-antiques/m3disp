@@ -52,20 +52,19 @@ export class KeyboardPainter {
     const h = this.args.whiteKeyHeight;
     const step = w + this.args.keyMargin;
 
-    ctx.fillStyle = "#ffffffe8";
+    ctx.fillStyle = "#ffffffff";
     for (let i = 0; i < this.args.numberOfWhiteKeys; i++) {
       ctx.rect(x, 0, w, h);
       x += step;
     }
     ctx.fill();
 
-    ctx.fillStyle = color + "10";
+    ctx.fillStyle = color;
     for (let i = 0; i < this.args.numberOfWhiteKeys; i++) {
       ctx.rect(x, 0, w, h);
       x += step;
     }
     ctx.fill();
-
   }
 
   paintBlackKeys(ctx: CanvasRenderingContext2D) {
@@ -105,7 +104,12 @@ export class KeyboardPainter {
     }
   }
 
-  paintBlackKeysOverlay(canvas: HTMLCanvasElement, kcodes: number[], colors: string[]) {
+  paintBlackKeysOverlay(
+    canvas: HTMLCanvasElement,
+    kcodes: number[],
+    colors: string[],
+    whiteKeyColor: string
+  ) {
     let x =
       this.args.whiteKeyWidth - Math.floor((this.args.blackKeyWidth - this.args.keyMargin) / 2);
     const w = this.args.blackKeyWidth;
@@ -120,10 +124,12 @@ export class KeyboardPainter {
       if (key != null) {
         const oct = Math.floor(kcode / 12);
         const dx = (key + oct * 7) * step;
-        for (const color of ['#ffffff', colors[i]]) {
-          ctx.fillStyle = color + "80";
-          ctx.fillRect(x + dx + 1, 1, w - 2, h - 2);
-        }
+
+        ctx.fillStyle = whiteKeyColor;
+        ctx.fillRect(x + dx + 1, 1, w - 2, h - 2);
+
+        ctx.fillStyle = colors[i] + "80";
+        ctx.fillRect(x + dx + 1, 1, w - 2, h - 2);
       }
     }
   }
@@ -142,7 +148,7 @@ function WhiteKeys(props: {
     canvas.height = props.painter.height;
     canvas.style.width = `${props.width}px`;
     canvas.style.height = `${props.height}px`;
-    props.painter.paintWhiteKeys(canvas.getContext("2d")!, theme.palette.primary.main);
+    props.painter.paintWhiteKeys(canvas.getContext("2d")!, theme.palette.text.primary);
   }, [props.width, props.height]);
   return <canvas ref={canvasRef} style={{ position: "absolute", top: 0, left: 0 }}></canvas>;
 }
@@ -256,7 +262,7 @@ function BlackKeysOverlay(props: {
             );
           }
         }
-        props.painter.paintBlackKeysOverlay(canvas, kcodes, colors);
+        props.painter.paintBlackKeysOverlay(canvas, kcodes, colors, theme.palette.text.primary);
       }
     };
     renderFrame();

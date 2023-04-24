@@ -33,7 +33,7 @@ export function AboutDialog() {
           </Typography>
           <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
             {acknowledgements.map((e) => (
-              <Typography variant="caption">{e}</Typography>
+              <Typography key={e} variant="caption">{e}</Typography>
             ))}
           </Box>
         </Box>

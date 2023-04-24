@@ -30,6 +30,7 @@ import { AppProgressDialog } from "./ProgressDialog";
 import { SettingsDialog } from "./SettingsDialog";
 
 import { AboutDialog } from "./AboutDialog";
+import { TimeSlider } from "../widgets/TimeSlider";
 
 const gap = { xs: 0, sm: 1, md: 1.5, lg: 2 };
 
@@ -101,6 +102,17 @@ function AppRootMobile() {
       >
         <Toolbar />
         <KeyboardList spacing={0} />
+        <Box
+          sx={{
+            display: "flex",
+            height: "24px",
+            px: 2,
+            justifyContent: "center",
+            alignItems: "center",
+          }}
+        >
+          <TimeSlider />
+        </Box>
         <Box sx={{ position: "relative", flexGrow: 1 }}>
           <PlayListView />
         </Box>
@@ -147,15 +159,19 @@ function AppRootDesktop() {
   const context = useContext(PlayerContext);
   const [panelHeight, setPanelHeight] = useState<number | null>(null);
   const leftPaneRef = useRef<HTMLDivElement>(null);
-
   const onResize = () => setPanelHeight(leftPaneRef.current!.clientHeight);
   const resizeObserver = new ResizeObserver(onResize);
+
+  const theme = useTheme();
+  const isMd = useMediaQuery(theme.breakpoints.down("md"));
+
   useEffect(() => {
     resizeObserver.observe(leftPaneRef.current!);
     return () => {
       resizeObserver.disconnect();
     };
   }, []);
+
   return (
     <Box
       sx={{
@@ -179,21 +195,22 @@ function AppRootDesktop() {
         <Toolbar />
         <FileDropContext>
           <Grid container spacing={gap} sx={{ height: "100%" }}>
-            <Grid xs={12} sm={7} md={8} lg={8.5} xl={9}>
+            <Grid xs={12} sm={7} md={8} lg={8} xl={8}>
               <Stack ref={leftPaneRef} spacing={gap}>
                 <KeyboardList spacing={gap} />
+                {isMd ? <WaveSliderCard /> : null}
+                {isMd ? <PlayControlCard /> : null}
               </Stack>
             </Grid>
-            <Grid xs={12} sm={5} md={4} lg={3.5} xl={3}>
+            <Grid xs={12} sm={5} md={4} lg={4} xl={4}>
               <Stack
                 sx={{
                   gap,
-                  minHeight: { sm: "580px", md: null },
                   height: panelHeight,
                 }}
               >
-                <WaveSliderCard />
-                <PlayControlCard />
+                {!isMd ? <WaveSliderCard /> : null}
+                {!isMd ? <PlayControlCard /> : null}
                 <PlayListCard />
               </Stack>
             </Grid>

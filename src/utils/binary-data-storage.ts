@@ -41,28 +41,24 @@ async function _clear(store: IDBObjectStore): Promise<void> {
   });
 }
 
-let serial = 0;
-
 export class BinaryDataStorage {
   constructor(storeName?: string | null) {
     this.storeName = storeName ?? "binaries";
-    this.id = serial++;
-    console.log('new BinaryDataStorage #' + this.id);
   }
 
   db?: IDBDatabase | null = null;
   storeName: string;
-  id: number;
 
   async open(name: string, dbFactory?: IDBFactory | null): Promise<void> {
     this.db = await new Promise((resolve, reject) => {
-      const req = (dbFactory ?? window.indexedDB).open(name, 2);
+      const VERSION = 1;
+      const req = (dbFactory ?? window.indexedDB).open(name, VERSION);
       req.onerror = reject;
       req.onsuccess = (event) => resolve((event.target as IDBOpenDBRequest).result);
       req.onupgradeneeded = (event) => {
         console.log(`${event.oldVersion} => ${event.newVersion}`);
         const db = (event.target as IDBOpenDBRequest).result;
-        if (event.oldVersion == 0 || event.oldVersion == 1) {
+        if (event.oldVersion == 0) {
           db.createObjectStore(this.storeName);
         }
       };
@@ -101,15 +97,12 @@ export class BinaryDataStorage {
   }
 
   async clear() {
-    console.log(`#${this.id}.clear()`);
-    console.log(this.db);
     const tx = this.db!.transaction(this.storeName, "readwrite");
     const store = tx.objectStore(this.storeName);
     await _clear(store);
   }
 
   async close() {
-    console.trace(`#${this.id}.clear()`);
     this.db?.close();
   }
 }

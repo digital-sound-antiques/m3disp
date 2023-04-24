@@ -1,4 +1,4 @@
-import { Card, Stack, useMediaQuery, useTheme } from "@mui/material";
+import { Box, Card, Stack, useMediaQuery, useTheme } from "@mui/material";
 import { Keyboard } from "./Keyboard";
 import { TrackInfoPanel, VolumeInfoPanel } from "./TrackInfo";
 import { ChannelId } from "../kss/channel-status";
@@ -15,14 +15,12 @@ type DeviceCardProps = {
 };
 
 function DeviceCard(props: DeviceCardProps) {
-
   const context = useContext(PlayerContext);
 
   const masks = context.channelMask[props.device];
-  
-  const res = [];
-  for (let i = 0; i < props.targets.length; i++) {    
 
+  const res = [];
+  for (let i = 0; i < props.targets.length; i++) {
     const mask = (masks & (1 << i)) != 0;
 
     let target = props.targets[i];
@@ -41,23 +39,30 @@ function DeviceCard(props: DeviceCardProps) {
           aspectRatio: props.keyboardAspectRatio ?? "640 / 22",
           width: "100%",
           overflow: "hidden",
-          borderBottom: "1px solid #383838",
+          mb: "1px",
           opacity: mask ? 0.5 : 1.0,
         }}
       >
-        {props.small ? undefined : <TrackInfoPanel title={props.name} targets={channels} disabled={mask}/>}
-        <Keyboard targets={channels} disabled={mask}/>
-        <VolumeInfoPanel small={props.small} targets={channels} disabled={mask}/>
+        {props.small ? undefined : (
+          <TrackInfoPanel title={props.name} targets={channels} disabled={mask} />
+        )}
+        <Keyboard targets={channels} disabled={mask} />
+        {props.small ? undefined : (
+          <Box sx={{ width: "12px", my: "4px", mx: "8px" }}>
+            <VolumeInfoPanel
+              variant="vertical"
+              small={props.small}
+              targets={channels}
+              disabled={mask}
+            />
+          </Box>
+        )}
       </Stack>
     );
   }
 
   if (props.small) {
-    return (
-      <Stack spacing="1px">
-        {res}
-      </Stack>
-    );
+    return <Stack spacing="1px">{res}</Stack>;
   }
 
   return (
