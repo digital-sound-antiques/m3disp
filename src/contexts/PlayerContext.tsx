@@ -112,6 +112,7 @@ const createDefaultContextData = () => {
     model.entries = entries;
     model.masterGain = json.masterGain;
     model.gainNode.gain.value = model.masterGain;
+    model.repeatMode = json.repeatMode;
   } catch (e) {
     console.error(e);
     localStorage.clear();

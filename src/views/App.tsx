@@ -188,7 +188,6 @@ function AppRootDesktop() {
               <Stack ref={leftPaneRef} spacing={gap}>
                 <KeyboardList spacing={gap} />
                 {isMd ? <WaveSliderCard /> : null}
-                {isMd ? <PlayControlCard /> : null}
               </Stack>
             </Grid>
             <Grid xs={12} sm={5} md={4} lg={4} xl={4}>
@@ -199,7 +198,7 @@ function AppRootDesktop() {
                 }}
               >
                 {!isMd ? <WaveSliderCard /> : null}
-                {!isMd ? <PlayControlCard /> : null}
+                <PlayControlCard />
                 <PlayListCard />
               </Stack>
             </Grid>

@@ -1,10 +1,10 @@
-import { Box, Card, Stack, useMediaQuery, useTheme } from "@mui/material";
-import { Keyboard } from "./Keyboard";
-import { TrackInfoPanel, VolumeInfoPanel } from "./TrackInfo";
-import { ChannelId } from "../kss/channel-status";
-import { KSSDeviceName } from "../kss/kss-device";
+import { Card, Stack, useMediaQuery, useTheme } from "@mui/material";
 import { useContext } from "react";
 import { PlayerContext } from "../contexts/PlayerContext";
+import { ChannelId } from "../kss/channel-status";
+import { KSSDeviceName } from "../kss/kss-device";
+import { Keyboard } from "./Keyboard";
+import { TrackInfoPanel, VolumeInfoPanel } from "./TrackInfo";
 
 type DeviceCardProps = {
   name: string;
@@ -16,7 +16,6 @@ type DeviceCardProps = {
 
 function DeviceCard(props: DeviceCardProps) {
   const context = useContext(PlayerContext);
-
   const masks = context.channelMask[props.device];
 
   const res = [];
@@ -43,20 +42,18 @@ function DeviceCard(props: DeviceCardProps) {
           opacity: mask ? 0.5 : 1.0,
         }}
       >
-        {props.small ? undefined : (
+        {props.small ? (
+          <VolumeInfoPanel
+            variant="horizontal"
+            targets={channels}
+            disabled={mask}
+            sx={{ width: "72px" }}
+          />
+        ) : (
           <TrackInfoPanel title={props.name} targets={channels} disabled={mask} />
         )}
+
         <Keyboard targets={channels} disabled={mask} />
-        {props.small ? undefined : (
-          <Box sx={{ width: "14px", my: "4px", mx: "6px" }}>
-            <VolumeInfoPanel
-              variant="vertical"
-              small={props.small}
-              targets={channels}
-              disabled={mask}
-            />
-          </Box>
-        )}
       </Stack>
     );
   }
@@ -74,7 +71,7 @@ function DeviceCard(props: DeviceCardProps) {
 
 export function KeyboardList(props: { spacing?: any }) {
   const theme = useTheme();
-  const isSmall = useMediaQuery(theme.breakpoints.down("md"));
+  const isSmall = useMediaQuery(theme.breakpoints.down("sm"));
   const aspect = isSmall ? "640/22" : "640/28";
 
   return (

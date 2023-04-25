@@ -52,13 +52,6 @@ export class KeyboardPainter {
     const h = this.args.whiteKeyHeight;
     const step = w + this.args.keyMargin;
 
-    ctx.fillStyle = "#ffffffff";
-    for (let i = 0; i < this.args.numberOfWhiteKeys; i++) {
-      ctx.rect(x, 0, w, h);
-      x += step;
-    }
-    ctx.fill();
-
     ctx.fillStyle = color;
     for (let i = 0; i < this.args.numberOfWhiteKeys; i++) {
       ctx.rect(x, 0, w, h);
@@ -142,6 +135,7 @@ function WhiteKeys(props: {
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const theme = useTheme();
+
   useEffect(() => {
     const canvas = canvasRef.current!;
     canvas.width = props.painter.width;
@@ -149,7 +143,8 @@ function WhiteKeys(props: {
     canvas.style.width = `${props.width}px`;
     canvas.style.height = `${props.height}px`;
     props.painter.paintWhiteKeys(canvas.getContext("2d")!, theme.palette.text.primary);
-  }, [props.width, props.height]);
+  }, [props.width, props.height, theme.palette.text.primary]);
+
   return <canvas ref={canvasRef} style={{ position: "absolute", top: 0, left: 0 }}></canvas>;
 }
 

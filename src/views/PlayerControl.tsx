@@ -4,10 +4,9 @@ import {
   Repeat,
   RepeatOn,
   RepeatOneOn,
-  Replay,
   SkipNext,
   SkipPrevious,
-  Stop,
+  Stop
 } from "@mui/icons-material";
 import { Box, Card, IconButton, Typography, useTheme } from "@mui/material";
 import { useContext, useEffect, useState } from "react";

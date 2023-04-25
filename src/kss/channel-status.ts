@@ -12,7 +12,7 @@ export type ChannelStatus = {
 
 function createPSGVoiceName(ton: boolean, non: boolean) {
   if (ton && non) {
-    return "Tone+Noise";
+    return "Tone & Noise";
   } else if (ton) {
     return "Tone";
   } else if (non) {
@@ -149,11 +149,11 @@ function createOPLLStatus(
   let voice;
   if (pch >= 6 && rflag) {
     if (pch == 6) {
-      voice = "Bass Drum";
+      voice = "B.D.";
     } else if (pch == 7) {
-      voice = "Snare & Hi-Hat";
+      voice = "S.D. & H.H";
     } else if (pch == 8) {
-      voice = "Tom & Cymbal";
+      voice = "TOM & CYM";
     }
   } else {
     voice = toOpllVoiceName((regs[0x30 + pch] >> 4) & 0x0f);

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<svg width="256px" height="256px" viewBox="0 0 256 256" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
-    <title>m3disp</title>
+<svg width="128px" height="186.08px" viewBox="0 0 128 186.08" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <title>Group</title>
     <defs>
         <polygon id="path-1" points="19.68 10.96 13.6 27.64 12.6 27.64 6.88 10.88 4.12 27.32 0 27.32 4.08 2.4 7.12 2.4 13.44 19.08 19.48 2.4 22.56 2.4 26.2 27.32 22.08 27.32"></polygon>
         <filter x="-29.3%" y="-29.7%" width="158.5%" height="159.4%" filterUnits="objectBoundingBox" id="filter-2">
@@ -60,41 +60,45 @@
             </feMerge>
         </filter>
     </defs>
-    <g id="m3disp" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
-        <g id="M3disp" transform="translate(76.360000, 178.680000)" fill-rule="nonzero">
-            <g id="Path">
-                <use fill="black" fill-opacity="1" filter="url(#filter-2)" xlink:href="#path-1"></use>
-                <use fill-opacity="0.87" fill="#FFFFFF" xlink:href="#path-1"></use>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="m3disp" transform="translate(-64.000000, -35.000000)">
+            <g id="Group" transform="translate(68.000000, 39.000000)">
+                <g id="M3disp" transform="translate(8.360000, 139.680000)" fill-rule="nonzero">
+                    <g id="Path">
+                        <use fill="black" fill-opacity="1" filter="url(#filter-2)" xlink:href="#path-1"></use>
+                        <use fill-opacity="0.87" fill="#FFFFFF" xlink:href="#path-1"></use>
+                    </g>
+                    <g id="Path">
+                        <use fill="black" fill-opacity="1" filter="url(#filter-4)" xlink:href="#path-3"></use>
+                        <use fill-opacity="0.87" fill="#FFFFFF" xlink:href="#path-3"></use>
+                    </g>
+                    <g id="Shape">
+                        <use fill="black" fill-opacity="1" filter="url(#filter-6)" xlink:href="#path-5"></use>
+                        <use fill-opacity="0.87" fill="#FFFFFF" xlink:href="#path-5"></use>
+                    </g>
+                    <g id="Shape">
+                        <use fill="black" fill-opacity="1" filter="url(#filter-8)" xlink:href="#path-7"></use>
+                        <use fill-opacity="0.87" fill="#FFFFFF" xlink:href="#path-7"></use>
+                    </g>
+                    <g id="Path">
+                        <use fill="black" fill-opacity="1" filter="url(#filter-10)" xlink:href="#path-9"></use>
+                        <use fill-opacity="0.87" fill="#FFFFFF" xlink:href="#path-9"></use>
+                    </g>
+                    <g id="Shape">
+                        <use fill="black" fill-opacity="1" filter="url(#filter-12)" xlink:href="#path-11"></use>
+                        <use fill-opacity="0.87" fill="#FFFFFF" xlink:href="#path-11"></use>
+                    </g>
+                </g>
+                <g id="Group-2" filter="url(#filter-13)" stroke="#00D0BE" stroke-width="3">
+                    <rect id="Rectangle" x="1.5" y="1.5" width="117" height="117" rx="22"></rect>
+                    <rect id="Rectangle" x="23.5" y="1.5" width="17" height="69"></rect>
+                    <rect id="Rectangle-Copy" x="51.5" y="1.5" width="17" height="69"></rect>
+                    <rect id="Rectangle-Copy-2" x="79.5" y="1.5" width="17" height="69"></rect>
+                    <line x1="32.5" y1="72.5" x2="32.5" y2="118.5" id="Line-2" stroke-linecap="square"></line>
+                    <line x1="60.5" y1="72.5" x2="60.5" y2="118.5" id="Line-2-Copy" stroke-linecap="square"></line>
+                    <line x1="88.5" y1="71.5" x2="88.5" y2="117.5" id="Line-2-Copy-2" stroke-linecap="square"></line>
+                </g>
             </g>
-            <g id="Path">
-                <use fill="black" fill-opacity="1" filter="url(#filter-4)" xlink:href="#path-3"></use>
-                <use fill-opacity="0.87" fill="#FFFFFF" xlink:href="#path-3"></use>
-            </g>
-            <g id="Shape">
-                <use fill="black" fill-opacity="1" filter="url(#filter-6)" xlink:href="#path-5"></use>
-                <use fill-opacity="0.87" fill="#FFFFFF" xlink:href="#path-5"></use>
-            </g>
-            <g id="Shape">
-                <use fill="black" fill-opacity="1" filter="url(#filter-8)" xlink:href="#path-7"></use>
-                <use fill-opacity="0.87" fill="#FFFFFF" xlink:href="#path-7"></use>
-            </g>
-            <g id="Path">
-                <use fill="black" fill-opacity="1" filter="url(#filter-10)" xlink:href="#path-9"></use>
-                <use fill-opacity="0.87" fill="#FFFFFF" xlink:href="#path-9"></use>
-            </g>
-            <g id="Shape">
-                <use fill="black" fill-opacity="1" filter="url(#filter-12)" xlink:href="#path-11"></use>
-                <use fill-opacity="0.87" fill="#FFFFFF" xlink:href="#path-11"></use>
-            </g>
-        </g>
-        <g id="Group-2" filter="url(#filter-13)" transform="translate(68.000000, 39.000000)" stroke="#00D0BE" stroke-width="3">
-            <rect id="Rectangle" x="1.5" y="1.5" width="117" height="117" rx="22"></rect>
-            <rect id="Rectangle" x="23.5" y="1.5" width="17" height="69"></rect>
-            <rect id="Rectangle-Copy" x="51.5" y="1.5" width="17" height="69"></rect>
-            <rect id="Rectangle-Copy-2" x="79.5" y="1.5" width="17" height="69"></rect>
-            <line x1="32.5" y1="72.5" x2="32.5" y2="118.5" id="Line-2" stroke-linecap="square"></line>
-            <line x1="60.5" y1="72.5" x2="60.5" y2="118.5" id="Line-2-Copy" stroke-linecap="square"></line>
-            <line x1="88.5" y1="71.5" x2="88.5" y2="117.5" id="Line-2-Copy-2" stroke-linecap="square"></line>
         </g>
     </g>
 </svg>

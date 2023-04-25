@@ -167,7 +167,8 @@ function updatePalette(base: Palette): Palette {
   res.text.secondary = text + "c0";
   res.text.disabled = text + "80"
   res.divider = text + "20";
-  res.background.paper = blendColor('#222222', primary + "20");
+  res.background.default = blendColor('#121212', primary + "20");
+  res.background.paper = blendColor('#282828', primary + "10");
   return res;
 }
 
