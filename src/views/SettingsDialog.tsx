@@ -173,7 +173,7 @@ function ColorPanel(props: TabPanelProps) {
           onChange={updatePrimaryColor}
         />
         <ColorSelector
-          label="Secondary Color"
+          label="Accent Color"
           variants={["A100", "A200", "A400", "A700"]}
           value={secondaryColor}
           onChange={updateSecondaryColor}
