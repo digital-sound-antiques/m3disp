@@ -26,11 +26,12 @@ import "./App.css";
 import { OptionMenu } from "./OptionMenu";
 import { PlayListCard, PlayListView } from "./PlayListView";
 import { PlayControl, PlayControlCard } from "./PlayerControl";
-import { AppProgressDialog } from "./ProgressDialog";
+import { AppProgressDialog } from "./AppProgressDialog";
 import { SettingsDialog } from "./SettingsDialog";
 
 import { AboutDialog } from "./AboutDialog";
 import { TimeSlider } from "../widgets/TimeSlider";
+import { SampleDialog } from "./SampleDialog";
 
 const gap = { xs: 0, sm: 1, md: 1.5, lg: 2 };
 
@@ -53,6 +54,7 @@ function AppRoot() {
       <OptionMenu id="option-menu" />
       <AboutDialog />
       <AppProgressDialog />
+      <SampleDialog/>
       {isXs ? <AppRootMobile /> : <AppRootDesktop />}
     </Fragment>
   );

@@ -155,15 +155,6 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
     if (!initialized) {
       await state.storage.open("m3disp");
       await pruneEntries();
-      if (state.entries.length == 0) {
-        const entries = await loadUrls([
-          "./mgs/captain.mgs",
-          "./mgs/captain2.mgs",
-          "./mgs/blue_skies.mgs",
-          "./mgs/imastown.mgs",
-        ]);
-        await setEntries(entries);
-      }
       setInitialized(true);
     }
   };
@@ -279,22 +270,6 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
       await stop();
       setState((oldState: PlayerContextData) => ({ ...oldState, channelMask: { ...channelMask } }));
     }
-  };
-
-  const loadUrls = async (urls: string[]): Promise<PlayListEntry[]> => {
-    const entries: PlayListEntry[] = [];
-    for (const url of urls) {
-      try {
-        const res = await fetch(url);
-        const filename = url.split(/[/\\]/).pop() ?? "Unknown";
-        const data = new Uint8Array(await res.arrayBuffer());
-        const entry = await createPlayListEntry(data, filename);
-        entries.push(entry);
-      } catch (e) {
-        console.warn(e);
-      }
-    }
-    return entries;
   };
 
   const createPlayListEntry = async (

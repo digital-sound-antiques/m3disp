@@ -1,4 +1,3 @@
-import { useTheme } from "@emotion/react";
 import { Divider, Menu, MenuItem } from "@mui/material";
 import { AppContext } from "../contexts/AppContext";
 import { useContext } from "react";

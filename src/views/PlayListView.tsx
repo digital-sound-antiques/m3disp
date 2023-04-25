@@ -1,12 +1,4 @@
-import {
-  DeleteSweepOutlined,
-  DragHandle,
-  Edit,
-  Pause,
-  PlayArrow,
-  PlaylistAdd,
-  Remove,
-} from "@mui/icons-material";
+import { DragHandle, Pause, PlayArrow, Remove } from "@mui/icons-material";
 import {
   Box,
   Button,
@@ -16,10 +8,10 @@ import {
   ListItem,
   ListItemButton,
   ListItemText,
-  Stack,
   SxProps,
   Theme,
   Typography,
+  useMediaQuery,
   useTheme,
 } from "@mui/material";
 
@@ -31,8 +23,14 @@ import { StrictModeDroppable as Droppable } from "../widgets/StrictModeDroppable
 
 import { FileDrop } from "react-file-drop";
 import { useFileDrop } from "../contexts/FileDropContext";
+import { PlayListToolBar } from "../widgets/PlayListToolBar";
+import { AppContext } from "../contexts/AppContext";
 
-export function PlayListBody(props: { editMode: boolean; sx?: SxProps<Theme> | null }) {
+export function PlayListBody(props: {
+  onAddClick: () => void;
+  editMode: boolean;
+  sx?: SxProps<Theme> | null;
+}) {
   const context = useContext(PlayerContext);
 
   const _play = async (index: number) => {
@@ -69,6 +67,48 @@ export function PlayListBody(props: { editMode: boolean; sx?: SxProps<Theme> | n
     }
     context.reorderEntry(source.index, destination.index);
   };
+
+  const theme = useTheme();
+  const isXs = useMediaQuery(theme.breakpoints.down("sm"));
+  const app = useContext(AppContext);
+
+  if (context.entries.length == 0) {
+    return (
+      <Box
+        sx={{
+          display: "flex",
+          flex: 1,
+          flexDirection: "column",
+          overflow: "auto",
+          ...props.sx,
+          justifyContent: "center",
+          alignItems: "center",
+          pb: 4,
+        }}
+      >
+        {isXs ? (
+          <Button variant="contained" onClick={props.onAddClick}>
+            Open File...
+          </Button>
+        ) : null}
+        {!isXs ? (
+          <Box
+            sx={{ m: 1, border: "2px dashed", borderColor: "primary.main", p: 3, borderRadius: 4 }}
+          >
+            <Typography variant="body2" color="primary.main" sx={{ m: 1 }}>
+              Drag and Drop your MGS files here
+            </Typography>
+          </Box>
+        ) : null}
+        <Typography variant="body2" sx={{ m: 2 }}>
+          Or
+        </Typography>
+        <Button variant="contained" onClick={() => app.openDialog("sample-dialog")}>
+          Open Samples
+        </Button>
+      </Box>
+    );
+  }
 
   return (
     <Box sx={{ flex: 1, overflow: "auto", ...props.sx }}>
@@ -138,63 +178,6 @@ export function PlayListBody(props: { editMode: boolean; sx?: SxProps<Theme> | n
           }}
         </Droppable>
       </DragDropContext>
-    </Box>
-  );
-}
-
-export function PlayListToolBar(props: {
-  deleteMode: boolean;
-  setEditMode: (flag: boolean) => void;
-  onAddClick: () => void;
-  sx?: SxProps<Theme> | null;
-}) {
-  const context = useContext(PlayerContext);
-  return (
-    <Box
-      sx={{
-        display: "flex",
-        flexDirection: "row",
-        justifyContent: "space-between",
-        alignItems: "center",
-        height: "48px",
-        pl: 1,
-        pr: 1,
-        ...props.sx,
-      }}
-    >
-      <IconButton onClick={props.onAddClick}>
-        <PlaylistAdd />
-      </IconButton>
-      {props.deleteMode ? (
-        <Stack sx={{ flexDirection: "row", gap: 1 }}>
-          <Button
-            variant="outlined"
-            color="error"
-            onClick={() => {
-              context.setEntries([]);
-              props.setEditMode(false);
-            }}
-          >
-            Clear all
-          </Button>
-          <Button
-            variant="outlined"
-            onClick={() => {
-              props.setEditMode(false);
-            }}
-          >
-            Done
-          </Button>
-        </Stack>
-      ) : (
-        <IconButton
-          onClick={() => {
-            props.setEditMode(true);
-          }}
-        >
-          <Edit />
-        </IconButton>
-      )}
     </Box>
   );
 }
@@ -294,7 +277,7 @@ export function PlayListView(props: { toolbarAlignment?: "top" | "bottom" }) {
           onAddClick={onTargetClick}
           sx={{ boxShadow: "0 0 2px 0 #00000080", ...barSx }}
         />
-        <PlayListBody editMode={deleteMode} sx={bodySx} />
+        <PlayListBody onAddClick={onTargetClick} editMode={deleteMode} sx={bodySx} />
       </FileDrop>
       <input
         onChange={onFileInputChange}
