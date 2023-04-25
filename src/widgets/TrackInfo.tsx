@@ -216,6 +216,7 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
           if (newStatus != null) {
             const lastVoice = vbufRef.current[vbufRef.current.length - 1];
             if (
+              props.targets[0].device != "opll" ||
               newStatus.mode == "rch" ||
               (newStatus.kcode != null &&
                 newStatus.keyKeepFrames != null &&
@@ -350,12 +351,14 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
           <Box sx={{ position: "relative", width: "100%", height: "100%" }}>{voiceNode}</Box>
         </Box>
       </Box>
-      <Box sx={{ position: "relative", width: "100%", height: "2px" }}>
+      <Box
+        sx={{ position: "relative", width: "100%", height: { sm: "1px", md: "2px", lg: "3px" } }}
+      >
         <Box sx={{ position: "absolute", top: 0, bottom: 0, right: 8, left: 8 }}>
           <VolumeInfoPanel variant="horizontal" targets={props.targets} disabled={props.disabled} />
         </Box>
       </Box>
-      <Box sx={{ height: "4px" }}></Box>
+      <Box sx={{ height: { xs: "4px", lg: "6px" } }}></Box>
     </Box>
   );
 }

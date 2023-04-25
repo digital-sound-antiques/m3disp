@@ -8,6 +8,30 @@ export function useFileDrop(playOnDrop: boolean, clearOnDrop: boolean = false) {
 
   const [isDraggingOver, setDraggingOver] = useState(false);
 
+  const highlightListItem = (target: HTMLElement): HTMLElement | null => {
+    if (target instanceof HTMLElement) {
+      const item = target.closest(".MuiListItem-root");
+      const list = target.closest(".MuiList-root");
+      const items = list?.querySelectorAll(".MuiListItem-root") ?? [];
+      for (let i = 0; i < items.length; i++) {
+        if (items[i] == item) {
+          items[i].classList.add("fileDragOver");
+        } else {
+          items[i].classList.remove("fileDragOver");
+        }
+      }
+    }
+    return null;
+  };
+
+  const clearHighlight = () => {
+    const list = document.querySelector(".MuiList-root");
+    const items = list?.querySelectorAll(".MuiListItem-root") ?? [];
+    for (let i = 0; i < items.length; i++) {
+      items[i].classList.remove("fileDragOver");
+    }
+  };
+
   const fileDropRef = useRef(null);
   const fileDropProps = {
     onDragOver: (ev: React.DragEvent<HTMLDivElement>) => {
@@ -16,12 +40,15 @@ export function useFileDrop(playOnDrop: boolean, clearOnDrop: boolean = false) {
         return;
       }
       setDraggingOver(true);
+      highlightListItem(ev.target as HTMLElement);
       ev.preventDefault();
     },
     onDragLeave: (ev: React.DragEvent<HTMLDivElement>) => {
       setDraggingOver(false);
+      clearHighlight();
     },
     onDrop: (files: FileList | null, ev: React.DragEvent<HTMLDivElement>) => {
+      clearHighlight();
       setDraggingOver(false);
       if (ev.defaultPrevented) {
         return;
@@ -63,6 +90,7 @@ export function FileDropContext(props: PropsWithChildren) {
 
   return (
     <FileDrop ref={fileDropRef} {...fileDropProps}>
+      <style>{`.fileDragOver { border-top: 2px solid ${theme.palette.secondary.main};  }`}</style>
       <Box
         sx={{
           outline: outline,
