@@ -2,6 +2,7 @@ import { KSSPlayer } from "./kss-player";
 import { KSSDeviceName } from "./kss-device";
 
 export type ChannelStatus = {
+  id: ChannelId;
   freq: number;
   kcode?: number | null;
   vol: number;
@@ -24,7 +25,8 @@ function createPSGVoiceName(ton: boolean, non: boolean) {
 
 /// ch 0,1,2: tone
 /// ch 3,4,5: noise
-function createPSGStatus(regs: Uint8Array, ch: number): ChannelStatus {
+function createPSGStatus(regs: Uint8Array, id: ChannelId): ChannelStatus {
+  const ch = id.index;
   if (ch < 3) {
     const fdiv = ((regs[ch * 2 + 1] & 0xff) << 8) | regs[ch * 2];
     const vol = Math.min(15, regs[8 + ch]);
@@ -35,9 +37,9 @@ function createPSGStatus(regs: Uint8Array, ch: number): ChannelStatus {
     const freq = fdiv > 0 ? 3579545 / 2 / 16 / 2 / fdiv : 0;
     if (ton && vol > 0 && freq != 0) {
       const kcode = 57 + Math.round(Math.log2(freq / A4) * 12);
-      return { freq, kcode, vol, voice };
+      return { id, freq, kcode, vol, voice };
     } else {
-      return { freq, vol, voice };
+      return { id, freq, vol, voice };
     }
   } else {
     const freq = regs[6];
@@ -46,27 +48,28 @@ function createPSGStatus(regs: Uint8Array, ch: number): ChannelStatus {
     const non = (regs[7] & (8 << (ch - 3))) == 0;
     const voice = createPSGVoiceName(ton, non);
     if (non && vol > 0) {
-      return { freq, kcode: freq, vol, mode: "noise", voice };
+      return { id, freq, kcode: freq, vol, mode: "noise", voice };
     } else {
-      return { freq, vol, mode: "noise", voice };
+      return { id, freq, vol, mode: "noise", voice };
     }
   }
 }
 
-function createSCCStatus(regs: Uint8Array, ch: number): ChannelStatus {
+function createSCCStatus(regs: Uint8Array, id: ChannelId): ChannelStatus {
+  const ch = id.index;
   const fdiv = ((regs[0xc0 + ch * 2 + 1] & 0xff) << 8) | regs[0xc0 + ch * 2];
   const freq = 3579545 / 2 / 16 / 2 / fdiv;
   const vol = regs[0xd0 + ch] & 0x0f;
   const A4 = 440.0;
 
-  const vch = ch < 5 ? ch : 4;
+  const vch = (regs[0xe0] & 1) ? ch : (ch < 5 ? ch : 4);
   const voice = new Uint8Array(regs.buffer, regs.byteOffset + vch * 32, 32);
 
   if (vol > 0 && freq > 0) {
     const kcode = 57 + Math.round(Math.log2(freq / A4) * 12);
-    return { freq, kcode, vol, voice };
+    return { id, freq, kcode, vol, voice };
   } else {
-    return { freq, vol, voice };
+    return { id, freq, vol, voice };
   }
 }
 
@@ -74,11 +77,12 @@ function createOPLLStatus(
   regs: Uint8Array,
   /// ch: logical channel
   /// 0-8: FM1-9, 9:BD, 10:SD, 11:TOM, 12:CYM, 13:HH
-  ch: number,
+  id: ChannelId,
   keyKeepFrames: ArrayLike<number> | Array<number>
 ): ChannelStatus | null {
   const rflag = (regs[0x0e] & 32) != 0;
 
+  let ch = id.index;
   let mode: string | null = null;
   let pch; // physical channel
 
@@ -147,7 +151,7 @@ function createOPLLStatus(
   }
 
   let voice;
-  if (pch >= 6 && rflag) {
+  if (rflag && ch >= 6) {
     if (pch == 6) {
       voice = "B.D.";
     } else if (pch == 7) {
@@ -165,9 +169,9 @@ function createOPLLStatus(
 
   if (kon) {
     const kcode = 57 + Math.round(Math.log2(freq / A4) * 12);
-    return { freq, kcode, vol, mode, keyKeepFrames: keyKeepFrames[ch], voice };
+    return { id, freq, kcode, vol, mode, keyKeepFrames: keyKeepFrames[ch], voice };
   } else {
-    return { freq, vol, mode, keyKeepFrames: keyKeepFrames[ch], voice };
+    return { id, freq, vol, mode, keyKeepFrames: keyKeepFrames[ch], voice };
   }
 }
 
@@ -180,11 +184,11 @@ export function getChannelStatus(player: KSSPlayer, id: ChannelId): ChannelStatu
 
   switch (id.device) {
     case "psg":
-      return createPSGStatus(snapshot.psg!, id.index);
+      return createPSGStatus(snapshot.psg!, id);
     case "scc":
-      return createSCCStatus(snapshot.scc!, id.index);
+      return createSCCStatus(snapshot.scc!, id);
     case "opll":
-      return createOPLLStatus(snapshot.opll!, id.index, snapshot.opllkeyKeepFrames!);
+      return createOPLLStatus(snapshot.opll!, id, snapshot.opllkeyKeepFrames!);
     default:
       throw new Error(`Uknown device: ${id.device}`);
   }
@@ -218,7 +222,7 @@ function toOpllVoiceName(n: number): string {
     case 9:
       return "Horn";
     case 10:
-      return "Synth";
+      return "Synthsizer";
     case 11:
       return "Harpsicode";
     case 12:
@@ -228,7 +232,7 @@ function toOpllVoiceName(n: number): string {
     case 14:
       return "Wood Bass";
     case 15:
-      return "Electric Bass";
+      return "Elec. Bass";
     default:
       throw new Error();
   }

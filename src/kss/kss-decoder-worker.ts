@@ -4,9 +4,9 @@ import { KSSChannelMask } from "./kss-device";
 
 export type KSSDecoderStartOptions = {
   data: Uint8Array | ArrayBuffer | ArrayBufferLike | ArrayLike<number>;
-  label?: string;
-  song?: number;
-  cpu?: number;
+  label?: string | null;
+  song?: number | null;
+  cpu?: number | null;
   duration?: number | null;
   fadeDuration?: number | null;
   rcf?: null | {
@@ -31,6 +31,10 @@ export type KSSDecoderDeviceSnapshot = {
   wave: number;
 };
 
+const defaultDuration = 60 * 1000 * 5;
+const defaultFadeDuration = 5 * 1000;
+const defaultLoop = 2;
+
 class KSSDecoderWorker extends AudioDecoderWorker {
   constructor(worker: Worker) {
     super(worker);
@@ -38,7 +42,10 @@ class KSSDecoderWorker extends AudioDecoderWorker {
 
   private _kss: KSS | null = null;
   private _kssplay: KSSPlay | null = null;
-  private _maxDuration = 60 * 1000 * 5;
+
+
+
+  private _duration = 60 * 1000 * 5;
   private _fadeDuration = 5 * 1000;
   private _decodeFrames = 0;
   private _maxLoop = 2;
@@ -58,9 +65,10 @@ class KSSDecoderWorker extends AudioDecoderWorker {
       throw new Error(`Invalid data type=${typeof args.data}`);
     }
 
-    if (this._kssplay == null) {
-      this._kssplay = new KSSPlay(this.sampleRate);
+    if (this._kssplay != null) {
+      this._kssplay.release();
     }
+    this._kssplay = new KSSPlay(this.sampleRate);
 
     this._kssplay.setData(this._kss);
     this._kssplay.setDeviceQuality({ psg: 1, opll: 1, scc: 0, opl: 1 });
@@ -75,11 +83,12 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     this._kssplay.setChannelMask("scc", args.channelMask?.scc ?? 0);
     this._kssplay.setChannelMask("opll", args.channelMask?.opll ?? 0);
     this._kssplay.setChannelMask("opl", args.channelMask?.opl ?? 0);
+    this._kssplay.setSilentLimit(15 * 1000);
 
-    this._fadeDuration = args.fadeDuration ?? this._fadeDuration;
-    this._maxDuration = args.duration ?? this._maxDuration;
+    this._fadeDuration = args.fadeDuration ?? defaultFadeDuration;
+    this._duration = (args.duration ?? defaultDuration);
     this._hasDebugMarker = args.debug ?? false;
-    this._maxLoop = args.loop ?? this._maxLoop;
+    this._maxLoop = args.loop ?? defaultLoop;
     this._decodeFrames = 0;
 
     this._kssplay.setIOWriteHandler(this._ioWriteHandler);
@@ -141,7 +150,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     if (this._kssplay == null) return;
 
     const interval = Math.floor(this.sampleRate / 60);
-    const maxTick = (this.sampleRate * this._maxDuration) / 1000;
+    const maxTick = (this.sampleRate * this._duration) / 1000;
     let tick = 0;
     while (tick <= maxTick) {
       this._kssplay!.calcSilent(interval);
@@ -179,14 +188,14 @@ class KSSDecoderWorker extends AudioDecoderWorker {
 
     if (
       this._kssplay.getLoopCount() >= this._maxLoop ||
-      this._maxDuration - this._fadeDuration <= currentTimeInMs
+      this._duration <= currentTimeInMs
     ) {
       if (this._kssplay.getFadeFlag() == 0) {
         this._kssplay.fadeStart(this._fadeDuration);
       }
     }
 
-    if (this._maxDuration < currentTimeInMs) {
+    if ((this._duration + this._fadeDuration) < currentTimeInMs) {
       return null;
     }
 

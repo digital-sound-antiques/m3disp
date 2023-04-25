@@ -57,7 +57,7 @@ export function VolumeIndicator(props: VolumeIndicatorProps) {
 
     let v;
     if (props.keyKeepFrames != null) {
-      const decayCycle = props.kcode != null ? 90 : 15;
+      const decayCycle = props.kcode != null ? 90 : 30;
       const elapsedCycle = Math.min(props.keyKeepFrames / 735, decayCycle);
       const att = (decayCycle - elapsedCycle) / decayCycle;
       v = Math.round(props.volume * att);
@@ -202,7 +202,6 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
   const context = useContext(PlayerContext);
 
   const [status, setStatus] = useState<ChannelStatus | null>(null);
-  const vbufRef = useRef<any[]>([]);
 
   const rootRef = useRef(null);
   const disabledRef = useRef(props.disabled);
@@ -210,35 +209,18 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
   const renderFrame = () => {
     if (rootRef.current != null) {
       requestAnimationFrame(renderFrame);
-      if (!disabledRef.current) {
+      if (
+        !disabledRef.current &&
+        (context.player.state == "playing" || context.player.state == "paused")
+      ) {
         for (const target of props.targets) {
           const newStatus = context.player.getChannelStatus(target);
           if (newStatus != null) {
-            const lastVoice = vbufRef.current[vbufRef.current.length - 1];
-            if (
-              props.targets[0].device != "opll" ||
-              newStatus.mode == "rch" ||
-              (newStatus.kcode != null &&
-                newStatus.keyKeepFrames != null &&
-                newStatus.keyKeepFrames == 0)
-            ) {
-              vbufRef.current = [newStatus.voice];
-            } else if (lastVoice != newStatus.voice) {
-              if (lastVoice == null) {
-                vbufRef.current = [newStatus.voice];
-              } else {
-                vbufRef.current = [lastVoice, newStatus.voice];
-              }
-            }
             setStatus(newStatus);
-          } else {
-            vbufRef.current = [];
-            setStatus(null);
           }
         }
       } else {
-        vbufRef.current = [];
-        setStatus({ freq: 0, vol: 0 });
+        setStatus(null);
       }
     }
   };
@@ -249,6 +231,7 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
   }, [props.disabled]);
 
   const voiceNameBoxRef = useRef<HTMLDivElement>(null);
+
   let voiceNode = null;
 
   if (props.targets[0].device != "scc") {
@@ -263,18 +246,16 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
             position: "relative",
             color: "primary.main",
             height: "100%",
-            width: "100%",
+            whiteSpace: "nowrap",
           }}
         >
           <Typography
             sx={{
               fontSize: { sm: "8px", md: "9px", lg: "10px", xl: "11px" },
               fontWeight: "bold",
-              whiteSpace: "nowrap",
-              textOverflow: "ellipsis",
             }}
           >
-            {[...vbufRef.current].reverse().join(" < ")}
+            {status?.voice}
           </Typography>
         </Box>
       );
@@ -291,13 +272,9 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
           }}
         >
           <Box sx={{ position: "absolute", top: 6, bottom: 6, right: 4, left: 4 }}>
-            <WaveIndicator
-              wave={status?.voice}
-              color={theme.palette.primary.main}
-              sx={{
-                opacity: 0.84,
-              }}
-            />
+            <WaveIndicator wave={status?.voice} color={theme.palette.primary.main} sx={{
+              opacity: 0.54
+            }} />
           </Box>
         </Box>
       );
@@ -313,8 +290,8 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
         flexDirection: "column",
         justifyContent: "start",
         alignItems: "stretch",
-        minWidth: { sm: "96px", lg: "160px" },
-        width: { sm: "96px", lg: "160px" },
+        minWidth: { sm: "96px", lg: "128px" },
+        width: { sm: "96px", lg: "128px" },
       }}
     >
       <Box
@@ -324,13 +301,15 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
           position: "relative",
           flexDirection: "row",
           alignItems: "stretch",
-          gap: 1,
-          px: 1,
+          px: { md: 0.25, lg: 0.5 },
         }}
       >
-        <Box sx={{ display: "flex", alignItems: "center" }}>
+        <Box
+          sx={{ flex: 0, flexShrink: 0, display: "flex", alignItems: "center", flexBasis: "2em" }}
+        >
           <Typography
             sx={{
+              flexBasis: "64px",
               textAlign: "center",
               fontSize: { sm: "8px", md: "9px", lg: "10px", xl: "11px" },
               fontWeight: "bold",
@@ -342,7 +321,10 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
         </Box>
         <Box
           sx={{
-            flex: 1,
+            position: "relative",
+            flex: 0,
+            flexGrow: 1,
+            flexShrink: 0,
             display: "flex",
             flexDirection: "column",
             alignItems: "stretch",
@@ -352,7 +334,7 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
         </Box>
       </Box>
       <Box
-        sx={{ position: "relative", width: "100%", height: { sm: "1px", md: "2px", lg: "3px" } }}
+        sx={{ position: "relative", width: "100%", height: { sm: "1px", md: "2px", lg: "2px" } }}
       >
         <Box sx={{ position: "absolute", top: 0, bottom: 0, right: 8, left: 8 }}>
           <VolumeInfoPanel variant="horizontal" targets={props.targets} disabled={props.disabled} />
@@ -383,24 +365,27 @@ export function VolumeInfoPanel(props: VolumeInfoPanelProps) {
     if (rootRef.current != null) {
       requestAnimationFrame(renderFrame);
       if (!disabledRef.current) {
-        let nextStatus: ChannelStatus = { freq: 0, vol: 0 };
-        for (const target of props.targets) {
-          const newStatus = context.player.getChannelStatus(target);
-          if (newStatus != null) {
-            if (nextStatus.vol < newStatus.vol) {
-              nextStatus.vol = newStatus.vol;
-            }
-            if (
-              nextStatus.keyKeepFrames == null ||
-              nextStatus.keyKeepFrames > (newStatus.keyKeepFrames ?? 0)
-            ) {
-              nextStatus.keyKeepFrames = newStatus.keyKeepFrames ?? 0;
+        if (props.targets.length > 0) {
+          let nextStatus: ChannelStatus;
+          for (const target of props.targets) {
+            nextStatus = { id: target, freq: 0, vol: 0 };
+            const newStatus = context.player.getChannelStatus(target);
+            if (newStatus != null) {
+              if (nextStatus.vol < newStatus.vol) {
+                nextStatus.vol = newStatus.vol;
+              }
+              if (
+                nextStatus.keyKeepFrames == null ||
+                nextStatus.keyKeepFrames > (newStatus.keyKeepFrames ?? 0)
+              ) {
+                nextStatus.keyKeepFrames = newStatus.keyKeepFrames ?? 0;
+              }
             }
           }
+          setStatus(nextStatus!);
         }
-        setStatus(nextStatus);
       } else {
-        setStatus({ freq: 0, vol: 0 });
+        setStatus(null);
       }
     }
   };

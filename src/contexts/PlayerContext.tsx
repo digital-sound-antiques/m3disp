@@ -8,11 +8,15 @@ import { BinaryDataStorage } from "../utils/binary-data-storage";
 import { isIOS, isSafari } from "../utils/platform-detect";
 import { unmuteAudio } from "../utils/unmute";
 import { AppProgressContext } from "./AppProgressContext";
+import { parseM3U } from "../utils/m3u-parser";
 
 export type PlayListEntry = {
   title: string;
   filename: string;
   dataId: string; // sha1 for data
+  duration?: number | null; // in ms
+  fadeDuration?: number | null; // in ms
+  song?: number | null; // sub song number
 };
 
 export type RepeatMode = "none" | "all" | "single";
@@ -156,6 +160,7 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
           "./mgs/captain.mgs",
           "./mgs/captain2.mgs",
           "./mgs/blue_skies.mgs",
+          "./mgs/imastown.mgs",
         ]);
         await setEntries(entries);
       }
@@ -226,8 +231,7 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
     }));
 
     if (playIndex != null && playIndex < entries.length) {
-      const { dataId } = entries[playIndex];
-      await play(dataId);
+      await play(entries[playIndex]);
     }
   };
 
@@ -309,23 +313,77 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
     };
   };
 
+  const registerFile = async (file: Blob): Promise<string> => {
+    console.log(`loading: ${file.name}`);
+    const data = await loadFromFile(file);
+    if (data instanceof Uint8Array) {
+      return await state.storage.put(data);
+    }
+    throw new Error(`Can't load ${file.name}`);
+  };
+
+  const getFilename = (path: string): string => {
+    return path.split(/[/\\]/).pop()!;
+  };
+
+  const getBasename = (path: string) => {
+    const filename = path.split(/[/\\]/).pop();
+    const fragments = filename!.split(".");
+    fragments.pop();
+    return fragments.join(".");
+  };
+
+  const loadEntriesFromM3U = async (m3u: File, files: FileList): Promise<PlayListEntry[]> => {
+    const text = await loadFromFile(m3u);
+    if (typeof text !== "string") {
+      throw new Error('Not a text file');
+    }
+    const items = parseM3U(text);
+    const dataIds = items.map((e) => e.dataId);
+    const dataMap: { [key: string]: string } = {};
+    const processed = new Set<string>();
+
+    for (const id of dataIds) {
+      if (id.startsWith("ref://")) {
+        if (processed.has(id)) continue;
+        const refName = id.substring(6).toLowerCase();
+        const refBasename = getBasename(refName);
+        for (const file of files) {
+          const name = getFilename(file.name).toLowerCase();
+          if (refName == name || refBasename + ".kss" == name) {
+            const dataId = await registerFile(file);
+            dataMap[id] = dataId;
+            processed.add(id);
+          }
+        }
+      }
+    }
+
+    const res: PlayListEntry[] = [];
+    for (const item of items) {
+      const dataId = dataMap[item.dataId];
+      if (dataId != null) {
+        res.push({ ...item, dataId });
+      }
+    }
+    return res;
+  };
+
   const progressContext = useContext(AppProgressContext);
 
-  const loadFiles = async (
-    files: FileList,
-    insertionIndex: number,
-    options: { play?: boolean; clear?: boolean } = {}
-  ) => {
-    const incomingEntries: PlayListEntry[] = [];
+  const loadEntriesFromFileList = async (files: FileList): Promise<PlayListEntry[]> => {
     const { setProgress } = progressContext;
+    const res: PlayListEntry[] = [];
     setProgress(0.0);
     for (let i = 0; i < files.length; i++) {
       const file = files[i];
       try {
         const data = await loadFromFile(file);
-        const filename = file.name.split(/[/\\]/).pop() ?? "Unknown";
-        const entry = await createPlayListEntry(data, filename);
-        incomingEntries.push(entry);
+        if (data instanceof Uint8Array) {
+          const filename = file.name.split(/[/\\]/).pop() ?? "Unknown";
+          const entry = await createPlayListEntry(data, filename);
+          res.push(entry);
+        }
       } catch (e) {
         console.warn(e);
       }
@@ -334,6 +392,31 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
       }
     }
     setProgress(null);
+    return res;
+  };
+
+  const loadFiles = async (
+    files: FileList,
+    insertionIndex: number,
+    options: { play?: boolean; clear?: boolean } = {}
+  ) => {
+    let m3u = false;
+    for (let i = 0; i < files.length; i++) {
+      if (/\.(pls|m3u)$/i.test(files[i].name)) {
+        m3u = true;
+      }
+    }
+
+    let incomingEntries: PlayListEntry[] = [];
+    if (m3u) {
+      for (let i = 0; i < files.length; i++) {
+        if (/\.(pls|m3u)$/i.test(files[i].name)) {
+          incomingEntries = [...incomingEntries, ...(await loadEntriesFromM3U(files[i], files))];
+        }
+      }
+    } else {
+      incomingEntries = await loadEntriesFromFileList(files);
+    }
 
     const state = stateRef.current!;
 
@@ -357,29 +440,32 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
     setEntries(newEntries, newSelectedIndex, playIndex);
   };
 
-  const play = async (indexOrDataId?: number | string | null) => {
+  const play = async (indexOrEntry?: number | PlayListEntry | null) => {
     const state = stateRef.current!;
     unmuteAudio();
 
     if (state.audioContext.state != "running") {
       await state.audioContext.resume();
     }
-    let dataId;
-    if (typeof indexOrDataId === "number") {
-      setSelectedIndex(indexOrDataId);
-      dataId = state.entries[indexOrDataId ?? state.selectedIndex]?.dataId;
-    } else if (typeof indexOrDataId === "string") {
-      dataId = indexOrDataId;
+
+    let entry: PlayListEntry;
+
+    if (typeof indexOrEntry === "number") {
+      setSelectedIndex(indexOrEntry);
+      entry = state.entries[indexOrEntry ?? state.selectedIndex];
+    } else if (typeof indexOrEntry === "object") {
+      entry = indexOrEntry as PlayListEntry;
     } else if (state.entries.length > 0) {
       const index = state.selectedIndex ?? 0;
       setSelectedIndex(index);
-      dataId = state.entries[index].dataId;
+      entry = state.entries[index];
     } else {
       return;
     }
 
-    const data = await state.storage.get(dataId);
-    await state.player.play({ data, channelMask: state.channelMask });
+    const data = await state.storage.get(entry.dataId);
+    const { song, duration, fadeDuration } = entry;
+    await state.player.play({ data, song, channelMask: state.channelMask, duration, fadeDuration });
 
     setState((oldState) => ({ ...oldState, isPlaying: true }));
   };
@@ -446,10 +532,8 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
   );
 }
 
-async function loadFromFile(blob: Blob): Promise<Uint8Array> {
-  await MGSC.initialize();
-
-  return new Promise<Uint8Array>((resolve, reject) => {
+async function loadFromFile(blob: Blob): Promise<Uint8Array | string> {
+  return new Promise<Uint8Array | string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => {
       try {
@@ -465,6 +549,8 @@ async function loadFromFile(blob: Blob): Promise<Uint8Array> {
             const { mgs } = MGSC.compile(text);
             resolve(mgs);
             return;
+          } else {
+            resolve(text);
           }
         }
         resolve(u8);
