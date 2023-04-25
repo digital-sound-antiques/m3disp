@@ -1,5 +1,5 @@
 import { Palette, Theme, createTheme } from "@mui/material";
-import { pink, teal } from "@mui/material/colors";
+import { teal } from "@mui/material/colors";
 import { PropsWithChildren, createContext, useEffect, useState } from "react";
 import AppGlobal from "./AppGlobal";
 
@@ -10,7 +10,7 @@ const defaultTheme = createTheme({
       main: teal[300],
     },
     secondary: {
-      main: pink["A200"],
+      main: teal["A200"],
     },
     action: {
       selectedOpacity: 0.84,
