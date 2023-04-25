@@ -110,13 +110,13 @@ const createDefaultContextData = () => {
 
   try {
     const data = localStorage.getItem("m3disp.playerContext");
-    const json = data != null ? JSON.parse(data) : undefined;
+    const json = data != null ? JSON.parse(data) : {};
     const pls = localStorage.getItem("m3disp.entries");
     const entries = pls != null ? JSON.parse(pls) : [];
     model.entries = entries;
-    model.masterGain = json.masterGain;
+    model.masterGain = json.masterGain ?? model.masterGain;
     model.gainNode.gain.value = model.masterGain;
-    model.repeatMode = json.repeatMode;
+    model.repeatMode = json.repeatMode ?? model.repeatMode;
   } catch (e) {
     console.error(e);
     localStorage.clear();

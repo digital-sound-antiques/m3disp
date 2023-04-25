@@ -56,7 +56,6 @@ export class BinaryDataStorage {
       req.onerror = reject;
       req.onsuccess = (event) => resolve((event.target as IDBOpenDBRequest).result);
       req.onupgradeneeded = (event) => {
-        console.log(`${event.oldVersion} => ${event.newVersion}`);
         const db = (event.target as IDBOpenDBRequest).result;
         if (event.oldVersion == 0) {
           db.createObjectStore(this.storeName);
