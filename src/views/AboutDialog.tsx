@@ -26,6 +26,7 @@ export function AboutDialog() {
       <DialogContent sx={{ minWidth: "288px", backgroundColor: "background.paper" }}>
         <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
           <Box sx={{ p:1 }}><img src={logo} /></Box>
+          <Typography variant="caption">A realtime MSX sound player for the Web<br/></Typography>
           <Typography variant="caption">v{packageJson.version}<br/></Typography>
           <Typography variant="caption">
             This software uses following drivers.
