@@ -240,19 +240,22 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
         <Box
           ref={voiceNameBoxRef}
           sx={{
-            display: "flex",
-            justifyContent: "start",
-            alignItems: "center",
             position: "relative",
+            display: "flex",
+            flexDirection: "row",
+            justifyContent: "stretch",
+            alignItems: "center",
             color: "primary.main",
+            width: "100%",
             height: "100%",
             whiteSpace: "nowrap",
           }}
         >
           <Typography
             sx={{
-              fontSize: { sm: "8px", md: "9px", lg: "10px", xl: "11px" },
+              fontSize: { sm: "8px", md: "9px", lg: "10px", xl: "11px" },              
               fontWeight: "bold",
+              px: 0.25,
             }}
           >
             {status?.voice}
@@ -272,9 +275,13 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
           }}
         >
           <Box sx={{ position: "absolute", top: 6, bottom: 6, right: 4, left: 4 }}>
-            <WaveIndicator wave={status?.voice} color={theme.palette.primary.main} sx={{
-              opacity: 0.54
-            }} />
+            <WaveIndicator
+              wave={status?.voice}
+              color={theme.palette.primary.main}
+              sx={{
+                opacity: 0.54,
+              }}
+            />
           </Box>
         </Box>
       );
@@ -313,7 +320,7 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
               textAlign: "center",
               fontSize: { sm: "8px", md: "9px", lg: "10px", xl: "11px" },
               fontWeight: "bold",
-              color: "text.secondary",
+              color: "text.secondary",            
             }}
           >
             {props.title}
@@ -322,6 +329,7 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
         <Box
           sx={{
             position: "relative",
+            ml: 0.25,
             flex: 0,
             flexGrow: 1,
             flexShrink: 0,
