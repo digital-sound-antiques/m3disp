@@ -289,7 +289,6 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
   };
 
   const registerFile = async (file: Blob): Promise<string> => {
-    console.log(`loading: ${file.name}`);
     const data = await loadFromFile(file);
     if (data instanceof Uint8Array) {
       return await state.storage.put(data);

@@ -5,7 +5,7 @@ import {
   Select,
   SelectChangeEvent,
   Stack,
-  Typography
+  Typography,
 } from "@mui/material";
 
 import { Fragment, useState } from "react";
@@ -169,7 +169,7 @@ function VariantSelector(props: {
   );
 }
 
-function ColorBall(props: { color: string; selected?: boolean; onClick?: () => void }) {
+export function ColorBall(props: { color: string; selected?: boolean; onClick?: () => void }) {
   return (
     <Box
       style={{

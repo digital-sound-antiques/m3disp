@@ -6,6 +6,9 @@ import {
   DialogActions,
   DialogContent,
   Divider,
+  ListSubheader,
+  MenuItem,
+  Select,
   Tab,
   Tabs,
   Typography,
@@ -13,9 +16,9 @@ import {
 } from "@mui/material";
 import Grid2 from "@mui/material/Unstable_Grid2/Grid2";
 import React, { Fragment, useContext, useState } from "react";
-import { AppContext } from "../contexts/AppContext";
+import { AppContext, KeyHighlightColorType } from "../contexts/AppContext";
 import { SettingsContext, SettingsContextProvider } from "../contexts/SettingsContext";
-import { ColorSelector } from "../widgets/ColorSelector";
+import { ColorBall, ColorSelector } from "../widgets/ColorSelector";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -178,8 +181,55 @@ function ColorPanel(props: TabPanelProps) {
           value={secondaryColor}
           onChange={updateSecondaryColor}
         />
+        <KeyColorTypeSelector value="primary" />
       </Box>
     </TabPanel>
+  );
+}
+
+function KeyColorTypeSelector(props: { value: KeyHighlightColorType }) {
+  const theme = useTheme();
+  const app = useContext(AppContext);
+
+  const [value, setValue] = useState(app.keyHighlightColorType);
+
+  const updateKeyHighlightColorType = (type: KeyHighlightColorType) => {
+    app.setKeyHighlightColorType(type);
+    setValue(type);
+  };
+
+  return (
+    <Fragment>
+      <ListSubheader>Keyboard Highlight</ListSubheader>
+      <Box sx={{ mx: 2 }}>
+        <Select
+          fullWidth
+          size="small"
+          value={value}
+          onChange={(evt) => updateKeyHighlightColorType(evt.target.value as KeyHighlightColorType)}
+          renderValue={(value) => {
+            return (
+              <MenuItem sx={{ p: 0 }}>
+                <ColorBall color={theme.palette[value].main} />
+                <Typography>{value == "primary" ? "PrimaryColor" : "Accent Color"}</Typography>
+              </MenuItem>
+            );
+          }}
+        >
+          {[
+            { id: "primary", name: "PrimaryColor" },
+            { id: "secondary", name: "Accent Color" },
+          ].map((e) => {
+            return (
+              <MenuItem key={e.id} value={e.id}>
+                <ColorBall color={theme.palette[e.id as KeyHighlightColorType].main} />
+                <Typography>{e.name}</Typography>
+              </MenuItem>
+            );
+          })}
+        </Select>
+      </Box>
+    </Fragment>
   );
 }
 
@@ -191,6 +241,7 @@ function SettingsDialogBody(props: { id: string }) {
 
   const [savedPrimaryColor] = useState(theme.palette.primary.main);
   const [savedSecondaryColor] = useState(theme.palette.secondary.main);
+  const [savedKeyHighlightColorType] = useState(app.keyHighlightColorType);
 
   const handleChange = (event: React.SyntheticEvent, newValue: number) => {
     setValue(newValue);
@@ -199,6 +250,7 @@ function SettingsDialogBody(props: { id: string }) {
   const onCancel = () => {
     app.setPrimaryColor(savedPrimaryColor);
     app.setSecondaryColor(savedSecondaryColor);
+    app.setKeyHighlightColorType(savedKeyHighlightColorType);
     app.closeDialog(props.id);
     settings.revert();
   };
@@ -213,7 +265,7 @@ function SettingsDialogBody(props: { id: string }) {
         sx={{
           minWidth: "300px",
           width: { sm: "480px" },
-          height: { xs: "480px", sm: "400px" },
+          height: { xs: "480px", sm: "480px" },
           p: 0,
           backgroundColor: "background.paper",
         }}

@@ -14,7 +14,7 @@ const defaultTheme = createTheme({
     },
     action: {
       selectedOpacity: 0.84,
-    }
+    },
   },
   shape: {
     borderRadius: 4,
@@ -30,8 +30,11 @@ const defaultTheme = createTheme({
   },
 });
 
+export type KeyHighlightColorType = "primary" | "secondary";
+
 type AppContextData = {
   theme: Theme;
+  keyHighlightColorType: KeyHighlightColorType;
   openMap: { [key: string]: boolean };
   anchorElMap: { [key: string]: HTMLElement | null };
   isOpen: (id: string) => boolean;
@@ -41,6 +44,7 @@ type AppContextData = {
   closePopup: (id: string) => void;
   setPrimaryColor: (id: string) => void;
   setSecondaryColor: (id: string) => void;
+  setKeyHighlightColorType: (id: KeyHighlightColorType) => void;
 };
 
 const noop = () => {
@@ -49,6 +53,7 @@ const noop = () => {
 
 const defaultContextData: AppContextData = {
   theme: defaultTheme,
+  keyHighlightColorType: "primary",
   openMap: {},
   anchorElMap: {},
   isOpen: () => false,
@@ -58,9 +63,14 @@ const defaultContextData: AppContextData = {
   closePopup: noop,
   setPrimaryColor: noop,
   setSecondaryColor: noop,
+  setKeyHighlightColorType: noop,
 };
 
 export const AppContext = createContext(defaultContextData);
+
+const keyPrimaryColor = "m3disp.palette.primary.main";
+const keySecondaryColor = "m3disp.palette.secondary.main";
+const keyKeyHighlightColorType = "m3disp.keyHighlightColorType";
 
 export function AppContextProvider(props: PropsWithChildren) {
   const isOpen = (id: string) => {
@@ -98,7 +108,7 @@ export function AppContextProvider(props: PropsWithChildren) {
       return { ...oldState, theme: { ...oldState.theme, palette } };
     });
     if (save) {
-      localStorage.setItem("m3disp.palette.primary.main", id);
+      localStorage.setItem(keyPrimaryColor, id);
     }
   };
 
@@ -109,7 +119,16 @@ export function AppContextProvider(props: PropsWithChildren) {
       return { ...oldState, theme: { ...oldState.theme, palette } };
     });
     if (save) {
-      localStorage.setItem("m3disp.palette.secondary.main", id);
+      localStorage.setItem(keySecondaryColor, id);
+    }
+  };
+
+  const setKeyHighlightColorType = (type: KeyHighlightColorType, save: boolean = true) => {
+    setState((oldState) => {
+      return { ...oldState, keyHighlightColorType: type };
+    });
+    if (save) {
+      localStorage.setItem(keyKeyHighlightColorType, type);
     }
   };
 
@@ -124,12 +143,11 @@ export function AppContextProvider(props: PropsWithChildren) {
   useEffect(() => {
     initialize();
     const base = state.theme.palette;
-    setPrimaryColor(
-      localStorage.getItem("m3disp.palette.primary.main") ?? base.primary.main,
-      false
-    );
-    setSecondaryColor(
-      localStorage.getItem("m3disp.palette.secondary.main") ?? base.secondary.main,
+    setPrimaryColor(localStorage.getItem(keyPrimaryColor) ?? base.primary.main, false);
+    setSecondaryColor(localStorage.getItem(keySecondaryColor) ?? base.secondary.main, false);
+    setKeyHighlightColorType(
+      (localStorage.getItem(keyKeyHighlightColorType) ??
+        state.keyHighlightColorType) as KeyHighlightColorType,
       false
     );
   }, []);
@@ -152,6 +170,7 @@ export function AppContextProvider(props: PropsWithChildren) {
         closeDialog,
         setPrimaryColor,
         setSecondaryColor,
+        setKeyHighlightColorType,
       }}
     >
       {initialized ? props.children : null}
@@ -162,13 +181,13 @@ export function AppContextProvider(props: PropsWithChildren) {
 function updatePalette(base: Palette): Palette {
   const res = Object.assign({}, base);
   const primary = base.primary.main;
-  const text = blendColor('#eeeeee', primary + "10");
+  const text = blendColor("#eeeeee", primary + "10");
   res.text.primary = text;
   res.text.secondary = text + "c0";
-  res.text.disabled = text + "80"
+  res.text.disabled = text + "80";
   res.divider = text + "20";
-  res.background.default = blendColor('#121212', primary + "10");
-  res.background.paper = blendColor('#303030', primary + "08");
+  res.background.default = blendColor("#121212", primary + "10");
+  res.background.paper = blendColor("#303030", primary + "08");
   return res;
 }
 

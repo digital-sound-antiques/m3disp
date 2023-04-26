@@ -5,6 +5,7 @@ import { ChannelId } from "../kss/channel-status";
 import { KSSDeviceName } from "../kss/kss-device";
 import { Keyboard } from "./Keyboard";
 import { TrackInfoPanel, VolumeInfoPanel } from "./TrackInfo";
+import { AppContext } from "../contexts/AppContext";
 
 type DeviceCardProps = {
   name: string;
@@ -15,6 +16,8 @@ type DeviceCardProps = {
 };
 
 function DeviceCard(props: DeviceCardProps) {
+  const theme = useTheme();
+  const app = useContext(AppContext);
   const context = useContext(PlayerContext);
   const masks = context.channelMask[props.device];
 
@@ -53,7 +56,16 @@ function DeviceCard(props: DeviceCardProps) {
           <TrackInfoPanel title={props.name} targets={channels} disabled={mask} />
         )}
 
-        <Keyboard targets={channels} disabled={mask} />
+        <Keyboard
+          targets={channels}
+          disabled={mask}
+          highlightColor={
+            app.keyHighlightColorType == "primary"
+              ? theme.palette.primary.main
+              : theme.palette.secondary.main
+          }
+          whiteKeyColor={theme.palette.text.primary}
+        />
       </Stack>
     );
   }

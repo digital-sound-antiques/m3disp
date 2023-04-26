@@ -2,6 +2,7 @@ import { Box, useTheme } from "@mui/material";
 import { useContext, useEffect, useRef, useState } from "react";
 import { PlayerContext } from "../contexts/PlayerContext";
 import { ChannelId, getChannelStatus } from "../kss/channel-status";
+import { AppContext } from "../contexts/AppContext";
 
 export type KeyboardPainterArgs = {
   whiteKeyWidth: number;
@@ -153,11 +154,10 @@ function WhiteKeysOverlay(props: {
   height?: number | null;
   painter: KeyboardPainter;
   targets: ChannelId[];
+  color: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const playerContext = useContext(PlayerContext);
-  const theme = useTheme();
-  const paletteRef = useRef(theme.palette);
 
   useEffect(() => {
     const canvas = canvasRef.current!;
@@ -167,8 +167,9 @@ function WhiteKeysOverlay(props: {
     canvas.style.height = `${props.height}px`;
   }, [props.width, props.height]);
 
+  const propsRef = useRef(props);
   useEffect(() => {
-    paletteRef.current = theme.palette;
+    propsRef.current = props;
   });
 
   useEffect(() => {
@@ -182,7 +183,7 @@ function WhiteKeysOverlay(props: {
           const channel = getChannelStatus(playerContext.player, target);
           if (channel != null && channel.kcode != null) {
             kcodes.push(channel.kcode);
-            colors.push(paletteRef.current.primary.main);
+            colors.push(propsRef.current.color);
           }
         }
         props.painter.paintWhiteKeysOverlay(canvas, kcodes, colors);
@@ -216,9 +217,9 @@ function BlackKeysOverlay(props: {
   height?: number | null;
   painter: KeyboardPainter;
   targets: ChannelId[];
+  color: string;
+  whiteKeyColor: string;
 }) {
-  const theme = useTheme();
-  const paletteRef = useRef(theme.palette);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
   useEffect(() => {
@@ -229,11 +230,12 @@ function BlackKeysOverlay(props: {
     canvas.style.height = `${props.height}px`;
   }, [props.width, props.height]);
 
-  useEffect(() => {
-    paletteRef.current = theme.palette;
-  });
-
   const playerContext = useContext(PlayerContext);
+
+  const propsRef = useRef(props);
+  useEffect(() => {
+    propsRef.current = props;
+  });
 
   useEffect(() => {
     const renderFrame = () => {
@@ -246,10 +248,10 @@ function BlackKeysOverlay(props: {
           const channel = playerContext.player.getChannelStatus(target);
           if (channel != null && channel.kcode != null) {
             kcodes.push(channel.kcode);
-            colors.push(paletteRef.current.primary.main);
+            colors.push(propsRef.current.color);
           }
         }
-        props.painter.paintBlackKeysOverlay(canvas, kcodes, colors, theme.palette.text.primary);
+        props.painter.paintBlackKeysOverlay(canvas, kcodes, colors, propsRef.current.whiteKeyColor);
       }
     };
     renderFrame();
@@ -261,6 +263,8 @@ type KeyboardProps = {
   painter?: KeyboardPainter | null;
   targets: ChannelId[];
   disabled?: boolean | null;
+  highlightColor: string;
+  whiteKeyColor: string;
 };
 
 const defaultPainter = new KeyboardPainter();
@@ -305,6 +309,7 @@ export function Keyboard(props: KeyboardProps) {
           targets={targets}
           width={size.width}
           height={size.height}
+          color={props.highlightColor}
         />
       ) : undefined}
       <BlackKeys painter={painter} width={size.width} height={size.height} />
@@ -314,6 +319,8 @@ export function Keyboard(props: KeyboardProps) {
           targets={targets}
           width={size.width}
           height={size.height}
+          color={props.highlightColor}
+          whiteKeyColor={props.whiteKeyColor}
         />
       ) : undefined}
     </Box>
