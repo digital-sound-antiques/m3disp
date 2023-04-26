@@ -19,7 +19,7 @@ function createPSGVoiceName(ton: boolean, non: boolean) {
   } else if (non) {
     return "Noise";
   } else {
-    return "Muted";
+    return "Mute";
   }
 }
 

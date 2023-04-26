@@ -162,13 +162,13 @@ export function AppContextProvider(props: PropsWithChildren) {
 function updatePalette(base: Palette): Palette {
   const res = Object.assign({}, base);
   const primary = base.primary.main;
-  const text = blendColor('#ffffff', primary + "20");
+  const text = blendColor('#eeeeee', primary + "10");
   res.text.primary = text;
   res.text.secondary = text + "c0";
   res.text.disabled = text + "80"
   res.divider = text + "20";
-  res.background.default = blendColor('#121212', primary + "20");
-  res.background.paper = blendColor('#282828', primary + "10");
+  res.background.default = blendColor('#121212', primary + "10");
+  res.background.paper = blendColor('#303030', primary + "08");
   return res;
 }
 

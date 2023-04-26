@@ -91,8 +91,8 @@ export class KeyboardPainter {
       if (key != null) {
         const oct = Math.floor(kcode / 12);
         const dx = (key + oct * 7) * step;
-        ctx.fillStyle = color + "C0";
-        ctx.fillRect(dx + 1, 1, w - 2, h - 2);
+        ctx.fillStyle = color + "c8";
+        ctx.fillRect(dx, 0, w, h);
       }
     }
   }
@@ -121,7 +121,7 @@ export class KeyboardPainter {
         ctx.fillStyle = whiteKeyColor;
         ctx.fillRect(x + dx + 1, 1, w - 2, h - 2);
 
-        ctx.fillStyle = colors[i] + "C0";
+        ctx.fillStyle = colors[i] + "c8";
         ctx.fillRect(x + dx + 1, 1, w - 2, h - 2);
       }
     }
@@ -182,11 +182,7 @@ function WhiteKeysOverlay(props: {
           const channel = getChannelStatus(playerContext.player, target);
           if (channel != null && channel.kcode != null) {
             kcodes.push(channel.kcode);
-            colors.push(
-              channel.mode != null
-                ? paletteRef.current.secondary.main
-                : paletteRef.current.primary.main
-            );
+            colors.push(paletteRef.current.primary.main);
           }
         }
         props.painter.paintWhiteKeysOverlay(canvas, kcodes, colors);
@@ -250,11 +246,7 @@ function BlackKeysOverlay(props: {
           const channel = playerContext.player.getChannelStatus(target);
           if (channel != null && channel.kcode != null) {
             kcodes.push(channel.kcode);
-            colors.push(
-              channel.mode != null
-                ? paletteRef.current.secondary.main
-                : paletteRef.current.primary.main
-            );
+            colors.push(paletteRef.current.primary.main);
           }
         }
         props.painter.paintBlackKeysOverlay(canvas, kcodes, colors, theme.palette.text.primary);

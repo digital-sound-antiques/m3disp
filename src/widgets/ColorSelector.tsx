@@ -1,22 +1,16 @@
 import {
   Box,
-  List,
-  ListItem,
   ListSubheader,
-  Menu,
   MenuItem,
+  Select,
   SelectChangeEvent,
   Stack,
-  SxProps,
-  Theme,
-  Select,
-  Typography,
+  Typography
 } from "@mui/material";
 
 import { Fragment, useState } from "react";
 
 import * as Colors from "@mui/material/colors";
-import { MenuOpen } from "@mui/icons-material";
 
 type PaletteName =
   | "red"
@@ -265,7 +259,6 @@ export function ColorSelector(props: {
           })}
         </Select>
       </Box>
-      {/* 
       <Box sx={{ display: "flex", mx: 4, my: 2 }}>
         <VariantSelector
           palette={colorDef.palette}
@@ -273,7 +266,7 @@ export function ColorSelector(props: {
           variants={variants}
           onChange={onVariantChange}
         />
-      </Box> */}
+      </Box>
     </Stack>
   );
 }

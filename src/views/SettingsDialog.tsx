@@ -9,7 +9,7 @@ import {
   Tab,
   Tabs,
   Typography,
-  useTheme
+  useTheme,
 } from "@mui/material";
 import Grid2 from "@mui/material/Unstable_Grid2/Grid2";
 import React, { Fragment, useContext, useState } from "react";
@@ -90,7 +90,7 @@ function MaskPanel(props: TabPanelProps) {
     /* Copy FM mask to rhythm mask. */
     if (ch == 6) {
       // copy bit6 to bit 13
-      const m = (1 << 13);
+      const m = 1 << 13;
       if (newMask & (1 << 6)) {
         newMask |= m;
       } else {
@@ -98,20 +98,20 @@ function MaskPanel(props: TabPanelProps) {
       }
     } else if (ch == 7) {
       // copy bit7 to bit 9, 12 (HH/SD)
-      const m = (1<<9) | (1<<12);
+      const m = (1 << 9) | (1 << 12);
       if (newMask & (1 << 7)) {
         newMask |= m;
       } else {
         newMask &= ~m;
-      } 
+      }
     } else if (ch == 8) {
       // copy bit8 to bit 10, 11 (CYM/TOM)
-      const m = (1<<10) | (1<<11);
+      const m = (1 << 10) | (1 << 11);
       if (newMask & (1 << 8)) {
         newMask |= m;
       } else {
         newMask &= ~m;
-      } 
+      }
     }
     context.setChannelMask({ ...context.channelMask, opll: newMask });
   };
@@ -168,7 +168,7 @@ function ColorPanel(props: TabPanelProps) {
       <Box sx={{ px: { sm: 2 } }}>
         <ColorSelector
           label="Primary Color"
-          variants={["200", "300", "400", "500", "600", "700"]}
+          variants={["200", "300", "400", "500"]}
           value={primaryColor}
           onChange={updatePrimaryColor}
         />
