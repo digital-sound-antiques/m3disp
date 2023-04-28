@@ -28,7 +28,7 @@ function parseDuration(value: string | null) {
 /// parseM3U or Playlist
 export function parseM3U(text: string): PlayListEntry[] {
   const lines = text.replaceAll("\r\n", "\n").replaceAll("\r", "\n").split("\n");
-  const plsPattern = /^(file[0-9]+=)?([^:]+)::(kss|msx)/i;
+  const plsPattern = /^(file[0-9]+=)?([^:]+)(::(kss|msx))?/i;
   const m3uPattern = /^.+\.[a-z]+$/i;
 
   const res: PlayListEntry[] = [];
@@ -52,7 +52,7 @@ export function parseM3U(text: string): PlayListEntry[] {
 
     if (filename == null) continue;
     
-    title = title?.replaceAll("\t", ",") ?? "";
+    title = title?.replaceAll("\t", ",");
 
     let song;
     if (id == null || id == "") {

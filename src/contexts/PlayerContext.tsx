@@ -1,5 +1,5 @@
 import { KSS } from "libkss-js";
-import { MGSC, detectEncoding } from "mgsc-js";
+import { MGSC, TextDecoderEncoding, detectEncoding } from "mgsc-js";
 import React, { useContext, useEffect, useRef, useState } from "react";
 import { AudioPlayerState } from "webaudio-stream-player";
 import { KSSChannelMask } from "../kss/kss-device";
@@ -9,9 +9,11 @@ import { isIOS, isSafari } from "../utils/platform-detect";
 import { unmuteAudio } from "../utils/unmute";
 import { AppProgressContext } from "./AppProgressContext";
 import { parseM3U } from "../utils/m3u-parser";
+import { compileIfRequired, loadFileAsText, loadUrls } from "../utils/load-urls";
+import AppGlobal from "./AppGlobal";
 
 export type PlayListEntry = {
-  title: string;
+  title?: string | null;
   filename: string;
   dataId: string; // sha1 for data
   duration?: number | null; // in ms
@@ -69,7 +71,7 @@ function autoResumeAudioContext(audioContext: AudioContext) {
 
 const createDefaultContextData = () => {
   const noop = (...args: any) => {
-    throw new Error("Operation ndt attached");
+    throw new Error("Operation not attached");
   };
   const audioContext = new AudioContext({ sampleRate: 44100, latencyHint: "interactive" });
   const model: PlayerContextData = {
@@ -156,6 +158,28 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
       await state.storage.open("m3disp");
       await pruneEntries();
       setInitialized(true);
+
+      try {
+        const params = AppGlobal.getQueryParamsOnce();
+        const openUrl = params.get("open");
+        if (openUrl) {
+          const [newEntry] = await loadUrls([openUrl], state.storage);
+          if (newEntry != null) {
+            setState((oldState) => {
+              const newEntries = [...oldState.entries];
+              if (newEntry?.dataId != newEntries[0]?.dataId) {
+                newEntries.unshift(newEntry);
+              }
+              return {
+                ...oldState,
+                entries: newEntries,
+              };
+            });
+          }
+        }
+      } catch (e) {
+        console.error(e);
+      }
     }
   };
 
@@ -213,13 +237,13 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
         entries,
         selectedIndex: null,
       }));
+    } else {
+      setState((oldState) => ({
+        ...oldState,
+        entries,
+        selectedIndex: selectedIndex ?? oldState.selectedIndex,
+      }));
     }
-
-    setState((oldState) => ({
-      ...oldState,
-      entries,
-      selectedIndex: selectedIndex ?? oldState.selectedIndex,
-    }));
 
     if (playIndex != null && playIndex < entries.length) {
       await play(entries[playIndex]);
@@ -288,10 +312,14 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
     };
   };
 
-  const registerFile = async (file: Blob): Promise<string> => {
+  const registerFile = async (file: Blob): Promise<{ title: string; dataId: string }> => {
     const data = await loadFromFile(file);
     if (data instanceof Uint8Array) {
-      return await state.storage.put(data);
+      const kss = new KSS(data, file.name);
+      const title = kss.getTitle();
+      kss.release();
+      const dataId = await state.storage.put(data);
+      return { title, dataId };
     }
     throw new Error(`Can't load ${file.name}`);
   };
@@ -308,13 +336,19 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
   };
 
   const loadEntriesFromM3U = async (m3u: File, files: FileList): Promise<PlayListEntry[]> => {
-    const text = await loadFromFile(m3u);
+    const text = await loadFileAsText(m3u);
     if (typeof text !== "string") {
-      throw new Error('Not a text file');
+      throw new Error("Not a text file");
     }
     const items = parseM3U(text);
     const dataIds = items.map((e) => e.dataId);
-    const dataMap: { [key: string]: string } = {};
+    const dataMap: {
+      [key: string]: {
+        dataId: string;
+        title: string;
+      };
+    } = {};
+
     const processed = new Set<string>();
 
     for (const id of dataIds) {
@@ -325,9 +359,12 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
         for (const file of files) {
           const name = getFilename(file.name).toLowerCase();
           if (refName == name || refBasename + ".kss" == name) {
-            const dataId = await registerFile(file);
-            dataMap[id] = dataId;
+            try {
+            dataMap[id] = await registerFile(file);
             processed.add(id);
+            } catch (e) {
+              console.error(`Can't load: ${file.name}`);
+            }
           }
         }
       }
@@ -335,9 +372,9 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
 
     const res: PlayListEntry[] = [];
     for (const item of items) {
-      const dataId = dataMap[item.dataId];
+      const { title, dataId } = dataMap[item.dataId] ?? {};
       if (dataId != null) {
-        res.push({ ...item, dataId });
+        res.push({ ...item, title: item.title ?? title, dataId });
       }
     }
     return res;
@@ -512,22 +549,7 @@ async function loadFromFile(blob: Blob): Promise<Uint8Array | string> {
     reader.onloadend = () => {
       try {
         const u8 = new Uint8Array(reader.result as ArrayBuffer);
-
-        let encoding = detectEncoding(u8);
-        if (encoding == "ascii") {
-          encoding = "utf-8";
-        }
-        if (encoding == "shift-jis" || encoding == "utf-8") {
-          const text = new TextDecoder(encoding).decode(u8);
-          if (text.indexOf("#opll_mode") >= 0) {
-            const { mgs } = MGSC.compile(text);
-            resolve(mgs);
-            return;
-          } else {
-            resolve(text);
-          }
-        }
-        resolve(u8);
+        resolve(compileIfRequired(u8));
       } catch (e) {
         reject(e);
       }

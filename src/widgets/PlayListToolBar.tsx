@@ -2,18 +2,17 @@ import { Edit, PlaylistAdd } from "@mui/icons-material";
 import {
   Box,
   Button,
-  Stack,
+  Divider,
   IconButton,
-  SxProps,
-  Theme,
   Menu,
   MenuItem,
-  Divider,
+  Stack,
+  SxProps,
+  Theme,
 } from "@mui/material";
-import { PlayerContext } from "../contexts/PlayerContext";
 import { useContext, useRef, useState } from "react";
-import { SampleDialog } from "../views/SampleDialog";
 import { AppContext } from "../contexts/AppContext";
+import { PlayerContext } from "../contexts/PlayerContext";
 
 function PlayListAddMenu(props: {
   anchorEl?: HTMLElement | null;
@@ -23,7 +22,8 @@ function PlayListAddMenu(props: {
   return (
     <Menu open={props.anchorEl != null} anchorEl={props.anchorEl} onClose={props.onClose}>
       <MenuItem onClick={() => props.onClick("open-file")}>Open File...</MenuItem>
-      <Divider />
+      {/* <MenuItem onClick={() => props.onClick("open-url")}>Open Url...</MenuItem>
+      <Divider /> */}
       <MenuItem onClick={() => props.onClick("open-sample")}>Open Sample...</MenuItem>
     </Menu>
   );
@@ -49,6 +49,8 @@ export function PlayListToolBar(props: {
     setMenuAnchorEl(null);
     if (id == "open-file") {
       props.onAddClick();
+    } else if (id == "open-url") {
+      app.openDialog("open-url-dialog");
     } else if (id == "open-sample") {
       app.openDialog("sample-dialog");
     }

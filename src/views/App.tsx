@@ -32,6 +32,7 @@ import { SettingsDialog } from "./SettingsDialog";
 import { AboutDialog } from "./AboutDialog";
 import { TimeSlider } from "../widgets/TimeSlider";
 import { SampleDialog } from "./SampleDialog";
+import { OpenUrlDialog } from "./OpenUrlDialog";
 
 const gap = { xs: 0, sm: 1, md: 1.5, lg: 2 };
 
@@ -54,6 +55,7 @@ function AppRoot() {
       <OptionMenu id="option-menu" />
       <AboutDialog />
       <AppProgressDialog />
+      <OpenUrlDialog />
       <SampleDialog/>
       {isXs ? <AppRootMobile /> : <AppRootDesktop />}
     </Fragment>

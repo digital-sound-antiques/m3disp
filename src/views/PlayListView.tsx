@@ -163,7 +163,7 @@ export function PlayListBody(props: {
                                 }}
                                 noWrap={true}
                               >
-                                {e.title}
+                                {e.title ?? e.filename}
                               </Typography>
                             </ListItemText>
                           </ListItemButton>
