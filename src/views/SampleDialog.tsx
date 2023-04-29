@@ -108,10 +108,12 @@ export function SampleDialog() {
   const p = useContext(AppProgressContext);
 
   const onClickItem = async (id: string) => {
+    await context.unmute();
     app.closeDialog("sample-dialog");
     const entries = await loadUrls(getUrls(id), context.storage, p.setProgress);
+    context.reducer.stop();
     context.reducer.setEntries(entries);
-    context.reducer.play();        
+    context.reducer.play(0);     
   };
 
   const handleClose = () => app.closeDialog("sample-dialog");

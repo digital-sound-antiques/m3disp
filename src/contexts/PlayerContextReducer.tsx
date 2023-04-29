@@ -100,13 +100,14 @@ export class PlayerContextReducer {
     target?: PlayListEntry | number | null
   ): PlayerContextState {
     let entry;
-    if (typeof entry === "number") {
+    if (typeof target === "number") {
       entry = state.entries[target as number];
     } else {
       entry = (target as PlayListEntry) ?? state.currentEntry ?? state.entries[0];
     }
 
     let nextPlayState = entry != null ? "playing" : "stopped";
+
     return {
       ...state,
       currentEntry: entry,
