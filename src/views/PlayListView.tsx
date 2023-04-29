@@ -18,7 +18,7 @@ import {
 import { useContext, useRef, useState } from "react";
 
 import { DragDropContext, Draggable, DropResult } from "react-beautiful-dnd";
-import { PlayerContext } from "../contexts/PlayerContext";
+import { PlayListEntry, PlayerContext } from "../contexts/PlayerContext";
 import { StrictModeDroppable as Droppable } from "../widgets/StrictModeDroppable";
 
 import { FileDrop } from "react-file-drop";
@@ -33,26 +33,6 @@ export function PlayListBody(props: {
 }) {
   const context = useContext(PlayerContext);
 
-  const _play = async (index: number) => {
-    if (context.selectedIndex == index) {
-      if (context.player.state == "paused") {
-        context.resume();
-      } else if (context.player.state == "playing") {
-        context.pause();
-      } else {
-        context.play(index);
-      }
-    } else {
-      context.play(index);
-    }
-  };
-
-  const _delete = async (index: number) => {
-    const entries = [...context.entries];
-    entries.splice(index, 1);
-    context.setEntries(entries);
-  };
-
   const [isListItemDragging, setListItemDragging] = useState(false);
 
   const onListItemDragStart = () => {
@@ -65,7 +45,7 @@ export function PlayListBody(props: {
     if (!destination) {
       return;
     }
-    context.reorderEntry(source.index, destination.index);
+    context.reducer.reorderEntry(source.index, destination.index);
   };
 
   const theme = useTheme();
@@ -110,6 +90,28 @@ export function PlayListBody(props: {
     );
   }
 
+  const onRemoveClick = (entry: PlayListEntry) => {
+    context.reducer.removeEntry(entry);
+  };
+
+  const onPlayListItemClick = async (entry: PlayListEntry) => {
+    if (context.currentEntry == entry) {
+      switch (context.playState) {
+        case "paused":
+          context.reducer.resume();
+          return;
+        case "playing":
+          context.reducer.pause();
+          return;
+        case "stopped":
+          break;
+      }
+    }
+
+    await context.unmute();
+    context.reducer.play(entry);
+  };
+
   return (
     <Box sx={{ flex: 1, overflow: "auto", ...props.sx }}>
       <DragDropContext onDragStart={onListItemDragStart} onDragEnd={onListItemDragEnd}>
@@ -118,21 +120,14 @@ export function PlayListBody(props: {
             return (
               <List ref={provided.innerRef} {...provided.droppableProps}>
                 {context.entries.map((e, index) => {
-                  const selected = !isListItemDragging && index == context.selectedIndex;
-                  const isPlaying = selected && context.isPlaying;
+                  const selected = !isListItemDragging && e == context.currentEntry;
+                  const isPlaying = selected && context.playState == "playing";
                   const secondaryAction = createSecondaryAction(
                     isListItemDragging,
                     isPlaying,
                     props.editMode,
-                    props.editMode
-                      ? () => {
-                          _delete(index);
-                        }
-                      : () => {
-                          _play(index);
-                        }
+                    props.editMode ? () => onRemoveClick(e) : () => onPlayListItemClick(e)
                   );
-
                   return (
                     <Draggable
                       isDragDisabled={!props.editMode}
@@ -150,9 +145,7 @@ export function PlayListBody(props: {
                         >
                           <ListItemButton
                             selected={selected}
-                            onClick={() => {
-                              _play(index);
-                            }}
+                            onClick={() => onPlayListItemClick(context.entries[index])}
                           >
                             {props.editMode ? <DragHandle sx={{ mr: 1 }} /> : null}
                             <ListItemText disableTypography={true}>

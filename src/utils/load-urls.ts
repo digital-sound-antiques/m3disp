@@ -2,6 +2,7 @@ import { KSS } from "libkss-js";
 import { PlayListEntry } from "../contexts/PlayerContext";
 import { BinaryDataStorage } from "./binary-data-storage";
 import { MGSC, TextDecoderEncoding, detectEncoding } from "mgsc-js";
+import { parseM3U } from "./m3u-parser";
 
 export const convertUrlIfRequired = (url: string) => {
   const m = url.match(/^(https:\/\/)?f\.msxplay\.com\/([0-9a-z]+)/i);
@@ -114,4 +115,151 @@ export async function loadFileAsText(blob: Blob): Promise<string> {
     };
     reader.readAsArrayBuffer(blob);
   });
+}
+
+export async function loadFilesFromFileList(
+  storage: BinaryDataStorage,
+  files: FileList,
+  progressCallback?: (value: number | null) => void
+): Promise<PlayListEntry[]> {
+  let m3u = false;
+  for (let i = 0; i < files.length; i++) {
+    if (/\.(pls|m3u)$/i.test(files[i].name)) {
+      m3u = true;
+    }
+  }
+
+  let entries: PlayListEntry[] = [];
+  if (m3u) {
+    for (let i = 0; i < files.length; i++) {
+      if (/\.(pls|m3u)$/i.test(files[i].name)) {
+        entries = [
+          ...entries,
+          ...(await loadEntriesFromM3U(storage, files[i], files, progressCallback)),
+        ];
+      }
+    }
+  } else {
+    entries = await loadEntriesFromFileList(storage, files, progressCallback);
+  }
+  return entries;
+}
+
+const getFilename = (path: string): string => {
+  return path.split(/[/\\]/).pop()!;
+};
+
+const getBasename = (path: string) => {
+  const filename = path.split(/[/\\]/).pop();
+  const fragments = filename!.split(".");
+  fragments.pop();
+  return fragments.join(".");
+};
+
+async function loadFromFile(blob: Blob): Promise<Uint8Array | string> {
+  return new Promise<Uint8Array | string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      try {
+        const u8 = new Uint8Array(reader.result as ArrayBuffer);
+        resolve(compileIfRequired(u8));
+      } catch (e) {
+        reject(e);
+      }
+    };
+    reader.readAsArrayBuffer(blob);
+  });
+}
+
+const registerFile = async (
+  storage: BinaryDataStorage,
+  file: Blob
+): Promise<{ title: string; dataId: string }> => {
+  const data = await loadFromFile(file);
+  if (data instanceof Uint8Array) {
+    const kss = new KSS(data, file.name);
+    const title = kss.getTitle();
+    kss.release();
+    const dataId = await storage.put(data);
+    return { title, dataId };
+  }
+  throw new Error(`Can't load ${file.name}`);
+};
+
+export async function loadEntriesFromM3U(
+  storage: BinaryDataStorage,
+  m3u: File,
+  files: FileList,
+  progressCallback?: (value: number | null) => void
+): Promise<PlayListEntry[]> {
+  const text = await loadFileAsText(m3u);
+
+  if (typeof text !== "string") {
+    throw new Error("Not a text file");
+  }
+  const items = parseM3U(text);
+  const dataIds = items.map((e) => e.dataId);
+  const dataMap: {
+    [key: string]: {
+      dataId: string;
+      title: string;
+    };
+  } = {};
+
+  const processed = new Set<string>();
+
+  for (const id of dataIds) {
+    if (id.startsWith("ref://")) {
+      if (processed.has(id)) continue;
+      const refName = id.substring(6).toLowerCase();
+      const refBasename = getBasename(refName);
+      for (const file of files) {
+        const name = getFilename(file.name).toLowerCase();
+        if (refName == name || refBasename + ".kss" == name) {
+          try {
+            dataMap[id] = await registerFile(storage, file);
+            processed.add(id);
+          } catch (e) {
+            console.error(`Can't load: ${file.name}`);
+          }
+        }
+      }
+    }
+  }
+
+  const res: PlayListEntry[] = [];
+  for (const item of items) {
+    const { title, dataId } = dataMap[item.dataId] ?? {};
+    if (dataId != null) {
+      res.push({ ...item, title: item.title ?? title, dataId });
+    }
+  }
+  return res;
+}
+
+export async function loadEntriesFromFileList(
+  storage: BinaryDataStorage,
+  files: FileList,
+  progressCallback?: (value: number | null) => void
+): Promise<PlayListEntry[]> {
+  const res: PlayListEntry[] = [];
+  progressCallback?.(0.0);
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    try {
+      const data = await loadFromFile(file);
+      if (data instanceof Uint8Array) {
+        const filename = file.name.split(/[/\\]/).pop() ?? "Unknown";
+        const entry = await createPlayListEntry(storage, data, filename);
+        res.push(entry);
+      }
+    } catch (e) {
+      console.warn(e);
+    }
+    if (i % 10 == 0) {
+      progressCallback?.(i / files.length);
+    }
+  }
+  progressCallback?.(null);
+  return res;
 }

@@ -54,7 +54,7 @@ export function PlayControl(props: { small: boolean }) {
     const modes: RepeatMode[] = ["none", "all", "single"];
     const index = modes.indexOf(context.repeatMode);
     const next = modes[(index + 1) % modes.length];
-    context.setRepeatMode(next);
+    context.reducer.setRepeatMode(next);
   };
 
   const repeatModeIcon = {
@@ -81,7 +81,7 @@ export function PlayControl(props: { small: boolean }) {
             }}
             noWrap={true}
           >
-            {context.entries[context.selectedIndex ?? -1]?.title ?? "-"}
+            {context.currentEntry?.title ?? "-"}
           </Typography>
         </Marquee>
       )}
@@ -95,7 +95,7 @@ export function PlayControl(props: { small: boolean }) {
           alignItems: "center",
         }}
       >
-        <IconButton onClick={() => context.prev()}>
+        <IconButton onClick={() => context.reducer.prev()}>
           <SkipPrevious />
         </IconButton>
         <IconButton onClick={toggleRepeatMode}>{repeatModeIcon}</IconButton>
@@ -111,13 +111,14 @@ export function PlayControl(props: { small: boolean }) {
         </IconButton> */}
         <IconButton
           sx={{ p: 0 }}
-          onClick={() => {
+          onClick={async () => {
             if (playState == "playing") {
-              context.pause();
+              context.reducer.pause();
             } else if (playState == "paused") {
-              context.resume();
+              context.reducer.resume();
             } else {
-              context.play();
+              await context.unmute();
+              context.reducer.play();
             }
           }}
         >
@@ -125,12 +126,12 @@ export function PlayControl(props: { small: boolean }) {
         </IconButton>
         <IconButton
           onClick={() => {
-            context.stop();
+            context.reducer.stop();
           }}
         >
           <Stop />
         </IconButton>
-        <IconButton onClick={() => context.next()}>
+        <IconButton onClick={() => context.reducer.next()}>
           <SkipNext />
         </IconButton>
       </Box>

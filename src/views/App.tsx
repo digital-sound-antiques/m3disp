@@ -33,6 +33,8 @@ import { AboutDialog } from "./AboutDialog";
 import { TimeSlider } from "../widgets/TimeSlider";
 import { SampleDialog } from "./SampleDialog";
 import { OpenUrlDialog } from "./OpenUrlDialog";
+import packageJson from "../../package.json";
+import ghlogo from "../assets/github-mark-white.svg";
 
 const gap = { xs: 0, sm: 1, md: 1.5, lg: 2 };
 
@@ -56,7 +58,7 @@ function AppRoot() {
       <AboutDialog />
       <AppProgressDialog />
       <OpenUrlDialog />
-      <SampleDialog/>
+      <SampleDialog />
       {isXs ? <AppRootMobile /> : <AppRootDesktop />}
     </Fragment>
   );
@@ -214,6 +216,9 @@ function AppRootDesktop() {
           sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}
         >
           <Stack direction="row" sx={{ width: "100%", justifyContent: "space-between" }}>
+            <a href="https://github.com/digital-sound-antiques/m3disp" target="github"><img src={ghlogo} width={16} height={16} /></a>
+            <Box sx={{ width: "12px" }}></Box>
+            <Typography variant="caption">v{packageJson.version}</Typography>
             <Box sx={{ flex: 1 }}></Box>
             <Typography variant="caption">
               Output Latency: {context.player.outputLatency}ms

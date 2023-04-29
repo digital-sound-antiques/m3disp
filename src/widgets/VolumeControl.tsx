@@ -36,7 +36,7 @@ export function VolumeControl() {
         step={0.25}
         value={context.masterGain}
         onChange={(ev, value) => {
-          context.setMasterGain(value as number);
+          context.reducer.setMasterGain(value as number);
         }}
       />
     </Stack>

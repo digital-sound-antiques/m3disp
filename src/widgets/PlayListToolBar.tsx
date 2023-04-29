@@ -83,7 +83,7 @@ export function PlayListToolBar(props: {
             variant="outlined"
             color="error"
             onClick={() => {
-              context.setEntries([]);
+              context.reducer.setEntries([]);
               props.setEditMode(false);
             }}
           >

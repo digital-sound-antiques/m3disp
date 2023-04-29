@@ -2,7 +2,7 @@ import { PropsWithChildren, createContext, useContext, useState } from "react";
 import { KSSChannelMask } from "../kss/kss-device";
 import { PlayerContext } from "./PlayerContext";
 
-export type SettingsContextData = {
+export type SettingsContextState = {
   channelMask: KSSChannelMask;
   setChannelMask: (channelMask: KSSChannelMask) => void;
   commit: () => void;
@@ -13,14 +13,14 @@ const noop = () => {
   console.log(`no-op`);
 };
 
-const defaultContextData: SettingsContextData = {
+const defaultContextState: SettingsContextState = {
   channelMask: { psg: 0, scc: 0, opll: 0, opl: 0 },
   setChannelMask: noop,
   commit: noop,
   revert: noop,
 };
 
-export const SettingsContext = createContext(defaultContextData);
+export const SettingsContext = createContext(defaultContextState);
 
 export function SettingsContextProvider(props: PropsWithChildren) {
   const context = useContext(PlayerContext);
@@ -32,7 +32,7 @@ export function SettingsContextProvider(props: PropsWithChildren) {
   };
 
   const commit = () => {
-    context.setChannelMask(state.channelMask);
+    context.reducer.setChannelMask(state.channelMask);
   };
 
   const revert = () => {
@@ -40,7 +40,7 @@ export function SettingsContextProvider(props: PropsWithChildren) {
   };
 
   const [state, setState] = useState({
-    ...defaultContextData,
+    ...defaultContextState,
     channelMask: { ...context.channelMask },
   });
 

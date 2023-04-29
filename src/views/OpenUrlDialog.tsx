@@ -18,7 +18,7 @@ export function OpenUrlDialog() {
     app.closeDialog(id);
     if (url != null) {
       const entries = await loadUrls([url], context.storage);
-      context.setEntries(entries);
+      context.reducer.setEntries(entries);
     }
   };
 

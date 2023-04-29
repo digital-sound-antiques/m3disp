@@ -2,6 +2,8 @@ import { PropsWithChildren, useContext, useRef, useState } from "react";
 import { PlayerContext } from "./PlayerContext";
 import { FileDrop } from "react-file-drop";
 import { Box, useTheme } from "@mui/material";
+import { loadEntriesFromFileList, loadFilesFromFileList } from "../utils/load-urls";
+import { BinaryDataStorage } from "../utils/binary-data-storage";
 
 export function useFileDrop(playOnDrop: boolean, clearOnDrop: boolean = false) {
   const context = useContext(PlayerContext);
@@ -30,6 +32,11 @@ export function useFileDrop(playOnDrop: boolean, clearOnDrop: boolean = false) {
     for (let i = 0; i < items.length; i++) {
       items[i].classList.remove("fileDragOver");
     }
+  };
+
+  const loadFiles = async (storage: BinaryDataStorage, files: FileList, insertionIndex: number) => {
+    const entries = await loadFilesFromFileList(storage, files);
+    context.reducer.addEntries(entries, insertionIndex);
   };
 
   const fileDropRef = useRef(null);
@@ -66,7 +73,10 @@ export function useFileDrop(playOnDrop: boolean, clearOnDrop: boolean = false) {
         }
       }
       if (files != null) {
-        context.loadFiles(files, insertionIndex, { play: playOnDrop, clear: clearOnDrop });
+        if (clearOnDrop) {
+          context.reducer.setEntries([]);
+        }
+        loadFiles(context.storage, files, insertionIndex);
       }
       ev.preventDefault();
     },
@@ -75,7 +85,7 @@ export function useFileDrop(playOnDrop: boolean, clearOnDrop: boolean = false) {
   const onFileInputChange = (ev: any) => {
     const { files } = ev.target;
     if (files != null) {
-      context.loadFiles(files, 0, { play: true, clear: false });
+      loadFiles(context.storage, files, 0);
       ev.preventDefault();
     }
   };
