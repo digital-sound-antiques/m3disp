@@ -71,7 +71,7 @@ function MobileAppBar() {
     <AppBar component="nav" sx={{ backgroundColor: theme.palette.background.default }}>
       <Toolbar>
         <Typography variant="h6" component="div">
-          M<sub>3</sub>disp
+          M<sup>3</sup>disp
         </Typography>
         <Box sx={{ flexGrow: 1 }} />
         <IconButton
@@ -127,7 +127,7 @@ function DesktopAppBar() {
       <Container maxWidth="xl" sx={{ minWidth: "320px" }}>
         <Toolbar variant="regular">
           <Typography variant="h6" color="inherit" component="div">
-            M<sub>3</sub>disp
+            M<sup>3</sup>disp
           </Typography>
           <Box sx={{ flexGrow: 1 }} />
           <Box sx={{ width: "128px", mx: 2 }}>
