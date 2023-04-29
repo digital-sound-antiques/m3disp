@@ -95,7 +95,7 @@ function CursorCanvas(props: CursorCanvasProps) {
       const pos = Math.round(context.player.progress.renderer.bufferedFrames * ratio);
       context.player.seekInFrame(pos);
       if (context.player.state == "paused" || context.player.state == "stopped") {
-        context.player.resume();
+        context.reducer.resume();
       }
     }
   };
