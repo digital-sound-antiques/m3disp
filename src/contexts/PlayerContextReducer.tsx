@@ -86,6 +86,8 @@ export class PlayerContextReducer {
       ) {
         return {
           ...state,
+          playState: "stopped",
+          playStateChangeCount: state.playStateChangeCount + 1,
           channelMask: { ...channelMask },
         };
       }
