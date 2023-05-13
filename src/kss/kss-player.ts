@@ -2,7 +2,12 @@ import { AudioPlayer, AudioRendererType, MonoWaveBuffer } from "webaudio-stream-
 import { KSSDecoderStartOptions, type KSSDecoderDeviceSnapshot } from "./kss-decoder-worker";
 
 import workletUrl from "./renderer-worklet.ts?worker&url";
-import { getChannelStatus, ChannelId, ChannelStatus } from "./channel-status";
+import {
+  getChannelStatus,
+  ChannelId,
+  ChannelStatus,
+  getChannelStatusArray,
+} from "./channel-status";
 
 export class WaveThumbnail {
   min: number = 0.0;
@@ -109,5 +114,9 @@ export class KSSPlayer extends AudioPlayer {
 
   getChannelStatus(id: ChannelId): ChannelStatus | null {
     return getChannelStatus(this, id);
+  }
+
+  getChannelStatusArray(id: ChannelId, pastSpanInFrames: number, futureSpanInFrames: number): (ChannelStatus | null)[] {
+    return getChannelStatusArray(this, id, pastSpanInFrames, futureSpanInFrames);
   }
 }

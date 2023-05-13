@@ -238,7 +238,7 @@ export function WaveSlider() {
     <Box sx={{ display: "flex", flexDirection: "column", padding: 2 }}>
       <WavePreview />
       <Stack direction="row" justifyContent="space-between" sx={{ mt: 1 }}>
-        <Typography variant="caption">{_toTimeString(progress.currentTime)}</Typography>
+        <Typography variant="caption">{_toTimeString(Math.min(progress.currentTime, progress.bufferedTime))}</Typography>
         <Typography variant="caption">{_toTimeString(progress.bufferedTime)}</Typography>
       </Stack>
     </Box>

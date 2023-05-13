@@ -4,6 +4,7 @@ import {
   Button,
   Divider,
   IconButton,
+  Link,
   Menu,
   MenuItem,
   Stack,
@@ -22,8 +23,8 @@ function PlayListAddMenu(props: {
   return (
     <Menu open={props.anchorEl != null} anchorEl={props.anchorEl} onClose={props.onClose}>
       <MenuItem onClick={() => props.onClick("open-file")}>Open File...</MenuItem>
-      {/* <MenuItem onClick={() => props.onClick("open-url")}>Open Url...</MenuItem>
-      <Divider /> */}
+      <MenuItem onClick={() => props.onClick("open-url")}>Open Url...</MenuItem>
+      <Divider />
       <MenuItem onClick={() => props.onClick("open-sample")}>Open Sample...</MenuItem>
     </Menu>
   );

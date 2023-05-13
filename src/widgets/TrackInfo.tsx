@@ -1,7 +1,7 @@
-import { Box, Divider, SxProps, Theme, Typography, useTheme } from "@mui/material";
+import { Box, SxProps, Theme, Typography, useTheme } from "@mui/material";
 import { useContext, useEffect, useRef, useState } from "react";
-import { ChannelId, ChannelStatus } from "../kss/channel-status";
 import { PlayerContext } from "../contexts/PlayerContext";
+import { ChannelId, ChannelStatus } from "../kss/channel-status";
 
 type TrackInfoPanelProps = {
   title: string;

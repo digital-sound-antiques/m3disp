@@ -7,7 +7,7 @@ type MarqueeProps = PropsWithChildren & {
 export function Marquee({ play, children }: MarqueeProps) {
   const [containerWidth, setContainerWidth] = useState(0);
   const [marqueeWidth, setMarqueeWidth] = useState(0);
-  const [isMounted, setIsMounted] = useState(false);
+
   const containerRef = useRef<HTMLDivElement>(null);
   const marqueeRef = useRef<HTMLDivElement>(null);
 

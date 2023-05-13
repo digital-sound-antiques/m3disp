@@ -9,6 +9,8 @@ import {
   Unstable_Grid2 as Grid,
   IconButton,
   Stack,
+  Tab,
+  Tabs,
   Toolbar,
   Typography,
   useMediaQuery,
@@ -35,6 +37,7 @@ import { SampleDialog } from "./SampleDialog";
 import { OpenUrlDialog } from "./OpenUrlDialog";
 import packageJson from "../../package.json";
 import ghlogo from "../assets/github-mark-white.svg";
+import { PianoRoll } from "../widgets/PianoRoll";
 
 const gap = { xs: 0, sm: 1, md: 1.5, lg: 2 };
 
@@ -167,6 +170,12 @@ function AppRootDesktop() {
     };
   }, []);
 
+  const [tabIndex, setTabIndex] = useState(0);
+
+  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
+    setTabIndex(newValue);
+  };
+
   return (
     <Box
       sx={{
@@ -183,7 +192,7 @@ function AppRootDesktop() {
         maxWidth="xl"
         sx={{
           minWidth: "320px",
-          mt: { sm: 2, md: 4, lg: 6 },
+          mt: { sm: 2, md: 2, lg: 4 },
           paddingX: { xs: 0, sm: 2, md: 6, lg: 8 },
         }}
       >
@@ -192,7 +201,27 @@ function AppRootDesktop() {
           <Grid container spacing={gap} sx={{ height: "100%" }}>
             <Grid xs={12} sm={7} md={8} lg={8} xl={8}>
               <Stack ref={leftPaneRef} spacing={gap}>
-                <KeyboardList spacing={gap} />
+                <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
+                  <Tabs value={tabIndex} onChange={handleTabChange}>
+                    <Tab label="Keyboard" value={0} />
+                    <Tab
+                      label={
+                        <>
+                          <Typography variant="inherit">
+                            Piano Roll <BetaSign />
+                          </Typography>
+                        </>
+                      }
+                      value={1}
+                    />
+                  </Tabs>
+                </Box>
+                <TabPanel value={tabIndex} index={0}>
+                  <KeyboardList spacing={gap} />
+                </TabPanel>
+                <TabPanel value={tabIndex} index={1}>
+                  <PianoRoll />
+                </TabPanel>
                 {isMd ? <WaveSliderCard /> : null}
               </Stack>
             </Grid>
@@ -216,7 +245,9 @@ function AppRootDesktop() {
           sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}
         >
           <Stack direction="row" sx={{ width: "100%", justifyContent: "space-between" }}>
-            <a href="https://github.com/digital-sound-antiques/m3disp" target="github"><img src={ghlogo} width={16} height={16} /></a>
+            <a href="https://github.com/digital-sound-antiques/m3disp" target="github">
+              <img src={ghlogo} width={16} height={16} />
+            </a>
             <Box sx={{ width: "12px" }}></Box>
             <Typography variant="caption">v{packageJson.version}</Typography>
             <Box sx={{ flex: 1 }}></Box>
@@ -228,4 +259,24 @@ function AppRootDesktop() {
       </Container>
     </Box>
   );
+}
+
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div role="tabpanel" hidden={value !== index} id={`tabpanel-${index}`} {...other}>
+      {value === index && children}
+    </div>
+  );
+}
+
+function BetaSign() {
+  return <Typography variant="caption" sx={{ textTransform: "none"}}>(Beta)</Typography>;
 }

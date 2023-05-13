@@ -42,7 +42,7 @@ function createPSGStatus(regs: Uint8Array, id: ChannelId): ChannelStatus {
       return { id, freq, vol, voice };
     }
   } else {
-    const freq = regs[6];
+    const freq = 96 - regs[6];
     const vol = Math.min(15, regs[8 + (ch - 3)]);
     const ton = (regs[7] & (1 << (ch - 3))) == 0;
     const non = (regs[7] & (8 << (ch - 3))) == 0;
@@ -62,7 +62,7 @@ function createSCCStatus(regs: Uint8Array, id: ChannelId): ChannelStatus {
   const vol = regs[0xd0 + ch] & 0x0f;
   const A4 = 440.0;
 
-  const vch = (regs[0xe0] & 1) ? ch : (ch < 5 ? ch : 4);
+  const vch = regs[0xe0] & 1 ? ch : ch < 5 ? ch : 4;
   const voice = new Uint8Array(regs.buffer, regs.byteOffset + vch * 32, 32);
 
   if (vol > 0 && freq > 0) {
@@ -192,6 +192,46 @@ export function getChannelStatus(player: KSSPlayer, id: ChannelId): ChannelStatu
     default:
       throw new Error(`Uknown device: ${id.device}`);
   }
+}
+
+export function getChannelStatusArray(
+  player: KSSPlayer,
+  id: ChannelId,
+  pastSpanInFrames: number,
+  futureSpanInFrames: number,
+): (ChannelStatus | null)[] {
+  const currentFrame = player.progress?.renderer?.currentFrame ?? 0;
+
+  const startFrame = currentFrame - pastSpanInFrames;
+  const endFrame = currentFrame + futureSpanInFrames;
+
+  const res: (ChannelStatus | null)[] = [];
+
+  for (let pos = startFrame; pos < endFrame; pos += 735) {
+    const snapshot = player.findSnapshotAt(pos);
+
+    if (snapshot == null) {
+      res.push(null);
+      continue;
+    }
+
+    switch (id.device) {
+      case "psg":
+        res.push(createPSGStatus(snapshot.psg!, id));
+        break;
+      case "scc":
+        res.push(createSCCStatus(snapshot.scc!, id));
+        break;
+      case "opll":
+        res.push(createOPLLStatus(snapshot.opll!, id, snapshot.opllkeyKeepFrames!));
+        break;
+      default:
+        res.push(null);
+        break;
+    }
+  }
+
+  return res;
 }
 
 export type ChannelId = {

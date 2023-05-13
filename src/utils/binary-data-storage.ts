@@ -1,8 +1,8 @@
-import sha1 from "sha1";
+import md5 from "md5";
 
 async function _put(store: IDBObjectStore, data: Uint8Array, id?: string | null): Promise<string> {
   return new Promise((resolve, reject) => {
-    const key = id ?? sha1(data as any);
+    const key = id ?? md5(data);
     const req = store.put(data, key);
     req.onerror = reject;
     req.onsuccess = (event) => resolve((event.target as IDBRequest<string>).result);

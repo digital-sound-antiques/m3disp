@@ -1,9 +1,9 @@
-import { PropsWithChildren, useContext, useRef, useState } from "react";
-import { PlayerContext } from "./PlayerContext";
-import { FileDrop } from "react-file-drop";
 import { Box, useTheme } from "@mui/material";
-import { loadEntriesFromFileList, loadFilesFromFileList } from "../utils/load-urls";
+import { PropsWithChildren, useContext, useRef, useState } from "react";
+import { FileDrop } from "react-file-drop";
 import { BinaryDataStorage } from "../utils/binary-data-storage";
+import { loadFilesFromFileList } from "../utils/load-urls";
+import { PlayerContext } from "./PlayerContext";
 
 export function useFileDrop(playOnDrop: boolean, clearOnDrop: boolean = false) {
   const context = useContext(PlayerContext);
@@ -37,6 +37,9 @@ export function useFileDrop(playOnDrop: boolean, clearOnDrop: boolean = false) {
   const loadFiles = async (storage: BinaryDataStorage, files: FileList, insertionIndex: number) => {
     const entries = await loadFilesFromFileList(storage, files);
     context.reducer.addEntries(entries, insertionIndex);
+    if (playOnDrop) {
+      context.reducer.play(insertionIndex);
+    }
   };
 
   const fileDropRef = useRef(null);

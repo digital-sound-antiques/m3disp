@@ -62,6 +62,11 @@ export function TimeSlider() {
         color="secondary"
         value={value}
         valueBuffer={valueBuffer}
+        sx={{
+          "& .MuiLinearProgress-bar": {
+            transition: 'none',
+          },
+        }}
       />
     </Box>
   );
