@@ -42,7 +42,7 @@ function createPSGStatus(regs: Uint8Array, id: ChannelId): ChannelStatus {
       return { id, freq, vol, voice };
     }
   } else {
-    const freq = 96 - regs[6];
+    const freq = 95 - regs[6];
     const vol = Math.min(15, regs[8 + (ch - 3)]);
     const ton = (regs[7] & (1 << (ch - 3))) == 0;
     const non = (regs[7] & (8 << (ch - 3))) == 0;
