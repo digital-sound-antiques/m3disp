@@ -260,6 +260,7 @@ function HighlightCanvas(props: {
 }) {
   const playerContext = useContext(PlayerContext);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const painterRef = useRef(props.painter);
 
   useEffect(() => {
     const canvas = canvasRef.current!;
@@ -268,6 +269,10 @@ function HighlightCanvas(props: {
     canvas.style.width = `${props.width}px`;
     canvas.style.height = `${props.height}px`;
   }, [props.width, props.height]);
+
+  useEffect(() => {
+    painterRef.current = props.painter;
+  }, [props.painter])
 
   useEffect(() => {
     const renderFrame = () => {
@@ -281,7 +286,7 @@ function HighlightCanvas(props: {
             keys.push(status.kcode);
           }
         }
-        props.painter(canvas, keys);
+        painterRef.current(canvas, keys);
       }
     };
     renderFrame();
