@@ -31,10 +31,14 @@ const defaultTheme = createTheme({
 });
 
 export type KeyHighlightColorType = "primary" | "secondary";
+export type PianoRollMode = "2d" | "3d";
 
 type AppContextData = {
   theme: Theme;
   keyHighlightColorType: KeyHighlightColorType;
+  pianoRollRangeInSec: number;
+  pianoRollLayered: boolean;
+  pianoRollMode: string;
   openMap: { [key: string]: boolean };
   anchorElMap: { [key: string]: HTMLElement | null };
   isOpen: (id: string) => boolean;
@@ -45,6 +49,9 @@ type AppContextData = {
   setPrimaryColor: (id: string) => void;
   setSecondaryColor: (id: string) => void;
   setKeyHighlightColorType: (id: KeyHighlightColorType) => void;
+  setPianoRollRangeInSec: (value: number) => void;
+  setPianoRollLayered: (value: boolean) => void;
+  setPianoRollMode: (value: PianoRollMode) => void;
 };
 
 const noop = () => {
@@ -54,6 +61,9 @@ const noop = () => {
 const defaultContextData: AppContextData = {
   theme: defaultTheme,
   keyHighlightColorType: "primary",
+  pianoRollRangeInSec: 4.0,
+  pianoRollLayered: false,
+  pianoRollMode: "2d",
   openMap: {},
   anchorElMap: {},
   isOpen: () => false,
@@ -64,6 +74,9 @@ const defaultContextData: AppContextData = {
   setPrimaryColor: noop,
   setSecondaryColor: noop,
   setKeyHighlightColorType: noop,
+  setPianoRollRangeInSec: noop,
+  setPianoRollLayered: noop,
+  setPianoRollMode: noop,
 };
 
 export const AppContext = createContext(defaultContextData);
@@ -71,6 +84,9 @@ export const AppContext = createContext(defaultContextData);
 const keyPrimaryColor = "m3disp.palette.primary.main";
 const keySecondaryColor = "m3disp.palette.secondary.main";
 const keyKeyHighlightColorType = "m3disp.keyHighlightColorType";
+const keyPianoRollRangeInSec = "m3disp.pianoRoll.rangeInSec";
+const keyPianoRollLayered = "m3disp.pianoRoll.layered";
+const keyPianoRollMode = "m3disp.pianoRoll.mode";
 
 export function AppContextProvider(props: PropsWithChildren) {
   const isOpen = (id: string) => {
@@ -132,6 +148,33 @@ export function AppContextProvider(props: PropsWithChildren) {
     }
   };
 
+  const setPianoRollRangeInSec = (value: number, save: boolean = true) => {
+    setState((oldState) => {
+      return { ...oldState, pianoRollRangeInSec: value };
+    });
+    if (save) {
+      localStorage.setItem(keyPianoRollRangeInSec, value.toString());
+    }
+  };
+
+  const setPianoRollLayered = (value: boolean, save: boolean = true) => {
+    setState((oldState) => {
+      return { ...oldState, pianoRollLayered: value };
+    });
+    if (save) {
+      localStorage.setItem(keyPianoRollLayered, value.toString());
+    }
+  };
+
+  const setPianoRollMode = (value: string, save: boolean = true) => {
+    setState((oldState) => {
+      return { ...oldState, pianoRollMode: value };
+    });
+    if (save) {
+      localStorage.setItem(keyPianoRollMode, value);
+    }
+  };
+
   const [state, setState] = useState(defaultContextData);
   const [initialized, setInitialized] = useState(false);
 
@@ -150,6 +193,15 @@ export function AppContextProvider(props: PropsWithChildren) {
         state.keyHighlightColorType) as KeyHighlightColorType,
       false
     );
+
+    let str = localStorage.getItem(keyPianoRollRangeInSec);
+    if (str != null) {
+      setPianoRollRangeInSec(parseFloat(str), false);
+    }
+    str = localStorage.getItem(keyPianoRollLayered);
+    if (str != null) {
+      setPianoRollLayered(str == "true", false);
+    }
   }, []);
 
   useEffect(() => {
@@ -171,6 +223,9 @@ export function AppContextProvider(props: PropsWithChildren) {
         setPrimaryColor,
         setSecondaryColor,
         setKeyHighlightColorType,
+        setPianoRollRangeInSec,
+        setPianoRollLayered,
+        setPianoRollMode,
       }}
     >
       {initialized ? props.children : null}

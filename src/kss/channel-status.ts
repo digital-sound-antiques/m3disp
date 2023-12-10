@@ -9,6 +9,7 @@ export type ChannelStatus = {
   mode?: string | null;
   keyKeepFrames?: number | null;
   voice?: string | Uint8Array | null;
+  vnum?: number | null; // voice number
 };
 
 function createPSGVoiceName(ton: boolean, non: boolean) {
@@ -48,9 +49,9 @@ function createPSGStatus(regs: Uint8Array, id: ChannelId): ChannelStatus {
     const non = (regs[7] & (8 << (ch - 3))) == 0;
     const voice = createPSGVoiceName(ton, non);
     if (non && vol > 0) {
-      return { id, freq, kcode: freq, vol, mode: "noise", voice };
+      return { id, freq, kcode: freq, vol, mode: "noise", voice, vnum: 8 };
     } else {
-      return { id, freq, vol, mode: "noise", voice };
+      return { id, freq, vol, mode: "noise", voice, vnum: 0 };
     }
   }
 }
@@ -64,12 +65,13 @@ function createSCCStatus(regs: Uint8Array, id: ChannelId): ChannelStatus {
 
   const vch = regs[0xe0] & 1 ? ch : ch < 5 ? ch : 4;
   const voice = new Uint8Array(regs.buffer, regs.byteOffset + vch * 32, 32);
+  const vnum = (voice[4] + voice[20]) >> 4;
 
   if (vol > 0 && freq > 0) {
     const kcode = 57 + Math.round(Math.log2(freq / A4) * 12);
-    return { id, freq, kcode, vol, voice };
+    return { id, freq, kcode, vol, voice, vnum };
   } else {
-    return { id, freq, vol, voice };
+    return { id, freq, vol, voice, vnum };
   }
 }
 
@@ -103,12 +105,15 @@ function createOPLLStatus(
 
   let kon = false;
   let vol: number = 0;
+  let vnum: number = 0;
 
   if (ch < 9) {
     kon = (regs[0x20 + pch] & 0x10) != 0;
     vol = 0x0f - (regs[0x30 + pch] & 0xf);
+    vnum = (regs[0x30 + pch] & 0xf0) >> 4;
   } else {
     mode = "rch";
+    vnum = ch + 7;
     if (rflag) {
       let ron;
       if (ch == 9) {
@@ -169,9 +174,9 @@ function createOPLLStatus(
 
   if (kon) {
     const kcode = 57 + Math.round(Math.log2(freq / A4) * 12);
-    return { id, freq, kcode, vol, mode, keyKeepFrames: keyKeepFrames[ch], voice };
+    return { id, freq, kcode, vol, mode, keyKeepFrames: keyKeepFrames[ch], voice, vnum };
   } else {
-    return { id, freq, vol, mode, keyKeepFrames: keyKeepFrames[ch], voice };
+    return { id, freq, vol, mode, keyKeepFrames: keyKeepFrames[ch], voice, vnum };
   }
 }
 
@@ -198,7 +203,7 @@ export function getChannelStatusArray(
   player: KSSPlayer,
   id: ChannelId,
   pastSpanInFrames: number,
-  futureSpanInFrames: number,
+  futureSpanInFrames: number
 ): (ChannelStatus | null)[] {
   const currentFrame = player.progress?.renderer?.currentFrame ?? 0;
 

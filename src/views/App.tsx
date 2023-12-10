@@ -38,6 +38,7 @@ import { OpenUrlDialog } from "./OpenUrlDialog";
 import packageJson from "../../package.json";
 import ghlogo from "../assets/github-mark-white.svg";
 import { PianoRoll } from "../widgets/PianoRoll";
+import { PianoRollControl } from "../widgets/PianoRollControl";
 
 const gap = { xs: 0, sm: 1, md: 1.5, lg: 2 };
 
@@ -154,6 +155,7 @@ function DesktopAppBar() {
 }
 
 function AppRootDesktop() {
+  const appContext = useContext(AppContext);
   const context = useContext(PlayerContext);
   const [panelHeight, setPanelHeight] = useState<number | null>(null);
   const leftPaneRef = useRef<HTMLDivElement>(null);
@@ -202,25 +204,26 @@ function AppRootDesktop() {
             <Grid xs={12} sm={7} md={8} lg={8} xl={8}>
               <Stack ref={leftPaneRef} spacing={gap}>
                 <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-                  <Tabs value={tabIndex} onChange={handleTabChange}>
-                    <Tab label="Keyboard" value={0} />
-                    <Tab
-                      label={
-                        <>
-                          <Typography variant="inherit">
-                            Piano Roll <BetaSign />
-                          </Typography>
-                        </>
-                      }
-                      value={1}
-                    />
-                  </Tabs>
+                  <Box sx={{ display: "flex", flexDirection: "row" }}>
+                    <Tabs value={tabIndex} onChange={handleTabChange} sx={{ flex: 2 }}>
+                      <Tab label="Keyboard" value={0} />
+                      <Tab
+                        label={<Typography variant="inherit">Piano Roll</Typography>}
+                        value={1}
+                      />
+                    </Tabs>
+                    <Box
+                      sx={{ display: "flex", flex: 1, justifyContent: "end", alignItems: "center" }}
+                    >
+                      {tabIndex == 1 ? <PianoRollControl /> : null}
+                    </Box>
+                  </Box>
                 </Box>
                 <TabPanel value={tabIndex} index={0}>
                   <KeyboardList spacing={gap} />
                 </TabPanel>
                 <TabPanel value={tabIndex} index={1}>
-                  <PianoRoll />
+                  <PianoRoll mode={appContext.pianoRollMode} />
                 </TabPanel>
                 {isMd ? <WaveSliderCard /> : null}
               </Stack>
@@ -278,5 +281,9 @@ function TabPanel(props: TabPanelProps) {
 }
 
 function BetaSign() {
-  return <Typography variant="caption" sx={{ textTransform: "none"}}>(Beta)</Typography>;
+  return (
+    <Typography variant="caption" sx={{ textTransform: "none" }}>
+      (Beta)
+    </Typography>
+  );
 }

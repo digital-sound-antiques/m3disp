@@ -4,6 +4,7 @@ import * as Colors from "@mui/material/colors";
 import { useContext, useEffect, useRef, useState } from "react";
 import { PlayerContext, PlayerContextState } from "../contexts/PlayerContext";
 import { ChannelId } from "../kss/channel-status";
+import { AppContext } from "../contexts/AppContext";
 
 const channelIds: ChannelId[] = [
   { device: "opll", index: 0 },
@@ -33,6 +34,25 @@ const channelIds: ChannelId[] = [
   { device: "scc", index: 4 },
 ];
 
+const voiceColorMap = [
+  "#00cccc",
+  "#888888",
+  "#3eb849",
+  "#74d07d",
+  "#5955e0",
+  "#8076f1",
+  "#b95e51",
+  "#65dbef",
+  "#db6559",
+  "#ff897d",
+  "#ccc35e",
+  "#ded087",
+  "#3aa241",
+  "#b766b5",
+  Colors.pink[700],
+  Colors.brown[400],
+];
+
 const colorMap = [
   Colors.teal,
   Colors.teal,
@@ -59,25 +79,6 @@ const colorMap = [
   Colors.yellow,
   Colors.yellow,
   Colors.yellow,
-  // Colors.red,
-  // Colors.pink,
-  // Colors.purple,
-  // Colors.deepPurple,
-  // Colors.indigo,
-  // Colors.blue,
-  // Colors.lightBlue,
-  // Colors.cyan,
-  // Colors.teal,
-  // Colors.green,
-  // Colors.lightGreen,
-  // Colors.yellow,
-  // Colors.lime,
-  // Colors.amber,
-  // Colors.orange,
-  // Colors.deepOrange,
-  // Colors.brown,
-  // Colors.grey,
-  // Colors.blueGrey,
 ];
 
 const lpos = 0.25;
@@ -156,21 +157,24 @@ function paintPianoRollBg(canvas: HTMLCanvasElement) {
   }
 }
 
-function paintPianoRoll(canvas: HTMLCanvasElement, playerContext: PlayerContextState) {
+function paintPianoRoll(
+  canvas: HTMLCanvasElement,
+  playerContext: PlayerContextState,
+  rangeInSec: number,
+  layered: boolean
+) {
   const ctx = canvas.getContext("2d")!;
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   ctx.beginPath();
 
-  const frames = 240;
-  const step = canvas.width / frames;
-  const kh = canvas.height / 96;
-
   for (let ch = 0; ch < channelIds.length; ch++) {
+    const kh = canvas.height / 96;
+    const frames = Math.round(60 * rangeInSec) + (layered ? ch * 8 : 0);
+    const step = canvas.width / frames;
     const id = channelIds[ch];
     const palette = colorMap[ch];
-    const color = palette["A200"];
-    ctx.fillStyle = color + "c0";
+    let color: string = palette["A200"];
     const statuses = playerContext.player.getChannelStatusArray(
       id,
       Math.floor(735 * frames * lpos),
@@ -178,18 +182,32 @@ function paintPianoRoll(canvas: HTMLCanvasElement, playerContext: PlayerContextS
     );
 
     for (let i = 0; i < statuses.length; i++) {
-      const { kcode, vol, keyKeepFrames } = statuses[i] ?? {};
+      const { kcode, vol, keyKeepFrames, vnum } = statuses[i] ?? {};
       if (kcode != null && vol != null) {
         let edge = (keyKeepFrames ?? 0) == 0;
-        ctx.fillRect(step * i + (edge ? 1 : 0), canvas.height * (1.0 - (kcode + 1) / 96), step, kh);
+        if (vnum != null) {
+          color = voiceColorMap[vnum % 16];
+        }
+        const height = kh - 2;
+        const yPos = (kh - height) / 2;
+        ctx.fillStyle = color + "f0";
+        ctx.fillRect(
+          step * i + (edge ? 1 : 0),
+          canvas.height * (1.0 - (kcode + 1) / 96) + yPos,
+          step,
+          height
+        );
       }
     }
   }
 }
 
 function PianoRollCanvas(props: { width: number; height: number }) {
+  const appContext = useContext(AppContext);
   const playerContext = useContext(PlayerContext);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const appContextRef = useRef(appContext);
+  appContextRef.current = appContext;
 
   useEffect(() => {
     const canvas = canvasRef.current!;
@@ -204,7 +222,12 @@ function PianoRollCanvas(props: { width: number; height: number }) {
       const canvas = canvasRef.current!;
       if (canvas != null) {
         requestAnimationFrame(renderFrame);
-        paintPianoRoll(canvas, playerContext);
+        paintPianoRoll(
+          canvas,
+          playerContext,
+          appContextRef.current.pianoRollRangeInSec,
+          appContextRef.current.pianoRollLayered
+        );
       }
     };
     renderFrame();
@@ -272,7 +295,7 @@ function HighlightCanvas(props: {
 
   useEffect(() => {
     painterRef.current = props.painter;
-  }, [props.painter])
+  }, [props.painter]);
 
   useEffect(() => {
     const renderFrame = () => {
@@ -304,9 +327,10 @@ function HighlightCanvas(props: {
   );
 }
 
-export function PianoRoll() {
+export function PianoRoll(props: { mode: string }) {
   const boxRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
+
   const onResize = () => {
     setSize({
       width: boxRef.current!.clientWidth,
@@ -322,17 +346,8 @@ export function PianoRoll() {
     };
   }, []);
 
-  const [mode, setMode] = useState("2d");
-  const onModeChange = () => {
-    if (mode == "2d") {
-      setMode("3d");
-    } else {
-      setMode("2d");
-    }
-  };
-
   const transform = () => {
-    if (mode == "3d") {
+    if (props.mode == "3d") {
       return "scaleY(1.2) translateY(-20%) perspective(900px) rotateX(-130deg) rotateZ(90deg) rotateY(0deg)";
     } else {
       return "none";
@@ -341,11 +356,6 @@ export function PianoRoll() {
 
   return (
     <Card sx={{ position: "relative", backgroundColor: "#121212", backgroundImage: "none" }}>
-      <Box sx={{ display: "flex", zIndex: 2, position: "absolute", top: 8, right: 8, gap: 1 }}>
-        <Button variant="outlined" sx={{ minWidth: 0, p: 0.5 }} onClick={onModeChange}>
-          <ThreeDRotation fontSize="small" />
-        </Button>
-      </Box>
       <Box
         ref={boxRef}
         sx={{
@@ -363,12 +373,12 @@ export function PianoRoll() {
         <AutoSizeCanvas painter={paintWhiteKeyboard} width={size.width} height={size.height} />
         <HighlightCanvas painter={paintWhiteHighlight} width={size.width} height={size.height} />
         <AutoSizeCanvas
-          painter={(canvas) => paintBlackKeyboard(canvas, mode == "3d")}
+          painter={(canvas) => paintBlackKeyboard(canvas, props.mode == "3d")}
           width={size.width}
           height={size.height}
         />
         <HighlightCanvas
-          painter={(canvas, keys) => paintBlackHighlight(canvas, keys, mode == "3d")}
+          painter={(canvas, keys) => paintBlackHighlight(canvas, keys, props.mode == "3d")}
           width={size.width}
           height={size.height}
         />

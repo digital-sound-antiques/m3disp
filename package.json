@@ -1,7 +1,7 @@
 {
   "name": "m3disp",
   "private": true,
-  "version": "0.10.0-beta.0",
+  "version": "0.11.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,30 +10,30 @@
     "server": "http-server -c-1 ./dist --ssl --key ./cert/localhost+2-key.pem --cert ./cert/localhost+2.pem"
   },
   "dependencies": {
-    "@emotion/react": "^11.10.6",
-    "@emotion/styled": "^11.10.6",
-    "@fontsource/roboto": "^4.5.8",
-    "@mui/icons-material": "^5.11.11",
-    "@mui/material": "^5.12.0",
-    "@types/sha1": "^1.1.3",
-    "fflate": "^0.7.4",
-    "libkss-js": "2.2.0-beta.0",
+    "@emotion/react": "^11.11.0",
+    "@emotion/styled": "^11.11.0",
+    "@fontsource/roboto": "^5.0.8",
+    "@mui/icons-material": "^5.14.19",
+    "@mui/material": "^5.14.20",
+    "@types/sha1": "^1.1.5",
+    "fflate": "^0.8.1",
+    "libkss-js": "^2.2.0",
     "md5": "^2.3.0",
-    "mgsc-js": "^2.0.0-beta.1",
+    "mgsc-js": "^2.0.0",
     "mgsrc-js": "^2.0.0",
     "react": "^18.2.0",
     "react-beautiful-dnd": "^13.1.1",
     "react-dom": "^18.2.0",
     "react-file-drop": "^3.1.6",
-    "webaudio-stream-player": "^1.1.0"
+    "webaudio-stream-player": "^1.2.1"
   },
   "devDependencies": {
     "@types/md5": "^2.3.2",
     "@types/react": "^18.0.28",
     "@types/react-beautiful-dnd": "^13.1.4",
     "@types/react-dom": "^18.0.11",
-    "@vitejs/plugin-react": "^3.1.0",
-    "typescript": "^4.9.3",
-    "vite": "^4.2.0"
+    "@vitejs/plugin-react": "^4.2.1",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.7"
   }
 }
