@@ -129,7 +129,7 @@ async function applyPlayStateChange(
         return play(state.currentEntry);
       }
     } else {
-      console.warn('Missing current entry.');
+      console.warn("Missing current entry.");
       return;
     }
   }
@@ -247,5 +247,3 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
     </PlayerContext.Provider>
   );
 }
-
-

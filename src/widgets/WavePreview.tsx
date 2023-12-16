@@ -225,14 +225,14 @@ export function WaveSlider() {
   const [progress, setProgress] = useState({ currentTime: 0, bufferedTime: 0 });
 
   useEffect(() => {
-    const timerId = setTimeout(() => {
+    const timerId = setInterval(() => {
       const progress = context.player.progress.renderer;
       setProgress(progress);
     }, 100);
     return () => {
       clearTimeout(timerId);
     };
-  });
+  }, []);
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", padding: 2 }}>
