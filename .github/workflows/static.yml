@@ -37,6 +37,8 @@ jobs:
           node-version: 18
       - run: npm ci
       - run: npm run build
+        env: 
+          VITE_GD_API_KEY: ${{ secrets.GD_API_KEY }}        
       - name: Setup Pages
         uses: actions/configure-pages@v3
       - name: Upload artifact

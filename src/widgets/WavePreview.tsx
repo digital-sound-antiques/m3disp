@@ -167,7 +167,7 @@ function WaveCanvas(props: WaveCanvasProps) {
 }
 
 type WavePreviewProps = {
-  height?: string | number | undefined;
+  height?: string | number | null;
 };
 
 export function WavePreview(props: WavePreviewProps) {
@@ -220,7 +220,7 @@ function _toTimeString(ms: number): string {
   return `${mm}:${ss}`;
 }
 
-export function WaveSlider() {
+export function WaveSlider(props: { height?: string| number | null }) {
   const context = useContext(PlayerContext);
   const [progress, setProgress] = useState({ currentTime: 0, bufferedTime: 0 });
 
@@ -236,9 +236,11 @@ export function WaveSlider() {
 
   return (
     <Box sx={{ display: "flex", flexDirection: "column", padding: 2 }}>
-      <WavePreview />
+      <WavePreview height={props.height}/>
       <Stack direction="row" justifyContent="space-between" sx={{ mt: 1 }}>
-        <Typography variant="caption">{_toTimeString(Math.min(progress.currentTime, progress.bufferedTime))}</Typography>
+        <Typography variant="caption">
+          {_toTimeString(Math.min(progress.currentTime, progress.bufferedTime))}
+        </Typography>
         <Typography variant="caption">{_toTimeString(progress.bufferedTime)}</Typography>
       </Stack>
     </Box>

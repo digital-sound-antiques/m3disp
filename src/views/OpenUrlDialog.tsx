@@ -2,7 +2,7 @@ import { ChangeEvent, useContext, useState } from "react";
 import { AppContext } from "../contexts/AppContext";
 import { Box, Button, Dialog, DialogActions, DialogContent, TextField } from "@mui/material";
 import { PlayerContext } from "../contexts/PlayerContext";
-import { loadEntriesFromUrl } from "../utils/load-urls";
+import { loadEntriesFromUrl } from "../utils/loader";
 import { AppProgressContext } from "../contexts/AppProgressContext";
 
 export function OpenUrlDialog() {

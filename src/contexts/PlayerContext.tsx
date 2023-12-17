@@ -3,7 +3,7 @@ import { AudioPlayerState } from "webaudio-stream-player";
 import { KSSChannelMask } from "../kss/kss-device";
 import { KSSPlayer } from "../kss/kss-player";
 import { BinaryDataStorage } from "../utils/binary-data-storage";
-import { loadEntriesFromUrl } from "../utils/load-urls";
+import { loadEntriesFromFileList, loadEntriesFromUrl } from "../utils/loader";
 import { isIOS, isSafari } from "../utils/platform-detect";
 import { unmuteAudio } from "../utils/unmute";
 import AppGlobal from "./AppGlobal";
@@ -163,9 +163,14 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
+    console.log('attach');
+    console.log(window.opener);
+    window.addEventListener("message", onWindowMessage, false);
     state.player.addEventListener("statechange", onPlayerStateChange);
     initialize();
     return () => {
+      console.log('detach');
+      window.removeEventListener("message", onWindowMessage, false);
       state.player.removeEventListener("statechange", onPlayerStateChange);
     };
   }, []);
@@ -229,6 +234,18 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
   const onPlayerStateChange = (ev: CustomEvent<AudioPlayerState>) => {
     if (ev.detail == "stopped") {
       reducer.onPlayerStopped();
+    }
+  };
+
+  const onWindowMessage = async (ev: MessageEvent) => {
+    console.log(ev);
+    if (ev.data instanceof Uint8Array && ev.data.length <= 65536) {
+      reducer.clearEntries();
+      const file = new File([ev.data], 'external.mgs');
+      const entries = await loadEntriesFromFileList(state.storage, [new File([ev.data], file.name)]);
+      reducer.addEntries(entries, 0);
+      reducer.resume();
+      reducer.play(0);
     }
   };
 

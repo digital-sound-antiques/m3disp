@@ -20,7 +20,7 @@ import { useContext } from "react";
 import { AppContext } from "../contexts/AppContext";
 import { AppProgressContext } from "../contexts/AppProgressContext";
 import { PlayerContext } from "../contexts/PlayerContext";
-import { loadFilesFromUrls } from "../utils/load-urls";
+import { loadFilesFromUrls } from "../utils/loader";
 
 function getUrls(id: string) {
   const res: string[] = [];

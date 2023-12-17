@@ -19,6 +19,8 @@ const defaultContextData: AppProgresssContextData = {
 export const AppProgressContext = createContext(defaultContextData);
 
 export function AppProgressContextProvider(props: PropsWithChildren) {
+  const [state, setState] = useState(defaultContextData);
+
   const setTitle = (value: string | null) => {
     setState((oldState) => ({ ...oldState, title: value }));
   };
@@ -26,8 +28,6 @@ export function AppProgressContextProvider(props: PropsWithChildren) {
   const setProgress = (value: number | null) => {
     setState((oldState) => ({ ...oldState, progress: value, rev: oldState.rev + 1 }));
   };
-
-  const [state, setState] = useState(defaultContextData);
 
   return (
     <AppProgressContext.Provider value={{ ...state, setProgress, setTitle }}>

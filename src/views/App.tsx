@@ -17,7 +17,7 @@ import {
 } from "@mui/material";
 
 import { MoreVert } from "@mui/icons-material";
-import { Fragment, useContext, useEffect, useRef, useState } from "react";
+import React, { Fragment, useContext, useEffect, useRef, useState } from "react";
 import { AppContext } from "../contexts/AppContext";
 import { FileDropContext } from "../contexts/FileDropContext";
 import { PlayerContext } from "../contexts/PlayerContext";
@@ -25,20 +25,20 @@ import { KeyboardList } from "../widgets/KeyboardList";
 import { VolumeControl } from "../widgets/VolumeControl";
 import { WaveSliderCard } from "../widgets/WavePreview";
 import "./App.css";
+import { AppProgressDialog } from "./AppProgressDialog";
 import { OptionMenu } from "./OptionMenu";
 import { PlayListCard, PlayListView } from "./PlayListView";
 import { PlayControl, PlayControlCard } from "./PlayerControl";
-import { AppProgressDialog } from "./AppProgressDialog";
 import { SettingsDialog } from "./SettingsDialog";
 
-import { AboutDialog } from "./AboutDialog";
-import { TimeSlider } from "../widgets/TimeSlider";
-import { SampleDialog } from "./SampleDialog";
-import { OpenUrlDialog } from "./OpenUrlDialog";
 import packageJson from "../../package.json";
 import ghlogo from "../assets/github-mark-white.svg";
 import { PianoRoll } from "../widgets/PianoRoll";
 import { PianoRollControl } from "../widgets/PianoRollControl";
+import { TimeSlider } from "../widgets/TimeSlider";
+import { AboutDialog } from "./AboutDialog";
+import { OpenUrlDialog } from "./OpenUrlDialog";
+import { SampleDialog } from "./SampleDialog";
 
 const gap = { xs: 0, sm: 1, md: 1.5, lg: 2 };
 

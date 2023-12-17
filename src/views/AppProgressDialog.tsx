@@ -8,7 +8,10 @@ export function AppProgressDialog() {
     <Dialog open={context.progress != null}>
       <DialogContent>
         <Box sx={{ width: "256px" }}>
-          <LinearProgress variant="determinate" value={(context.progress ?? 1.0) * 100} />
+          <LinearProgress
+            variant={context.progress == 0.0 ? "indeterminate" : "determinate"}
+            value={(context.progress ?? 1.0) * 100}
+          />
         </Box>
       </DialogContent>
     </Dialog>

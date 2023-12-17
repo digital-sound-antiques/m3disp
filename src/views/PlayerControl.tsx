@@ -32,9 +32,9 @@ export function PlayControl(props: { small: boolean }) {
     <Box
       sx={{
         display: "flex",
-        width: "56px",
-        height: "56px",
-        borderRadius: "28px",
+        width: "40px",
+        height: "40px",
+        borderRadius: "20px",
         justifyContent: "center",
         alignItems: "center",
         backgroundColor: theme.palette.primary.main,
