@@ -72,7 +72,7 @@ export function parseM3U(text: string): PlayListEntry[] {
     if (durationInMs != null && loopDurationInMs != null) {
       if (loopDurationInMs > 0) {
         durationInMs += loopDurationInMs;
-      } else if (loopDurationInMs < 0 || loopDurationInMs == -0) {
+      } else if (loopDurationInMs < 0 || loopDurationInMs === -0) {
         durationInMs += durationInMs + loopDurationInMs;
       } else {
         // do nothind
