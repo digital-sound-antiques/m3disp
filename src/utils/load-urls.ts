@@ -5,14 +5,47 @@ import { MGSC, TextDecoderEncoding, detectEncoding } from "mgsc-js";
 import { parseM3U } from "./m3u-parser";
 
 export const convertUrlIfRequired = (url: string) => {
-  const m = url.match(/^(https:\/\/)?f\.msxplay\.com\/([0-9a-z]+)/i);
+  // MSXplay.com
+  let m = url.match(/^(https:\/\/)?f\.msxplay\.com\/([0-9a-z]+)/i);
   if (m != null) {
     return `https://firebasestorage.googleapis.com/v0/b/msxplay-63a7a.appspot.com/o/pastebin%2F${m[2]}?alt=media`;
   }
+
+  // github.com (blob or raw URL)
+  m = url.match(/^(?:https:\/\/)?github\.com\/(.+)\/(?:blob|raw)\/(.*)/);
+  if (m != null) {
+    return `https://raw.githubusercontent.com/${m[1]}/${m[2]}`;
+  }
+
   return url;
 };
 
-export const loadUrls = async (
+export async function loadEntriesFromUrl(
+  url: string, // m3u, pls or single data file.
+  storage: BinaryDataStorage,
+  progressCallback?: (value: number | null) => void
+): Promise<PlayListEntry[]> {
+  const targetUrl = convertUrlIfRequired(url);
+  const fileUrls = [];
+
+  if (/[^/]*\.(m3u|pls)/i.test(url)) {
+    const baseUrl = targetUrl.replace(/[^/]*\.(m3u|pls)/i, "");
+    const res = await fetch(targetUrl);
+    const items = parseM3U(await res.text());
+    for (const item of items) {
+      if (/https?:\/\//.test(item.filename)) {
+        fileUrls.push(item.filename);
+      } else {
+        fileUrls.push(`${baseUrl}${item.filename}`);
+      }
+    }
+  } else { 
+    fileUrls.push(targetUrl);
+  }
+  return loadFilesFromUrls(fileUrls, storage, progressCallback);
+}
+
+export const loadFilesFromUrls = async (
   urls: string[],
   storage: BinaryDataStorage,
   setProgress?: (value: number | null) => void

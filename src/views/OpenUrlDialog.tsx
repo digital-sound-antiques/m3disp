@@ -2,10 +2,12 @@ import { ChangeEvent, useContext, useState } from "react";
 import { AppContext } from "../contexts/AppContext";
 import { Box, Button, Dialog, DialogActions, DialogContent, TextField } from "@mui/material";
 import { PlayerContext } from "../contexts/PlayerContext";
-import { loadUrls } from "../utils/load-urls";
+import { loadEntriesFromUrl } from "../utils/load-urls";
+import { AppProgressContext } from "../contexts/AppProgressContext";
 
 export function OpenUrlDialog() {
   const app = useContext(AppContext);
+  const progress = useContext(AppProgressContext);
   const context = useContext(PlayerContext);
   const id = "open-url-dialog";
 
@@ -17,7 +19,7 @@ export function OpenUrlDialog() {
   const onOk = async () => {
     app.closeDialog(id);
     if (url != null) {
-      const entries = await loadUrls([url], context.storage);
+      const entries = await loadEntriesFromUrl(url, context.storage, progress.setProgress);
       context.reducer.setEntries(entries);
     }
   };

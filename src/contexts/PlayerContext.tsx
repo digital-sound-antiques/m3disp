@@ -1,13 +1,14 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import { AudioPlayerState } from "webaudio-stream-player";
 import { KSSChannelMask } from "../kss/kss-device";
 import { KSSPlayer } from "../kss/kss-player";
 import { BinaryDataStorage } from "../utils/binary-data-storage";
-import { loadUrls } from "../utils/load-urls";
+import { loadEntriesFromUrl } from "../utils/load-urls";
 import { isIOS, isSafari } from "../utils/platform-detect";
 import { unmuteAudio } from "../utils/unmute";
 import AppGlobal from "./AppGlobal";
 import { PlayerContextReducer } from "./PlayerContextReducer";
+import { AppProgressContext } from "./AppProgressContext";
 
 export type PlayListEntry = {
   title?: string | null;
@@ -148,6 +149,7 @@ async function applyPlayStateChange(
 export function PlayerContextProvider(props: React.PropsWithChildren) {
   const [state, setState] = useState(defaultContextState);
   const oldState = usePrevious(state);
+  const p = useContext(AppProgressContext);
 
   useEffect(() => {
     applyPlayStateChange(oldState, state);
@@ -184,19 +186,13 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
         const params = AppGlobal.getQueryParamsOnce();
         const openUrl = params.get("open");
         if (openUrl) {
-          const [newEntry] = await loadUrls([openUrl], state.storage);
-          if (newEntry != null) {
-            setState((oldState) => {
-              const newEntries = [...oldState.entries];
-              if (newEntry?.dataId != newEntries[0]?.dataId) {
-                newEntries.unshift(newEntry);
-              }
-              return {
-                ...oldState,
-                entries: newEntries,
-              };
-            });
-          }
+          const entries = await loadEntriesFromUrl(openUrl, state.storage, p.setProgress);
+          setState((oldState) => {
+            return {
+              ...oldState,
+              entries,
+            };
+          });
         }
       } catch (e) {
         console.error(e);

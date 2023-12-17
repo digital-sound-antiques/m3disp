@@ -1,11 +1,8 @@
-import { Album, Close, LibraryMusic } from "@mui/icons-material";
+import { Close, LibraryMusic } from "@mui/icons-material";
 import {
   AppBar,
-  Button,
   Dialog,
   DialogActions,
-  DialogContent,
-  DialogTitle,
   Divider,
   IconButton,
   List,
@@ -17,13 +14,13 @@ import {
   Toolbar,
   Typography,
   useMediaQuery,
-  useTheme,
+  useTheme
 } from "@mui/material";
 import { useContext } from "react";
 import { AppContext } from "../contexts/AppContext";
 import { AppProgressContext } from "../contexts/AppProgressContext";
 import { PlayerContext } from "../contexts/PlayerContext";
-import { loadUrls } from "../utils/load-urls";
+import { loadFilesFromUrls } from "../utils/load-urls";
 
 function getUrls(id: string) {
   const res: string[] = [];
@@ -110,7 +107,7 @@ export function SampleDialog() {
   const onClickItem = async (id: string) => {
     await context.unmute();
     app.closeDialog("sample-dialog");
-    const entries = await loadUrls(getUrls(id), context.storage, p.setProgress);
+    const entries = await loadFilesFromUrls(getUrls(id), context.storage, p.setProgress);
     context.reducer.stop();
     context.reducer.setEntries(entries);
     context.reducer.play(0);     

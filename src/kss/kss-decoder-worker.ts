@@ -43,8 +43,6 @@ class KSSDecoderWorker extends AudioDecoderWorker {
   private _kss: KSS | null = null;
   private _kssplay: KSSPlay | null = null;
 
-
-
   private _duration = 60 * 1000 * 5;
   private _fadeDuration = 5 * 1000;
   private _decodeFrames = 0;
@@ -86,7 +84,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     this._kssplay.setSilentLimit(15 * 1000);
 
     this._fadeDuration = args.fadeDuration ?? defaultFadeDuration;
-    this._duration = (args.duration ?? defaultDuration);
+    this._duration = args.duration ?? defaultDuration;
     this._hasDebugMarker = args.debug ?? false;
     this._maxLoop = args.loop ?? defaultLoop;
     this._decodeFrames = 0;
@@ -186,16 +184,13 @@ class KSSDecoderWorker extends AudioDecoderWorker {
 
     const currentTimeInMs = (this._decodeFrames / this.sampleRate) * 1000;
 
-    if (
-      this._kssplay.getLoopCount() >= this._maxLoop ||
-      this._duration <= currentTimeInMs
-    ) {
+    if (this._kssplay.getLoopCount() >= this._maxLoop || this._duration <= currentTimeInMs) {
       if (this._kssplay.getFadeFlag() == 0) {
         this._kssplay.fadeStart(this._fadeDuration);
       }
     }
 
-    if ((this._duration + this._fadeDuration) < currentTimeInMs) {
+    if (this._duration + this._fadeDuration <= currentTimeInMs) {
       return null;
     }
 
