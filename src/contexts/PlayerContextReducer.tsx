@@ -77,6 +77,18 @@ export class PlayerContextReducer {
     });
   }
 
+  setDefaultLoopCount(value: number) {
+    this.setState((state) => {
+      return { ...state, defaultLoopCount: value };
+    });
+  }
+
+  setDefaultDuration(value: number) {
+    this.setState((state) => {
+      return { ...state, defaultDuration: value };
+    });
+  }
+
   setChannelMask(channelMask: KSSChannelMask) {
     this.setState((state) => {
       if (

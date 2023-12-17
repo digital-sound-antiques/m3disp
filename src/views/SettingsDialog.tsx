@@ -19,6 +19,7 @@ import React, { Fragment, useContext, useState } from "react";
 import { AppContext, KeyHighlightColorType } from "../contexts/AppContext";
 import { SettingsContext, SettingsContextProvider } from "../contexts/SettingsContext";
 import { ColorBall, ColorSelector } from "../widgets/ColorSelector";
+import { NumberSelector } from "../widgets/NumberSelector";
 
 interface TabPanelProps {
   children?: React.ReactNode;
@@ -187,6 +188,30 @@ function ColorPanel(props: TabPanelProps) {
   );
 }
 
+function PlayerPanel(props: TabPanelProps) {
+  const context = useContext(SettingsContext);
+
+  return (
+    <TabPanel value={props.value} index={props.index}>
+      <Box sx={{ px: { sm: 2 } }}>
+        <NumberSelector
+          label="Loop Count"
+          values={[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}
+          value={context.defaultLoopCount}
+          onChange={context.setDefaultLoopCount}
+        />
+        <NumberSelector
+          label="Maximum Duration"
+          values={[120 * 1000, 180 * 1000, 300 * 1000, 600 * 1000, 900 * 1000, 1200 * 1000]}
+          value={context.defaultDuration}
+          valueLabelFn={(value) => `${(value / 60 / 1000).toFixed(0)} min.`}
+          onChange={context.setDefaultDuration}
+        />
+      </Box>
+    </TabPanel>
+  );
+}
+
 function KeyColorTypeSelector(props: { value: KeyHighlightColorType }) {
   const theme = useTheme();
   const app = useContext(AppContext);
@@ -265,19 +290,21 @@ function SettingsDialogBody(props: { id: string }) {
         sx={{
           minWidth: "300px",
           width: { sm: "480px" },
-          height: { xs: "480px", sm: "480px" },
-          p: 0,
+          height: { xs: "480px", sm: "520px" },
+          p: 1,
           backgroundColor: "background.paper",
         }}
       >
         <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
           <Tabs value={value} onChange={handleChange} variant="fullWidth">
+            <Tab label="Player" />
             <Tab label="Theme" />
             <Tab label="Channels" />
           </Tabs>
         </Box>
-        <ColorPanel value={value} index={0} />
-        <MaskPanel value={value} index={1} />
+        <PlayerPanel value={value} index={0} />
+        <ColorPanel value={value} index={1} />
+        <MaskPanel value={value} index={2} />
       </DialogContent>
       <DialogActions sx={{ backgroundColor: "background.paper" }}>
         <Button onClick={onCancel}>Cancel</Button>

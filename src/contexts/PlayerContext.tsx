@@ -9,6 +9,7 @@ import { unmuteAudio } from "../utils/unmute";
 import AppGlobal from "./AppGlobal";
 import { PlayerContextReducer } from "./PlayerContextReducer";
 import { AppProgressContext } from "./AppProgressContext";
+import { KSSDecoderStartOptions } from "../kss/kss-decoder-worker";
 
 export type PlayListEntry = {
   title?: string | null;
@@ -32,6 +33,8 @@ export interface PlayerContextState {
   currentEntry: PlayListEntry | null;
   playState: "playing" | "paused" | "stopped";
   playStateChangeCount: number;
+  defaultLoopCount: number;
+  defaultDuration: number;
   channelMask: KSSChannelMask;
   unmute: () => Promise<void>;
 }
@@ -60,6 +63,8 @@ const createDefaultContextState = () => {
     playStateChangeCount: 0,
     playState: "stopped",
     masterGain: 4.0,
+    defaultLoopCount: 2,
+    defaultDuration: 300 * 1000,
     channelMask: {
       psg: 0,
       opl: 0,
@@ -88,6 +93,8 @@ const createDefaultContextState = () => {
     state.masterGain = json.masterGain ?? state.masterGain;
     state.gainNode.gain.value = state.masterGain;
     state.repeatMode = json.repeatMode ?? state.repeatMode;
+    state.defaultLoopCount = json.defaultLoopCount ?? state.defaultLoopCount;
+    state.defaultDuration = json.defaultDuration ?? state.defaultDuration;
   } catch (e) {
     console.error(e);
     localStorage.clear();
@@ -118,7 +125,16 @@ async function applyPlayStateChange(
     const { channelMask } = state;
     const { dataId, song, duration, fadeDuration } = entry;
     const data = await state.storage.get(dataId);
-    await state.player.play({ channelMask, data, song, duration, fadeDuration });
+    const options: KSSDecoderStartOptions = {
+      channelMask,
+      data,
+      song,
+      duration,
+      fadeDuration,
+      loop: state.defaultLoopCount,      
+      defaultDuration: state.defaultDuration,
+    };
+    await state.player.play(options);
   };
 
   if (state.playState == "playing") {
@@ -163,13 +179,10 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
   const [initialized, setInitialized] = useState(false);
 
   useEffect(() => {
-    console.log('attach');
-    console.log(window.opener);
     window.addEventListener("message", onWindowMessage, false);
     state.player.addEventListener("statechange", onPlayerStateChange);
     initialize();
     return () => {
-      console.log('detach');
       window.removeEventListener("message", onWindowMessage, false);
       state.player.removeEventListener("statechange", onPlayerStateChange);
     };
@@ -214,14 +227,27 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
   };
 
   const save = () => {
-    const { channelMask, repeatMode, masterGain } = state;
-    const data = { version: 1, channelMask, masterGain, repeatMode };
+    const { defaultLoopCount, defaultDuration, channelMask, repeatMode, masterGain } = state;
+    const data = {
+      version: 1,
+      defaultLoopCount,
+      defaultDuration,
+      channelMask,
+      masterGain,
+      repeatMode,
+    };
     localStorage.setItem("m3disp.playerContext", JSON.stringify(data));
   };
 
   useEffect(() => {
     save();
-  }, [state.masterGain, state.channelMask, state.repeatMode]);
+  }, [
+    state.masterGain,
+    state.defaultLoopCount,
+    state.defaultDuration,
+    state.channelMask,
+    state.repeatMode,
+  ]);
 
   const saveEntries = (entries: PlayListEntry[]) => {
     const data = JSON.stringify(entries);
@@ -238,11 +264,12 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
   };
 
   const onWindowMessage = async (ev: MessageEvent) => {
-    console.log(ev);
     if (ev.data instanceof Uint8Array && ev.data.length <= 65536) {
       reducer.clearEntries();
-      const file = new File([ev.data], 'external.mgs');
-      const entries = await loadEntriesFromFileList(state.storage, [new File([ev.data], file.name)]);
+      const file = new File([ev.data], "external.mgs");
+      const entries = await loadEntriesFromFileList(state.storage, [
+        new File([ev.data], file.name),
+      ]);
       reducer.addEntries(entries, 0);
       reducer.resume();
       reducer.play(0);

@@ -9,6 +9,7 @@ export type KSSDecoderStartOptions = {
   cpu?: number | null;
   duration?: number | null;
   fadeDuration?: number | null;
+  defaultDuration?: number| null;
   rcf?: null | {
     resistor: number;
     capacitor: number;
@@ -84,7 +85,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     this._kssplay.setSilentLimit(15 * 1000);
 
     this._fadeDuration = args.fadeDuration ?? defaultFadeDuration;
-    this._duration = args.duration ?? defaultDuration;
+    this._duration = args.duration ?? ((args.defaultDuration ?? defaultDuration) - this._fadeDuration);
     this._hasDebugMarker = args.debug ?? false;
     this._maxLoop = args.loop ?? defaultLoop;
     this._decodeFrames = 0;
