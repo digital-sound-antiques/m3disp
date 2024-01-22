@@ -25,6 +25,7 @@ import { FileDrop } from "react-file-drop";
 import { useFileDrop } from "../contexts/FileDropContext";
 import { PlayListToolBar } from "../widgets/PlayListToolBar";
 import { AppContext } from "../contexts/AppContext";
+import { saveEntriesAsZip } from "../utils/saver";
 
 export function PlayListBody(props: {
   onAddClick: () => void;
@@ -247,8 +248,13 @@ export function PlayListView(props: { toolbarAlignment?: "top" | "bottom" }) {
   }
 
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const onTargetClick = () => {
+  const onAddClick = () => {
     fileInputRef.current!.click();
+  };
+
+  const context = useContext(PlayerContext);
+  const onExportClick = () => {
+    saveEntriesAsZip(context.entries, context.storage, (progress) => {});
   };
 
   return (
@@ -267,10 +273,11 @@ export function PlayListView(props: { toolbarAlignment?: "top" | "bottom" }) {
         <PlayListToolBar
           deleteMode={deleteMode}
           setEditMode={setDeleteMode}
-          onAddClick={onTargetClick}
+          onAddClick={onAddClick}
+          onExportClick={onExportClick}
           sx={{ boxShadow: "0 0 2px 0 #00000080", ...barSx }}
         />
-        <PlayListBody onAddClick={onTargetClick} editMode={deleteMode} sx={bodySx} />
+        <PlayListBody onAddClick={onAddClick} editMode={deleteMode} sx={bodySx} />
       </FileDrop>
       <input
         onChange={onFileInputChange}

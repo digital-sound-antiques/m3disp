@@ -18,6 +18,7 @@ export type PlayListEntry = {
   duration?: number | null; // in ms
   fadeDuration?: number | null; // in ms
   song?: number | null; // sub song number
+  loop?: number | null; // loop number
 };
 
 export type RepeatMode = "none" | "all" | "single";

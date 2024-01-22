@@ -8,7 +8,7 @@ import * as fflate from "fflate";
 /// Convert a given url to a download endpoint that allows CORS access.
 export function toDownloadEndpoint(url: string) {
   // f.msxplay.com
-  let m = url.match(/^(https:\/\/)?f\.msxplay\.com\/([0-9a-z]+)/i);
+  let m = url.match(/^(https:\/\/)?f\.msxplay\.com\/([0-9a-z_\-]+)/i);
   if (m != null) {
     return `https://firebasestorage.googleapis.com/v0/b/msxplay-63a7a.appspot.com/o/pastebin%2F${m[2]}?alt=media`;
   }
@@ -19,8 +19,14 @@ export function toDownloadEndpoint(url: string) {
     return `https://raw.githubusercontent.com/${m[1]}/${m[2]}`;
   }
 
+  // Dropbox URL
+  m = url.match(/^(?:https:\/\/)?www\.dropbox\.com/);
+  if (m != null) {
+    return url.replace("www.dropbox.com", "dl.dropboxusercontent.com").replace(/&?dl=0$/, "");
+  }
+
   // Google Drive Public URL
-  m = url.match(/^(?:https:\/\/)?drive.google.com\/file\/d\/([A-Za-z0-9_\-]+)/);
+  m = url.match(/^(?:https:\/\/)?drive\.google\.com\/file\/d\/([A-Za-z0-9_\-]+)/);
   if (m != null) {
     return `https://www.googleapis.com/drive/v3/files/${m[1]}?alt=media&key=${
       import.meta.env.VITE_GD_API_KEY
@@ -50,7 +56,8 @@ function _unzip(data: Uint8Array): { [key: string]: Uint8Array } {
       if (/__MACOSX\//.test(file.name)) {
         return false;
       }
-      return /\.(mgs|bgm|opx|mpk|kss|mbm|m3u|m3u8|pls)$/i.test(file.name);
+      console.log(`filter: ${file.name}`);
+      return /\.(mgs|bgm|opx|mpk|kss|mbm|m3u8?|pls)$/i.test(file.name);
     },
   });
 }
@@ -75,6 +82,7 @@ export async function loadEntriesFromZip(
     const data = unzipped[name];
     files.push(new File([data], name));
   }
+  console.log(files);
   return createEntriesFromFileList(storage, files, progressCallback);
 }
 
@@ -87,35 +95,43 @@ export async function loadEntriesFromUrl(
 
   try {
     progressCallback?.(0.0);
-    
-    if (/[^/]*\.(m3u|m3u8|pls)$/i.test(url)) {
-      // .m3u or .pls
-      const baseUrl = targetUrl.replace(/[^/]*\.(m3u|m3u8|pls)/i, "");
-      const text = await loadTextFromUrl(targetUrl);
-      const items = parseM3U(text);
-      const fileUrls = [];
-      for (const item of items) {
-        if (/https?:\/\//.test(item.filename)) {
-          fileUrls.push(item.filename);
-        } else {
-          fileUrls.push(`${baseUrl}${item.filename}`);
-        }
-      }
-      return loadFilesFromUrls(fileUrls, storage, progressCallback);
-    } else if (/[^/]*\.zip$/i) {
-      // .zip file
-      const res = await fetch(targetUrl);
-      if (res.status == 200) {
-        return loadEntriesFromZip(await res.blob(), storage, progressCallback);
-      } else {
-        throw new Error(res.statusText);
-      }
-    } else {
-      // single data file
-      const fileUrls = [];
-      fileUrls.push(targetUrl);
-      return loadFilesFromUrls(fileUrls, storage, progressCallback);
+
+    const res = await fetch(targetUrl);
+
+    if (res.status != 200) {
+      throw new Error(res.statusText);
     }
+
+    const contentType = res.headers.get("content-type");
+    const ab = await res.arrayBuffer();
+    const u8a = new Uint8Array(ab);
+    if (isZipfile(u8a)) {
+      return loadEntriesFromZip(u8a, storage, progressCallback);
+    }
+
+    // playlist
+    if (contentType == "text/plain") {
+      const text = loadBufferAsText(ab);
+      if (!/#opll_mode/.test(text)) {
+        const baseUrl = targetUrl.replace(/[^/]*\.(m3u8?|pls)/i, "");
+        const text = await loadTextFromUrl(targetUrl);
+        const items = parseM3U(text);
+        const fileUrls = [];
+        for (const item of items) {
+          if (/https?:\/\//.test(item.filename)) {
+            fileUrls.push(item.filename);
+          } else {
+            fileUrls.push(`${baseUrl}${item.filename}`);
+          }
+        }
+        return loadFilesFromUrls(fileUrls, storage, progressCallback);
+      }
+    }
+
+    // mml or binary
+    const fileUrls = [];
+    fileUrls.push(targetUrl);
+    return loadFilesFromUrls(fileUrls, storage, progressCallback);
   } finally {
     progressCallback?.(null);
   }
@@ -211,17 +227,26 @@ export function compileIfRequired(u8: Uint8Array): Uint8Array {
   return u8;
 }
 
+function loadBufferAsText(input: Uint8Array | ArrayBuffer | ArrayBufferLike): string {
+  let u8: Uint8Array;
+  if (input instanceof Uint8Array) {
+    u8 = input;
+  } else {
+    u8 = new Uint8Array(input);
+  }
+  let encoding = detectEncoding(u8);
+  if (encoding == "ascii" || encoding == "binary") {
+    encoding = "utf-8";
+  }
+  return new TextDecoder(encoding as TextDecoderEncoding).decode(u8);
+}
+
 export async function loadBlobAsText(blob: Blob): Promise<string> {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => {
       try {
-        const u8 = new Uint8Array(reader.result as ArrayBuffer);
-        let encoding = detectEncoding(u8);
-        if (encoding == "ascii" || encoding == "binary") {
-          encoding = "utf-8";
-        }
-        const text = new TextDecoder(encoding as TextDecoderEncoding).decode(u8);
+        const text = loadBufferAsText(reader.result as ArrayBuffer);
         resolve(text);
       } catch (e) {
         reject(e);
@@ -238,7 +263,7 @@ export async function createEntriesFromFileList(
 ): Promise<PlayListEntry[]> {
   let m3u = false;
   for (let i = 0; i < files.length; i++) {
-    if (/\.(pls|m3u|m3u8?)$/i.test(files[i].name)) {
+    if (/\.(pls|m3u8?)$/i.test(files[i].name)) {
       m3u = true;
     }
   }
@@ -246,7 +271,7 @@ export async function createEntriesFromFileList(
   let entries: PlayListEntry[] = [];
   if (m3u) {
     for (let i = 0; i < files.length; i++) {
-      if (/\.(pls|m3u|m3u8)$/i.test(files[i].name)) {
+      if (/\.(pls|m3u8?)$/i.test(files[i].name)) {
         entries = [
           ...entries,
           ...(await loadEntriesFromM3U(storage, files[i], files, progressCallback)),
@@ -330,6 +355,7 @@ export async function loadEntriesFromM3U(
       const refNameAlt = refName.replace(/\.[^/]+$/, "") + ".kss";
       for (const file of files) {
         const name = file.name.toLowerCase();
+        console.log({ id, name, refName, refNameAlt });
         if (refName == name || refNameAlt == name) {
           try {
             dataMap[id] = await registerFile(storage, file);
@@ -349,6 +375,8 @@ export async function loadEntriesFromM3U(
       res.push({ ...item, title: item.title ?? title, dataId });
     }
   }
+
+  console.log(res);
   return res;
 }
 

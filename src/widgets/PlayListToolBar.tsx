@@ -1,15 +1,14 @@
-import { Edit, PlaylistAdd } from "@mui/icons-material";
+import { EditNote, PlaylistAdd, SaveAlt, Share } from "@mui/icons-material";
 import {
   Box,
   Button,
   Divider,
   IconButton,
-  Link,
   Menu,
   MenuItem,
   Stack,
   SxProps,
-  Theme,
+  Theme
 } from "@mui/material";
 import { useContext, useRef, useState } from "react";
 import { AppContext } from "../contexts/AppContext";
@@ -22,10 +21,22 @@ function PlayListAddMenu(props: {
 }) {
   return (
     <Menu open={props.anchorEl != null} anchorEl={props.anchorEl} onClose={props.onClose}>
-      <MenuItem onClick={() => props.onClick("open-file")}>Open File...</MenuItem>
-      <MenuItem onClick={() => props.onClick("open-url")}>Open Url...</MenuItem>
+      <MenuItem onClick={() => props.onClick("open-file")}>Add File...</MenuItem>
+      <MenuItem onClick={() => props.onClick("open-url")}>Add URL...</MenuItem>
       <Divider />
-      <MenuItem onClick={() => props.onClick("open-sample")}>Open Sample...</MenuItem>
+      <MenuItem onClick={() => props.onClick("open-sample")}>Open Samples...</MenuItem>
+    </Menu>
+  );
+}
+
+function PlayListSaveMenu(props: {
+  anchorEl?: HTMLElement | null;
+  onClick: (id: string) => void;
+  onClose: () => void;
+}) {
+  return (
+    <Menu open={props.anchorEl != null} anchorEl={props.anchorEl} onClose={props.onClose}>
+      <MenuItem onClick={() => props.onClick("export")}>Save As Zip...</MenuItem>
     </Menu>
   );
 }
@@ -34,20 +45,19 @@ export function PlayListToolBar(props: {
   deleteMode: boolean;
   setEditMode: (flag: boolean) => void;
   onAddClick: () => void;
+  onExportClick: () => void;
   sx?: SxProps<Theme> | null;
 }) {
   const app = useContext(AppContext);
   const context = useContext(PlayerContext);
 
   const addButtonRef = useRef<HTMLButtonElement>(null);
-  const [menuAnchorEl, setMenuAnchorEl] = useState<HTMLElement | null>(null);
-
+  const [addMenuAnchorEl, setAddMenuAnchorEl] = useState<HTMLElement | null>(null);
   const onAddButtonClick = () => {
-    setMenuAnchorEl(addButtonRef.current);
+    setAddMenuAnchorEl(addButtonRef.current);
   };
-
-  const onMenuClick = (id: string) => {
-    setMenuAnchorEl(null);
+  const onAddMenuClick = (id: string) => {
+    setAddMenuAnchorEl(null);
     if (id == "open-file") {
       props.onAddClick();
     } else if (id == "open-url") {
@@ -56,9 +66,26 @@ export function PlayListToolBar(props: {
       app.openDialog("sample-dialog");
     }
   };
+  const onAddMenuClose = () => {
+    setAddMenuAnchorEl(null);
+  };
 
-  const onMenuClose = () => {
-    setMenuAnchorEl(null);
+  const saveButtonRef = useRef<HTMLButtonElement>(null);
+  const [saveMenuAnchorEl, setSaveMenuAnchorEl] = useState<HTMLElement | null>(null);
+
+  const onSaveButtonClick = () => {
+    setSaveMenuAnchorEl(saveButtonRef.current);
+  };
+
+  const onSaveMenuClick = (id: string) => {
+    setSaveMenuAnchorEl(null);
+    if (id == "export") {
+      props.onExportClick();
+    }
+  };
+
+  const onSaveMenuClose = () => {
+    setSaveMenuAnchorEl(null);
   };
 
   return (
@@ -74,10 +101,25 @@ export function PlayListToolBar(props: {
         ...props.sx,
       }}
     >
-      <PlayListAddMenu anchorEl={menuAnchorEl} onClick={onMenuClick} onClose={onMenuClose} />
-      <IconButton ref={addButtonRef} onClick={onAddButtonClick}>
-        <PlaylistAdd />
-      </IconButton>
+      <PlayListAddMenu
+        anchorEl={addMenuAnchorEl}
+        onClick={onAddMenuClick}
+        onClose={onAddMenuClose}
+      />
+      <PlayListSaveMenu
+        anchorEl={saveMenuAnchorEl}
+        onClick={onSaveMenuClick}
+        onClose={onSaveMenuClose}
+      />
+
+      <Stack sx={{ flexDirection: "row", gap: 1 }}>
+        <IconButton ref={addButtonRef} onClick={onAddButtonClick}>
+          <PlaylistAdd />
+        </IconButton>
+        <IconButton ref={saveButtonRef} onClick={onSaveButtonClick}>
+          <SaveAlt />
+        </IconButton>
+      </Stack>
       {props.deleteMode ? (
         <Stack sx={{ flexDirection: "row", gap: 1 }}>
           <Button
@@ -105,7 +147,7 @@ export function PlayListToolBar(props: {
             props.setEditMode(true);
           }}
         >
-          <Edit />
+          <EditNote />
         </IconButton>
       )}
     </Box>

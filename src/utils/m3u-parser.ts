@@ -1,15 +1,17 @@
 import { PlayListEntry } from "../contexts/PlayerContext";
 
 function parseDuration(value: string | null): number | null {
-  if (value == null) {
+  const v = value?.trim();
+
+  if (v == null) {
     return null;
   }
 
-  if (value.trim() === "") {
+  if (v == "") {
     return null;
   }
 
-  const columns = value.split(":");
+  const columns = v.split(":");
   let duration = 0;
   for (let i = 0; i < columns.length; i++) {
     duration = duration * 60 + parseInt(columns[i]);
@@ -33,20 +35,37 @@ function parseLoopDuration(value: string | null, mainDurationInMs: number | null
     }
     return null;
   } else {
-    return parseDuration(value);  
+    return parseDuration(value);
   }
 }
 
-/// parse .m3u or Winamp .pls
-export function parseM3U(text: string): PlayListEntry[] {
-  const lines = text.replaceAll("\r\n", "\n").replaceAll("\r", "\n").split("\n");
-  const plsPattern = /^(file[0-9]+=)?([^:]+)(::(kss|msx))?/i;
+function parseSongNumber(value: string): number {
+  if (value.startsWith("$")) {
+    return parseInt(value.substring(1), 16);
+  } else {
+    return parseInt(value);
+  }
+}
+
+export function parseNEZplugM3U(lines: string[]): PlayListEntry[] {
+  const extendedPattern = /^(file[0-9]+=)?([^:]+)(::(kss|msx))?/i;
   const m3uPattern = /^.+\.[a-z0-9_\-]+$/i;
 
   const res: PlayListEntry[] = [];
 
+  let plsMode = false;
+
   for (const line of lines) {
-    if (line.startsWith("#")) continue;
+    if (/^\s*#/.test(line)) {
+      continue;
+    }
+    if (line.trim() == "[playlist]") {
+      plsMode = true;
+      continue;
+    }
+    if (plsMode && !/^\s*file/i.test(line)) {
+      continue;
+    }
 
     let [head, id, title, mainDuration, loopDuration, fadeDuration] = line
       .replaceAll("\\,", "\t")
@@ -54,7 +73,7 @@ export function parseM3U(text: string): PlayListEntry[] {
     title = title?.replaceAll("\t", ",");
 
     let filename;
-    let m = head.match(plsPattern);
+    let m = head.match(extendedPattern);
     if (m != null) {
       filename = m[2];
     } else {
@@ -69,10 +88,8 @@ export function parseM3U(text: string): PlayListEntry[] {
     let song;
     if (id == null || id == "") {
       song = null;
-    } else if (id.startsWith("$")) {
-      song = parseInt(id.substring(1), 16);
     } else {
-      song = parseInt(id);
+      song = parseSongNumber(id);
     }
 
     let mainDurationInMs = parseDuration(mainDuration);
@@ -96,4 +113,65 @@ export function parseM3U(text: string): PlayListEntry[] {
     });
   }
   return res;
+}
+
+/// parse Extended M3U
+export function parseExtendedM3U(lines: string[]): PlayListEntry[] {
+  // #EXTM3U - file header, must be the first line of the file.
+  // #EXTINC:<enc> - text encoding, must be the second line of the flie.
+  // #EXTINF:<time> (key-value pair)*,Track Title
+  //   ex. #EXTINF:123 song=<song> loop=<loop> fade=<fade>,Track Title
+  //   - <time>: (required) maximum runtime in seconds.
+  //   - <song>: (optional) sub song number.
+  //   - <loop>: (optional) number of loops (if specified, runtime will be auto detected).
+  //   - <fade>: (optional) fade duraion in seconds.
+  const infoPattern = /^#EXTINF:([0-9]+)(.*)$/i;
+  let extInfo = {};
+
+  const entries: PlayListEntry[] = [];
+  for (const line of lines) {
+    const m = line.match(infoPattern);
+    if (m != null) {
+      let duration = parseDuration(m[1]);
+      if (duration == 0) {
+        duration = null;
+      }
+      const values = m[2].split(/(?<!\\)[,]/).map((e) => e.trim());
+      const props = values[0].split(/\s+/);
+      const title = values[1];
+      let song: number | null | undefined;
+      let loop: number | null | undefined;
+      let fadeDuration: number | null | undefined;
+
+      for (const prop of props) {
+        const [key, value] = prop.split("=").map((e) => e.trim());
+        if (key == "song") {
+          song = parseSongNumber(value);
+        } else if (key == "loop") {
+          loop = parseInt(value);
+        } else if (key == "fade") {
+          fadeDuration = parseDuration(value);
+        }
+      }
+      extInfo = { duration, song, loop, fadeDuration, title };
+    } else if (line.trim().startsWith("#")) {
+      // ignore
+    } else if (line.trim() != "") {
+      const filename = line.trim();
+      entries.push({ ...extInfo, filename, dataId: `ref://${filename}` });
+      extInfo = {};
+    }
+  }
+  return entries;
+}
+
+export function parseM3U(text: string): PlayListEntry[] {
+  const lines = text.replaceAll("\r\n", "\n").replaceAll("\r", "\n").split("\n");
+  if (lines.length > 0) {
+    if (/^#EXTM3U/i.test(lines[0].trim())) {
+      return parseExtendedM3U(lines);
+    }
+    return parseNEZplugM3U(lines);
+  }
+  return [];
 }
