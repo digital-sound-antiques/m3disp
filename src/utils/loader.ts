@@ -192,9 +192,14 @@ export function compileIfRequired(u8: Uint8Array): Uint8Array {
   if (encoding == "ascii") {
     encoding = "utf-8";
   }
+  if (encoding == "euc-jp") {
+    // MML can't be euc-jp, so we treat this as shift-jis
+    encoding = "shift-jis"
+  }
+
   if (encoding == "shift-jis" || encoding == "utf-8") {
     const text = new TextDecoder(encoding).decode(u8);
-    if (text.indexOf("#opll_mode") >= 0) {
+    if (text.toLowerCase().indexOf("#opll_mode") >= 0) {
       const { mgs, success } = MGSC.compile(text);
       if (success) {
         return mgs;
