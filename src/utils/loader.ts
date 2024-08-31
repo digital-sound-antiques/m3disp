@@ -91,6 +91,8 @@ export async function loadEntriesFromUrl(
 ): Promise<PlayListEntry[]> {
   const targetUrl = toDownloadEndpoint(url);
 
+  console.log(targetUrl);
+
   try {
     progressCallback?.(0.0);
     
@@ -108,7 +110,7 @@ export async function loadEntriesFromUrl(
         }
       }
       return loadFilesFromUrls(fileUrls, storage, progressCallback);
-    } else if (/[^/]*\.zip$/i) {
+    } else if (/[^/]*\.zip$/i.test(url)) {
       // .zip file
       const res = await fetch(targetUrl);
       if (res.status == 200) {
