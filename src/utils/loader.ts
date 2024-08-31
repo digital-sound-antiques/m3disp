@@ -19,6 +19,12 @@ export function toDownloadEndpoint(url: string) {
     return `https://raw.githubusercontent.com/${m[1]}/${m[2]}`;
   }
 
+  // Dropbox Public Share URL
+  m = url.match(/^(?:https:\/\/)?www.dropbox.com\/(.*)/);
+  if (m != null) {
+    return `https://dl.dropboxusercontent.com/${m[1]}`.replace('dl=0', '');
+  }
+
   // Google Drive Public URL
   m = url.match(/^(?:https:\/\/)?drive.google.com\/file\/d\/([A-Za-z0-9_\-]+)/);
   if (m != null) {
