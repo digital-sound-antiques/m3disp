@@ -5,11 +5,14 @@ import {
   Divider,
   IconButton,
   Link,
+  ListItem,
+  ListItemText,
   Menu,
   MenuItem,
+  MenuList,
   Stack,
   SxProps,
-  Theme
+  Theme,
 } from "@mui/material";
 import { useContext, useRef, useState } from "react";
 import { AppContext } from "../contexts/AppContext";
@@ -22,20 +25,28 @@ function PlayListAddMenu(props: {
 }) {
   return (
     <Menu open={props.anchorEl != null} anchorEl={props.anchorEl} onClose={props.onClose}>
-      <MenuItem onClick={() => props.onClick("open-file")}>Open File...</MenuItem>
-      <MenuItem onClick={() => props.onClick("open-url")}>
-        Open Url...
-        <IconButton sx={{ ml: 4 }}>
-          <Link
-            href="https://github.com/digital-sound-antiques/m3disp/wiki/Experimental-Feature"
-            target="_blank"
-          >
-            <HelpOutline />
-          </Link>
-        </IconButton>
-      </MenuItem>
-      <Divider />
-      <MenuItem onClick={() => props.onClick("open-sample")}>Open Samples...</MenuItem>
+      <MenuList sx={{ width: 220 }}>
+        <MenuItem onClick={() => props.onClick("open-file")}>
+          <ListItemText>Open File...</ListItemText>
+        </MenuItem>
+
+        <MenuItem onClick={() => props.onClick("open-url")}>
+          <ListItemText>Open Url...</ListItemText>
+          <IconButton onClick={(e) => e.stopPropagation()}>
+            <Link
+              href="https://github.com/digital-sound-antiques/m3disp/wiki/Experimental-Feature"
+              target="_blank"
+            >
+              <HelpOutline />
+            </Link>
+          </IconButton>
+        </MenuItem>
+
+        <Divider />
+        <MenuItem onClick={() => props.onClick("open-sample")}>
+          <ListItemText>Open Samples...</ListItemText>
+        </MenuItem>
+      </MenuList>
     </Menu>
   );
 }
@@ -47,7 +58,11 @@ function PlayListSaveMenu(props: {
 }) {
   return (
     <Menu open={props.anchorEl != null} anchorEl={props.anchorEl} onClose={props.onClose}>
-      <MenuItem onClick={() => props.onClick("export")}>Save As Zip...</MenuItem>
+      <MenuList>
+        <MenuItem onClick={() => props.onClick("export")}>
+          <ListItemText>Save as Zip...</ListItemText>
+        </MenuItem>
+      </MenuList>
     </Menu>
   );
 }

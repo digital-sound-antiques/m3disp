@@ -13,7 +13,7 @@ function extractExtension(name: string): string {
   return "";
 }
 
-function createExtendedM3U(entries: PlayListEntry[]) {
+function createExtendedM3U(entries: (PlayListEntry & { exportName?: string | null })[]) {
   const lines = ["#EXTM3U", "#EXTENC:UTF-8"];
   for (const entry of entries) {
     const props: { [key: string]: any } = {
@@ -33,8 +33,12 @@ function createExtendedM3U(entries: PlayListEntry[]) {
       info.push(`,${entry.title}`);
     }
     lines.push(info.join(""));
-    const ext = extractExtension(entry.filename);
-    lines.push(`${entry.dataId}${ext}`);
+    if (entry.exportName != null) {
+      lines.push(entry.exportName);
+    } else {
+      const ext = extractExtension(entry.filename);
+      lines.push(`${entry.dataId}${ext}`);
+    }
   }
   return lines.join("\n");
 }
@@ -47,27 +51,62 @@ export function saveAs(input: Uint8Array | string, filename: string) {
   a.click();
 }
 
+function insertCounterToBasename(filename: string, count: number) {
+  const segments = filename.split(".");
+  if (segments.length >= 2) {
+    const ext = segments.pop();
+    return segments.join(".") + ` (${count})` + "." + ext;
+  }
+  return `${filename} (${count})`;
+}
+
+/** Determine filename for exporting. Duplicated file names are taken into account. */
+function withExportName(entries: PlayListEntry[]): (PlayListEntry & { exportName: string })[] {
+  const res: (PlayListEntry & { exportName: string })[] = [];
+  const dataIdToExportName: { [key: string]: string } = {};
+  const counterMap: { [key: string]: number } = {};
+
+  for (const entry of entries) {
+    const { filename, dataId } = entry;
+    let exportName = dataIdToExportName[dataId];
+    if (exportName != null) {
+      res.push({ ...entry, exportName: dataIdToExportName[dataId] });
+    } else {
+      // suffix ' ($count)' if the same export name already exists for a different file.
+      const count = counterMap[filename] != null ? counterMap[filename] + 1 : null;
+      exportName = count != null ? insertCounterToBasename(filename, count) : filename;
+      res.push({ ...entry, exportName });
+      counterMap[filename] = count ?? 1;
+      dataIdToExportName[dataId] = exportName;
+    }
+  }
+
+  return res;
+}
+
 export async function zipEntries(
   entries: PlayListEntry[],
   storage: BinaryDataStorage,
   progressCallback?: (value: number | null) => void
 ): Promise<Uint8Array> {
-  const m3u = createExtendedM3U(entries);
+  const targets = withExportName(entries);
+  const m3u = createExtendedM3U(targets);
   const data: fflate.Zippable = {};
   data["index.m3u"] = new TextEncoder().encode(m3u);
-  for (const entry of entries) {
-    const ext = extractExtension(entry.filename);
-    data[`${entry.dataId}${ext}`] = await storage.get(entry.dataId);
+  for (const entry of targets) {
+    data[entry.exportName] = await storage.get(entry.dataId);
   }
+  console.log(data);
   const zip = fflate.zipSync(data);
   return zip;
 }
 
 export async function saveEntriesAsZip(
+  filename: string,
   entries: PlayListEntry[],
   storage: BinaryDataStorage,
   progressCallback?: (value: number | null) => void
 ) {
   const zip = await zipEntries(entries, storage, progressCallback);
-  saveAs(zip, "m3disp.zip");
+  saveAs(zip, filename);
 }

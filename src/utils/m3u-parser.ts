@@ -123,7 +123,7 @@ export function parseExtendedM3U(lines: string[]): PlayListEntry[] {
   //   ex. #EXTINF:123 song=<song> loop=<loop> fade=<fade>,Track Title
   //   - <time>: (required) maximum runtime in seconds.
   //   - <song>: (optional) sub song number.
-  //   - <loop>: (optional) number of loops (if specified, runtime will be auto detected).
+  //   - <loop>: (optional) number of loops (if not specified, time will be auto detected).
   //   - <fade>: (optional) fade duraion in seconds.
   const infoPattern = /^#EXTINF:([0-9]+)(.*)$/i;
   let extInfo = {};

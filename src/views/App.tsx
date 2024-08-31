@@ -39,6 +39,7 @@ import { TimeSlider } from "../widgets/TimeSlider";
 import { AboutDialog } from "./AboutDialog";
 import { OpenUrlDialog } from "./OpenUrlDialog";
 import { SampleDialog } from "./SampleDialog";
+import { SaveAsZipDialog } from "./SaveAsZipDialog";
 
 const gap = { xs: 0, sm: 1, md: 1.5, lg: 2 };
 
@@ -62,6 +63,7 @@ function AppRoot() {
       <AboutDialog />
       <AppProgressDialog />
       <OpenUrlDialog />
+      <SaveAsZipDialog />
       <SampleDialog />
       {isXs ? <AppRootMobile /> : <AppRootDesktop />}
     </Fragment>

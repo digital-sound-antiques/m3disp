@@ -232,6 +232,7 @@ function createSecondaryAction(
 }
 
 export function PlayListView(props: { toolbarAlignment?: "top" | "bottom" }) {
+  const app = useContext(AppContext);
   const { fileDropRef, fileDropProps, isDraggingOver, onFileInputChange } = useFileDrop(false);
   const border = isDraggingOver ? `2px solid` : null;
   const [deleteMode, setDeleteMode] = useState(false);
@@ -249,12 +250,13 @@ export function PlayListView(props: { toolbarAlignment?: "top" | "bottom" }) {
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const onAddClick = () => {
+    fileInputRef.current!.value = ""; // clear the last file info
     fileInputRef.current!.click();
   };
 
   const context = useContext(PlayerContext);
   const onExportClick = () => {
-    saveEntriesAsZip(context.entries, context.storage, (progress) => {});
+    app.openDialog("save-as-zip-dialog");
   };
 
   return (

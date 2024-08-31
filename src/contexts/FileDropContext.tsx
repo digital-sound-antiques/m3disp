@@ -38,7 +38,7 @@ export function useFileDrop(playOnDrop: boolean, clearOnDrop: boolean = false) {
     const entries = await createEntriesFromFileList(storage, files);
     context.reducer.addEntries(entries, insertionIndex);
     if (playOnDrop) {
-      context.reducer.play(insertionIndex);
+      context.reducer.play(!clearOnDrop ? insertionIndex : 0);
     }
   };
 

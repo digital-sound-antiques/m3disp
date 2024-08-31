@@ -1,9 +1,9 @@
+import * as fflate from "fflate";
 import { KSS } from "libkss-js";
+import { MGSC, TextDecoderEncoding, detectEncoding } from "mgsc-js";
 import { PlayListEntry } from "../contexts/PlayerContext";
 import { BinaryDataStorage } from "./binary-data-storage";
-import { MGSC, TextDecoderEncoding, detectEncoding } from "mgsc-js";
 import { parseM3U } from "./m3u-parser";
-import * as fflate from "fflate";
 
 /// Convert a given url to a download endpoint that allows CORS access.
 export function toDownloadEndpoint(url: string) {
@@ -82,7 +82,6 @@ export async function loadEntriesFromZip(
     const data = unzipped[name];
     files.push(new File([data], name));
   }
-  console.log(files);
   return createEntriesFromFileList(storage, files, progressCallback);
 }
 
@@ -104,19 +103,21 @@ export async function loadEntriesFromUrl(
       throw new Error(res.statusText);
     }
 
-    const contentType = res.headers.get("content-type");
+    const contentType = res.headers.get("content-type")?.replace(/;.*$/, "").trim(); // strip charset section
     const ab = await res.arrayBuffer();
     const u8a = new Uint8Array(ab);
+
+    console.log(contentType);
 
     // zip file
     if (isZipfile(u8a)) {
       return loadEntriesFromZip(u8a, storage, progressCallback);
     }
 
-    // playlist
     if (contentType == "text/plain") {
       const text = loadBufferAsText(ab);
       if (!/#opll_mode/.test(text)) {
+        // play list
         const baseUrl = targetUrl.replace(/[^/]*\.(m3u8?|pls)/i, "");
         const text = await loadTextFromUrl(targetUrl);
         const items = parseM3U(text);
@@ -359,7 +360,6 @@ export async function loadEntriesFromM3U(
       const refNameAlt = refName.replace(/\.[^/]+$/, "") + ".kss";
       for (const file of files) {
         const name = file.name.toLowerCase();
-        console.log({ id, name, refName, refNameAlt });
         if (refName == name || refNameAlt == name) {
           try {
             dataMap[id] = await registerFile(storage, file);
@@ -380,7 +380,6 @@ export async function loadEntriesFromM3U(
     }
   }
 
-  console.log(res);
   return res;
 }
 
