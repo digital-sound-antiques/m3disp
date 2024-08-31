@@ -22,7 +22,7 @@ export function toDownloadEndpoint(url: string) {
   // Dropbox Public Share URL
   m = url.match(/^(?:https:\/\/)?www.dropbox.com\/(.*)/);
   if (m != null) {
-    return `https://dl.dropboxusercontent.com/${m[1]}`.replace('dl=0', '');
+    return `https://dl.dropboxusercontent.com/${m[1]}`.replace("dl=0", "");
   }
 
   // Google Drive Public URL
@@ -95,7 +95,7 @@ export async function loadEntriesFromUrl(
 
   try {
     progressCallback?.(0.0);
-    
+
     if (/[^/]*\.(m3u|m3u8|pls)$/i.test(url)) {
       // .m3u or .pls
       const baseUrl = targetUrl.replace(/[^/]*\.(m3u|m3u8|pls)/i, "");
@@ -110,19 +110,20 @@ export async function loadEntriesFromUrl(
         }
       }
       return loadFilesFromUrls(fileUrls, storage, progressCallback);
-    } else if (/[^/]*\.zip$/i.test(url)) {
-      // .zip file
+    } else {
       const res = await fetch(targetUrl);
       if (res.status == 200) {
-        return loadEntriesFromZip(await res.blob(), storage, progressCallback);
+        if (res.headers.get("content-type")?.endsWith("zip")) {
+          // .zip file
+          return loadEntriesFromZip(await res.blob(), storage, progressCallback);
+        } else {
+          const fileUrls = [];
+          fileUrls.push(targetUrl);
+          return loadFilesFromUrls(fileUrls, storage, progressCallback);
+        }
       } else {
         throw new Error(res.statusText);
       }
-    } else {
-      // single data file
-      const fileUrls = [];
-      fileUrls.push(targetUrl);
-      return loadFilesFromUrls(fileUrls, storage, progressCallback);
     }
   } finally {
     progressCallback?.(null);
@@ -202,7 +203,7 @@ export function compileIfRequired(u8: Uint8Array): Uint8Array {
   }
   if (encoding == "euc-jp") {
     // MML can't be euc-jp, so we treat this as shift-jis
-    encoding = "shift-jis"
+    encoding = "shift-jis";
   }
 
   if (encoding == "shift-jis" || encoding == "utf-8") {
