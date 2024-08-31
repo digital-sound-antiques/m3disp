@@ -1,4 +1,4 @@
-import { Divider, Menu, MenuItem } from "@mui/material";
+import { Divider, Link, Menu, MenuItem } from "@mui/material";
 import { AppContext } from "../contexts/AppContext";
 import { useContext } from "react";
 
@@ -20,7 +20,12 @@ export function OptionMenu(props: { id: string }) {
       >
         Settings
       </MenuItem>
-      <Divider/>
+      <Divider />
+      <MenuItem>
+        <Link href="https://github.com/digital-sound-antiques/m3disp/wiki" target="help" underline="none" color="white">
+          Help
+        </Link>
+      </MenuItem>
       <MenuItem
         onClick={() => {
           app.closePopup(props.id);
