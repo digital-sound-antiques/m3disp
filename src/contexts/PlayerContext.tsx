@@ -57,7 +57,8 @@ const createDefaultContextState = () => {
     audioContext: audioContext,
     gainNode: new GainNode(audioContext),
     storage: new BinaryDataStorage(),
-    player: new KSSPlayer("worklet"),
+    // Workaround: AudioWorklet's playback is broken in iOS 17.5.1
+    player: new KSSPlayer(isIOS ? "script" : "worklet"),
     repeatMode: "none",
     entries: [],
     currentEntry: null,

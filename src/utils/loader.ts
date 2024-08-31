@@ -19,10 +19,10 @@ export function toDownloadEndpoint(url: string) {
     return `https://raw.githubusercontent.com/${m[1]}/${m[2]}`;
   }
 
-  // Dropbox URL
-  m = url.match(/^(?:https:\/\/)?www\.dropbox\.com/);
+  // Dropbox Public Share URL
+  m = url.match(/^(?:https:\/\/)?www.dropbox.com\/(.*)/);
   if (m != null) {
-    return url.replace("www.dropbox.com", "dl.dropboxusercontent.com").replace(/&?dl=0$/, "");
+    return `https://dl.dropboxusercontent.com/${m[1]}`.replace(/&?dl=0/, "");
   }
 
   // Google Drive Public URL
@@ -93,6 +93,8 @@ export async function loadEntriesFromUrl(
 ): Promise<PlayListEntry[]> {
   const targetUrl = toDownloadEndpoint(url);
 
+  console.log(targetUrl);
+
   try {
     progressCallback?.(0.0);
 
@@ -105,6 +107,8 @@ export async function loadEntriesFromUrl(
     const contentType = res.headers.get("content-type");
     const ab = await res.arrayBuffer();
     const u8a = new Uint8Array(ab);
+
+    // zip file
     if (isZipfile(u8a)) {
       return loadEntriesFromZip(u8a, storage, progressCallback);
     }
@@ -210,7 +214,7 @@ export function compileIfRequired(u8: Uint8Array): Uint8Array {
   }
   if (encoding == "euc-jp") {
     // MML can't be euc-jp, so we treat this as shift-jis
-    encoding = "shift-jis"
+    encoding = "shift-jis";
   }
 
   if (encoding == "shift-jis" || encoding == "utf-8") {

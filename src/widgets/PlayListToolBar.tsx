@@ -1,9 +1,10 @@
-import { EditNote, PlaylistAdd, SaveAlt, Share } from "@mui/icons-material";
+import { EditNote, HelpOutline, PlaylistAdd, SaveAlt } from "@mui/icons-material";
 import {
   Box,
   Button,
   Divider,
   IconButton,
+  Link,
   Menu,
   MenuItem,
   Stack,
@@ -21,8 +22,18 @@ function PlayListAddMenu(props: {
 }) {
   return (
     <Menu open={props.anchorEl != null} anchorEl={props.anchorEl} onClose={props.onClose}>
-      <MenuItem onClick={() => props.onClick("open-file")}>Add File...</MenuItem>
-      <MenuItem onClick={() => props.onClick("open-url")}>Add URL...</MenuItem>
+      <MenuItem onClick={() => props.onClick("open-file")}>Open File...</MenuItem>
+      <MenuItem onClick={() => props.onClick("open-url")}>
+        Open Url...
+        <IconButton sx={{ ml: 4 }}>
+          <Link
+            href="https://github.com/digital-sound-antiques/m3disp/wiki/Experimental-Feature"
+            target="_blank"
+          >
+            <HelpOutline />
+          </Link>
+        </IconButton>
+      </MenuItem>
       <Divider />
       <MenuItem onClick={() => props.onClick("open-sample")}>Open Samples...</MenuItem>
     </Menu>
@@ -88,6 +99,8 @@ export function PlayListToolBar(props: {
     setSaveMenuAnchorEl(null);
   };
 
+  const onHelpClick = () => {};
+
   return (
     <Box
       sx={{
@@ -120,6 +133,7 @@ export function PlayListToolBar(props: {
           <SaveAlt />
         </IconButton>
       </Stack>
+
       {props.deleteMode ? (
         <Stack sx={{ flexDirection: "row", gap: 1 }}>
           <Button
