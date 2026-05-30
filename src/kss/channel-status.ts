@@ -1,5 +1,6 @@
 import { KSSPlayer } from "./kss-player";
 import { KSSDeviceName } from "./kss-device";
+import type { KSSDecoderDeviceSnapshot } from "./kss-decoder-worker";
 
 export type ChannelStatus = {
   id: ChannelId;
@@ -247,6 +248,22 @@ export type ChannelId = {
   device: KSSDeviceName;
   index: number;
 };
+
+/** スナップショット1点から kcode を取り出す（BPM解析用） */
+export function getKcodeAt(
+  snapshot: KSSDecoderDeviceSnapshot | null | undefined,
+  id: ChannelId
+): number | null {
+  if (snapshot == null) return null;
+  try {
+    switch (id.device) {
+      case "psg":  return snapshot.psg  ? createPSGStatus(snapshot.psg,  id, snapshot.psgKeyKeepFrames  ?? [])?.kcode ?? null : null;
+      case "scc":  return snapshot.scc  ? createSCCStatus(snapshot.scc,  id, snapshot.sccKeyKeepFrames  ?? [])?.kcode ?? null : null;
+      case "opll": return snapshot.opll ? createOPLLStatus(snapshot.opll, id, snapshot.opllKeyKeepFrames ?? [])?.kcode ?? null : null;
+      default:     return null;
+    }
+  } catch { return null; }
+}
 
 function toOpllVoiceName(n: number): string {
   switch (n) {

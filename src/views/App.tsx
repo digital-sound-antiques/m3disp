@@ -35,6 +35,7 @@ import packageJson from "../../package.json";
 import ghlogo from "../assets/github-mark-white.svg";
 import { PianoRoll } from "../widgets/PianoRoll";
 import { PianoRollControl } from "../widgets/PianoRollControl";
+import { ScoreList, ScoreControl } from "../widgets/Score";
 import { TimeSlider } from "../widgets/TimeSlider";
 import { AboutDialog } from "./AboutDialog";
 import { OpenUrlDialog } from "./OpenUrlDialog";
@@ -175,6 +176,7 @@ function AppRootDesktop() {
   }, []);
 
   const [tabIndex, setTabIndex] = useState(0);
+  const [scoreBpm, setScoreBpm] = useState(120);
 
   const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
     setTabIndex(newValue);
@@ -209,15 +211,14 @@ function AppRootDesktop() {
                   <Box sx={{ display: "flex", flexDirection: "row" }}>
                     <Tabs value={tabIndex} onChange={handleTabChange} sx={{ flex: 2 }}>
                       <Tab label="Keyboard" value={0} />
-                      <Tab
-                        label={<Typography variant="inherit">Piano Roll</Typography>}
-                        value={1}
-                      />
+                      <Tab label={<Typography variant="inherit">Piano Roll</Typography>} value={1} />
+                      <Tab label={<Typography variant="inherit">Score</Typography>} value={2} />
                     </Tabs>
                     <Box
                       sx={{ display: "flex", flex: 1, justifyContent: "end", alignItems: "center" }}
                     >
                       {tabIndex == 1 ? <PianoRollControl /> : null}
+                      {tabIndex == 2 ? <ScoreControl bpm={scoreBpm} onChange={setScoreBpm} /> : null}
                     </Box>
                   </Box>
                 </Box>
@@ -226,6 +227,9 @@ function AppRootDesktop() {
                 </TabPanel>
                 <TabPanel value={tabIndex} index={1}>
                   <PianoRoll mode={appContext.pianoRollMode} />
+                </TabPanel>
+                <TabPanel value={tabIndex} index={2}>
+                  <ScoreList bpm={scoreBpm} />
                 </TabPanel>
                 {isMd ? <WaveSliderCard /> : null}
               </Stack>

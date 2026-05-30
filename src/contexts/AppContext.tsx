@@ -39,6 +39,7 @@ type AppContextData = {
   pianoRollRangeInSec: number;
   pianoRollLayered: boolean;
   pianoRollMode: string;
+  pianoRollShowKeyboard: boolean;
   openMap: { [key: string]: boolean };
   anchorElMap: { [key: string]: HTMLElement | null };
   isOpen: (id: string) => boolean;
@@ -52,6 +53,7 @@ type AppContextData = {
   setPianoRollRangeInSec: (value: number) => void;
   setPianoRollLayered: (value: boolean) => void;
   setPianoRollMode: (value: PianoRollMode) => void;
+  setPianoRollShowKeyboard: (value: boolean) => void;
 };
 
 const noop = () => {
@@ -64,6 +66,7 @@ const defaultContextData: AppContextData = {
   pianoRollRangeInSec: 4.0,
   pianoRollLayered: false,
   pianoRollMode: "2d",
+  pianoRollShowKeyboard: true,
   openMap: {},
   anchorElMap: {},
   isOpen: () => false,
@@ -77,6 +80,7 @@ const defaultContextData: AppContextData = {
   setPianoRollRangeInSec: noop,
   setPianoRollLayered: noop,
   setPianoRollMode: noop,
+  setPianoRollShowKeyboard: noop,
 };
 
 export const AppContext = createContext(defaultContextData);
@@ -175,6 +179,10 @@ export function AppContextProvider(props: PropsWithChildren) {
     }
   };
 
+  const setPianoRollShowKeyboard = (value: boolean) => {
+    setState((oldState) => ({ ...oldState, pianoRollShowKeyboard: value }));
+  };
+
   const [state, setState] = useState(defaultContextData);
   const [initialized, setInitialized] = useState(false);
 
@@ -226,6 +234,7 @@ export function AppContextProvider(props: PropsWithChildren) {
         setPianoRollRangeInSec,
         setPianoRollLayered,
         setPianoRollMode,
+        setPianoRollShowKeyboard,
       }}
     >
       {initialized ? props.children : null}

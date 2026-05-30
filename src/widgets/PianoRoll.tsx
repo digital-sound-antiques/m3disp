@@ -5,6 +5,7 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { PlayerContext, PlayerContextState } from "../contexts/PlayerContext";
 import { ChannelId } from "../kss/channel-status";
 import { AppContext } from "../contexts/AppContext";
+import { detectBPM, type BPMInfo } from "../kss/bpm-detector";
 
 const channelIds: ChannelId[] = [
   { device: "opll", index: 0 },
@@ -208,11 +209,57 @@ function _drawParticles(ctx: CanvasRenderingContext2D, dt: number) {
   ctx.shadowColor = "transparent";
 }
 
+function paintMeasureLines(
+  canvas: HTMLCanvasElement,
+  playerContext: PlayerContextState,
+  rangeInSec: number,
+  bpmInfo: BPMInfo
+) {
+  const ctx = canvas.getContext("2d")!;
+  const frames = Math.round(60 * rangeInSec);
+  const step = canvas.width / frames;
+  const nowIdx = Math.floor(frames * lpos);
+  const beatsPerMeasure = 4;
+
+  const audioFrame = playerContext.player.progress?.renderer?.currentFrame ?? 0;
+  // findSnapshotAt と同じ補正を適用してノート描画位置と一致させる
+  const latencySamples = (playerContext.player.outputLatency ?? 0)
+    * (playerContext.player.audioContext?.sampleRate ?? 44100);
+  const currentNtsc = Math.floor(Math.max(0, audioFrame - latencySamples) / 735);
+
+  const { beatFrames } = bpmInfo;
+  const winStart = currentNtsc - nowIdx;
+  const winEnd   = currentNtsc + (frames - nowIdx);
+
+  // beatFrames を二分探索でウィンドウ内の開始位置を特定
+  let startK = 0;
+  while (startK < beatFrames.length - 1 && beatFrames[startK] < winStart) startK++;
+
+  ctx.save();
+  for (let k = startK; k < beatFrames.length; k++) {
+    const bf = beatFrames[k];
+    if (bf > winEnd) break;
+    const i = Math.round(nowIdx + (bf - currentNtsc));
+    if (i < 0 || i >= frames) continue;
+    // k=0 が firstOnset（小節1拍1）なので k % 4 で小節判定
+    const isMeasure = k % beatsPerMeasure === 0;
+    const x = i * step;
+    ctx.strokeStyle = isMeasure ? "rgba(255,255,255,0.28)" : "rgba(255,255,255,0.09)";
+    ctx.lineWidth = isMeasure ? 2 : 1;
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, canvas.height);
+    ctx.stroke();
+  }
+  ctx.restore();
+}
+
 function paintPianoRoll(
   canvas: HTMLCanvasElement,
   playerContext: PlayerContextState,
   rangeInSec: number,
-  layered: boolean
+  layered: boolean,
+  bpmInfo: BPMInfo | null
 ) {
   const now = performance.now();
   const dt = Math.min((now - _lastRenderTime) / 1000, 1 / 20);
@@ -220,6 +267,8 @@ function paintPianoRoll(
 
   const ctx = canvas.getContext("2d")!;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  if (bpmInfo) paintMeasureLines(canvas, playerContext, rangeInSec, bpmInfo);
 
   for (let ch = 0; ch < channelIds.length; ch++) {
     const kh = canvas.height / 96;
@@ -274,14 +323,13 @@ function paintPianoRoll(
         ctx.shadowBlur = 0;
         ctx.fillStyle = "#ffffff60";
 
-        // キーオン直後（nowIdx との距離が近い）ほど多くパーティクルを出す
-        const noteAge = nowIdx - seg.start; // フレーム数
-        if (noteAge < 12) {
-          const rate = 1 - noteAge / 12;
-          const count = Math.round(rate * rate * 5);
-          if (count > 0) {
-            _spawnParticles(nowX, y + h / 2, seg.color, count);
-          }
+        // アタック時バースト + 発音中は継続トリクル
+        const noteAge = nowIdx - seg.start;
+        const burst = noteAge < 8 ? Math.round((1 - noteAge / 8) ** 2 * 4) : 0;
+        const trickle = Math.random() < 0.35 ? 1 : 0;
+        const count = burst + trickle;
+        if (count > 0) {
+          _spawnParticles(nowX, y + h / 2, seg.color, count);
         }
       } else {
         ctx.shadowColor = "transparent";
@@ -296,6 +344,16 @@ function paintPianoRoll(
 
   // パーティクルを最前面に描画
   _drawParticles(ctx, dt);
+
+  // 検出 BPM を右上に表示
+  if (bpmInfo) {
+    const fontSize = Math.max(10, 11 * devicePixelRatio);
+    ctx.font = `${fontSize}px monospace`;
+    ctx.textAlign = "right";
+    ctx.textBaseline = "top";
+    ctx.fillStyle = "rgba(255,255,255,0.35)";
+    ctx.fillText(`♩=${bpmInfo.bpm}`, canvas.width - 6 * devicePixelRatio, 4 * devicePixelRatio);
+  }
 }
 
 function PianoRollCanvas(props: { width: number; height: number }) {
@@ -304,6 +362,7 @@ function PianoRollCanvas(props: { width: number; height: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const appContextRef = useRef(appContext);
   appContextRef.current = appContext;
+  const bpmInfoRef = useRef<BPMInfo | null>(null);
 
   useEffect(() => {
     const canvas = canvasRef.current!;
@@ -312,6 +371,17 @@ function PianoRollCanvas(props: { width: number; height: number }) {
     canvas.style.width = `${props.width}px`;
     canvas.style.height = `${props.height}px`;
   }, [props.width, props.height]);
+
+  // BPM を定期検出（5秒ごと）
+  useEffect(() => {
+    const run = () => {
+      const info = detectBPM(playerContext.player);
+      if (info) bpmInfoRef.current = info;
+    };
+    run();
+    const id = setInterval(run, 5000);
+    return () => clearInterval(id);
+  }, []);
 
   useEffect(() => {
     const renderFrame = () => {
@@ -322,7 +392,8 @@ function PianoRollCanvas(props: { width: number; height: number }) {
           canvas,
           playerContext,
           appContextRef.current.pianoRollRangeInSec,
-          appContextRef.current.pianoRollLayered
+          appContextRef.current.pianoRollLayered,
+          bpmInfoRef.current
         );
       }
     };
@@ -424,6 +495,7 @@ function HighlightCanvas(props: {
 }
 
 export function PianoRoll(props: { mode: string }) {
+  const appContext = useContext(AppContext);
   const boxRef = useRef<HTMLDivElement | null>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
 
@@ -467,18 +539,20 @@ export function PianoRoll(props: { mode: string }) {
         <AutoSizeCanvas painter={paintPianoRollBg} width={size.width} height={size.height} />
         <PianoRollCanvas width={size.width} height={size.height} />
         
-        <AutoSizeCanvas painter={paintWhiteKeyboard} width={size.width} height={size.height} />
-        <HighlightCanvas painter={paintWhiteHighlight} width={size.width} height={size.height} />
-        <AutoSizeCanvas
-          painter={(canvas) => paintBlackKeyboard(canvas, props.mode == "3d")}
-          width={size.width}
-          height={size.height}
-        />
-        <HighlightCanvas
-          painter={(canvas, keys) => paintBlackHighlight(canvas, keys, props.mode == "3d")}
-          width={size.width}
-          height={size.height}
-        />
+        {appContext.pianoRollShowKeyboard && <>
+          <AutoSizeCanvas painter={paintWhiteKeyboard} width={size.width} height={size.height} />
+          <HighlightCanvas painter={paintWhiteHighlight} width={size.width} height={size.height} />
+          <AutoSizeCanvas
+            painter={(canvas) => paintBlackKeyboard(canvas, props.mode == "3d")}
+            width={size.width}
+            height={size.height}
+          />
+          <HighlightCanvas
+            painter={(canvas, keys) => paintBlackHighlight(canvas, keys, props.mode == "3d")}
+            width={size.width}
+            height={size.height}
+          />
+        </>}
        
       </Box>
     </Card>

@@ -1,4 +1,4 @@
-import { AlignHorizontalCenter, AlignHorizontalLeft, FlightTakeoff, Layers, ThreeDRotation, ZoomIn } from "@mui/icons-material";
+import { Layers, Piano, ThreeDRotation, ZoomIn } from "@mui/icons-material";
 import { Box, Slider, Switch } from "@mui/material";
 import { useContext } from "react";
 import { AppContext } from "../contexts/AppContext";
@@ -67,6 +67,10 @@ export function PianoRollControl() {
     context.setPianoRollLayered(!context.pianoRollLayered);
   };
 
+  const onShowKeyboardClick = () => {
+    context.setPianoRollShowKeyboard(!context.pianoRollShowKeyboard);
+  };
+
   return (
     <Box sx={{ display: "flex", flexDirection: "row", alignItems: "center" }}>
       <ZoomIn sx={{ fontSize: 16 }} />
@@ -86,6 +90,12 @@ export function PianoRollControl() {
         checked={context.pianoRollLayered}
         sx={{ ml: 0.5, mr: 1 }}
         onClick={onLayerClick}
+      />
+      <Piano sx={{ ml: 1, fontSize: 16 }} />
+      <AntSwitch
+        checked={context.pianoRollShowKeyboard}
+        sx={{ ml: 0.5, mr: 1 }}
+        onClick={onShowKeyboardClick}
       />
       <ThreeDRotation sx={{ ml: 1, fontSize: 16 }} />
       <AntSwitch
