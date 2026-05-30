@@ -159,12 +159,65 @@ function paintPianoRollBg(canvas: HTMLCanvasElement) {
 
 type Seg = { note: number; start: number; end: number; color: string };
 
+// --- パーティクルシステム ---
+type Particle = {
+  x: number; y: number;
+  vx: number; vy: number;
+  life: number;   // 1.0 → 0.0
+  size: number;
+  color: string;
+};
+
+const _particles: Particle[] = [];
+let _lastRenderTime = 0;
+
+function _spawnParticles(x: number, y: number, color: string, count: number) {
+  for (let i = 0; i < count; i++) {
+    // 上方向を中心に扇状に広がる
+    const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.4;
+    const speed = (60 + Math.random() * 140) * devicePixelRatio;
+    _particles.push({
+      x, y,
+      vx: Math.cos(angle) * speed,
+      vy: Math.sin(angle) * speed,
+      life: 0.8 + Math.random() * 0.2,
+      size: (1.5 + Math.random() * 2.5) * devicePixelRatio,
+      color,
+    });
+  }
+}
+
+function _drawParticles(ctx: CanvasRenderingContext2D, dt: number) {
+  for (let i = _particles.length - 1; i >= 0; i--) {
+    const p = _particles[i];
+    p.x += p.vx * dt;
+    p.y += p.vy * dt;
+    p.vy += 250 * devicePixelRatio * dt; // 重力
+    p.life -= dt * 2.5;
+    if (p.life <= 0) { _particles.splice(i, 1); continue; }
+
+    const alpha = p.life * p.life;
+    ctx.shadowColor = p.color;
+    ctx.shadowBlur = p.size * 3;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+  }
+  ctx.globalAlpha = 1.0;
+  ctx.shadowBlur = 0;
+  ctx.shadowColor = "transparent";
+}
+
 function paintPianoRoll(
   canvas: HTMLCanvasElement,
   playerContext: PlayerContextState,
   rangeInSec: number,
   layered: boolean
 ) {
+  const now = performance.now();
+  const dt = Math.min((now - _lastRenderTime) / 1000, 1 / 20);
+  _lastRenderTime = now;
+
   const ctx = canvas.getContext("2d")!;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
@@ -174,6 +227,7 @@ function paintPianoRoll(
     const frames = Math.round(60 * rangeInSec) + (layered ? ch * 8 : 0);
     const step = canvas.width / frames;
     const nowIdx = Math.floor(frames * lpos);
+    const nowX = nowIdx * step;
     const id = channelIds[ch];
     const baseColor: string = colorMap[ch]["A200"];
 
@@ -205,12 +259,13 @@ function paintPianoRoll(
       }
     }
 
-    // セグメントを矩形で一括描画、発音中は白く光らせる
+    // セグメントを描画 + キーオン直後にパーティクルを生成
     for (const seg of segments) {
       const isPlaying = seg.start <= nowIdx && nowIdx <= seg.end;
       const x = seg.start * step;
       const w = Math.max(step, (seg.end - seg.start + 1) * step);
       const y = canvas.height * (1.0 - (seg.note + 1) / 96) + (kh - h) / 2;
+
       if (isPlaying) {
         ctx.shadowColor = "#ffffff";
         ctx.shadowBlur = 8 * devicePixelRatio;
@@ -218,6 +273,16 @@ function paintPianoRoll(
         ctx.fillRect(x, y, w, h);
         ctx.shadowBlur = 0;
         ctx.fillStyle = "#ffffff60";
+
+        // キーオン直後（nowIdx との距離が近い）ほど多くパーティクルを出す
+        const noteAge = nowIdx - seg.start; // フレーム数
+        if (noteAge < 12) {
+          const rate = 1 - noteAge / 12;
+          const count = Math.round(rate * rate * 5);
+          if (count > 0) {
+            _spawnParticles(nowX, y + h / 2, seg.color, count);
+          }
+        }
       } else {
         ctx.shadowColor = "transparent";
         ctx.shadowBlur = 0;
@@ -228,6 +293,9 @@ function paintPianoRoll(
     ctx.shadowBlur = 0;
     ctx.shadowColor = "transparent";
   }
+
+  // パーティクルを最前面に描画
+  _drawParticles(ctx, dt);
 }
 
 function PianoRollCanvas(props: { width: number; height: number }) {
