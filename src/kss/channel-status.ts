@@ -26,7 +26,11 @@ function createPSGVoiceName(ton: boolean, non: boolean) {
 
 /// ch 0,1,2: tone
 /// ch 3,4,5: noise
-function createPSGStatus(regs: Uint8Array, id: ChannelId): ChannelStatus {
+function createPSGStatus(
+  regs: Uint8Array,
+  id: ChannelId,
+  keyKeepFrames: ArrayLike<number>
+): ChannelStatus {
   const ch = id.index;
   if (ch < 3) {
     const fdiv = ((regs[ch * 2 + 1] & 0xff) << 8) | regs[ch * 2];
@@ -49,14 +53,14 @@ function createPSGStatus(regs: Uint8Array, id: ChannelId): ChannelStatus {
     const non = (regs[7] & (8 << (ch - 3))) == 0;
     const voice = createPSGVoiceName(ton, non);
     if (non && vol > 0) {
-      return { id, freq, kcode: freq, vol, mode: "noise", voice, vnum: 8 };
+      return { id, freq, kcode: freq, vol, mode: "noise", voice, vnum: 8, keyKeepFrames: keyKeepFrames[ch] };
     } else {
-      return { id, freq, vol, mode: "noise", voice, vnum: 0 };
+      return { id, freq, vol, mode: "noise", voice, vnum: 0, keyKeepFrames: keyKeepFrames[ch] };
     }
   }
 }
 
-function createSCCStatus(regs: Uint8Array, id: ChannelId): ChannelStatus {
+function createSCCStatus(regs: Uint8Array, id: ChannelId, keyKeepFrames: ArrayLike<number>): ChannelStatus {
   const ch = id.index;
   const fdiv = ((regs[0xc0 + ch * 2 + 1] & 0xff) << 8) | regs[0xc0 + ch * 2];
   const freq = 3579545 / 2 / 16 / 2 / fdiv;
@@ -69,9 +73,9 @@ function createSCCStatus(regs: Uint8Array, id: ChannelId): ChannelStatus {
 
   if (vol > 0 && freq > 0) {
     const kcode = 57 + Math.round(Math.log2(freq / A4) * 12);
-    return { id, freq, kcode, vol, voice, vnum };
+    return { id, freq, kcode, vol, voice, vnum, keyKeepFrames: keyKeepFrames[ch] };
   } else {
-    return { id, freq, vol, voice, vnum };
+    return { id, freq, vol, voice, vnum, keyKeepFrames: keyKeepFrames[ch] };
   }
 }
 
@@ -80,7 +84,7 @@ function createOPLLStatus(
   /// ch: logical channel
   /// 0-8: FM1-9, 9:BD, 10:SD, 11:TOM, 12:CYM, 13:HH
   id: ChannelId,
-  keyKeepFrames: ArrayLike<number> | Array<number>
+  keyKeepFrames: ArrayLike<number>
 ): ChannelStatus | null {
   const rflag = (regs[0x0e] & 32) != 0;
 
@@ -189,11 +193,11 @@ export function getChannelStatus(player: KSSPlayer, id: ChannelId): ChannelStatu
 
   switch (id.device) {
     case "psg":
-      return createPSGStatus(snapshot.psg!, id);
+      return createPSGStatus(snapshot.psg!, id, snapshot.psgKeyKeepFrames!);
     case "scc":
-      return createSCCStatus(snapshot.scc!, id);
+      return createSCCStatus(snapshot.scc!, id, snapshot.sccKeyKeepFrames!);
     case "opll":
-      return createOPLLStatus(snapshot.opll!, id, snapshot.opllkeyKeepFrames!);
+      return createOPLLStatus(snapshot.opll!, id, snapshot.opllKeyKeepFrames!);
     default:
       throw new Error(`Uknown device: ${id.device}`);
   }
@@ -222,13 +226,13 @@ export function getChannelStatusArray(
 
     switch (id.device) {
       case "psg":
-        res.push(createPSGStatus(snapshot.psg!, id));
+        res.push(createPSGStatus(snapshot.psg!, id, snapshot.psgKeyKeepFrames!));
         break;
       case "scc":
-        res.push(createSCCStatus(snapshot.scc!, id));
+        res.push(createSCCStatus(snapshot.scc!, id, snapshot.sccKeyKeepFrames!));
         break;
       case "opll":
-        res.push(createOPLLStatus(snapshot.opll!, id, snapshot.opllkeyKeepFrames!));
+        res.push(createOPLLStatus(snapshot.opll!, id, snapshot.opllKeyKeepFrames!));
         break;
       default:
         res.push(null);

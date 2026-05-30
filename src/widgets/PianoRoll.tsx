@@ -157,6 +157,8 @@ function paintPianoRollBg(canvas: HTMLCanvasElement) {
   }
 }
 
+type Seg = { note: number; start: number; end: number; color: string };
+
 function paintPianoRoll(
   canvas: HTMLCanvasElement,
   playerContext: PlayerContextState,
@@ -164,41 +166,67 @@ function paintPianoRoll(
   layered: boolean
 ) {
   const ctx = canvas.getContext("2d")!;
-
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  ctx.beginPath();
 
   for (let ch = 0; ch < channelIds.length; ch++) {
     const kh = canvas.height / 96;
+    const h = kh - 2;
     const frames = Math.round(60 * rangeInSec) + (layered ? ch * 8 : 0);
     const step = canvas.width / frames;
+    const nowIdx = Math.floor(frames * lpos);
     const id = channelIds[ch];
-    const palette = colorMap[ch];
-    let color: string = palette["A200"];
+    const baseColor: string = colorMap[ch]["A200"];
+
+    const pastSpanInFrames = Math.floor(735 * frames * lpos);
+    const futureSpanInFrames = Math.floor(735 * frames * (1.0 - lpos));
     const statuses = playerContext.player.getChannelStatusArray(
       id,
-      Math.floor(735 * frames * lpos),
-      Math.floor(735 * frames * (1.0 - lpos))
+      pastSpanInFrames,
+      futureSpanInFrames,
     );
 
+    // ノートごとにセグメントを構築
+    const segments: Seg[] = [];
+    let cur: Seg | null = null;
     for (let i = 0; i < statuses.length; i++) {
-      const { kcode, vol, keyKeepFrames, vnum } = statuses[i] ?? {};
-      if (kcode != null && vol != null) {
-        let edge = (keyKeepFrames ?? 0) == 0;
-        if (vnum != null) {
-          color = voiceColorMap[vnum % 16];
+      const s = statuses[i];
+      const note = s?.kcode ?? null;
+      if (note != null && note >= 0 && note < 96) {
+        const color = s?.vnum != null ? voiceColorMap[s.vnum % 16] : baseColor;
+        if (cur === null || cur.note !== note) {
+          cur = { note, start: i, end: i, color };
+          segments.push(cur);
+        } else {
+          cur.end = i;
+          cur.color = color;
         }
-        const height = kh - 2;
-        const yPos = (kh - height) / 2;
-        ctx.fillStyle = color + "f0";
-        ctx.fillRect(
-          step * i + (edge ? 1 : 0),
-          canvas.height * (1.0 - (kcode + 1) / 96) + yPos,
-          step,
-          height
-        );
+      } else {
+        cur = null;
       }
     }
+
+    // セグメントを矩形で一括描画、発音中は白く光らせる
+    for (const seg of segments) {
+      const isPlaying = seg.start <= nowIdx && nowIdx <= seg.end;
+      const x = seg.start * step;
+      const w = Math.max(step, (seg.end - seg.start + 1) * step);
+      const y = canvas.height * (1.0 - (seg.note + 1) / 96) + (kh - h) / 2;
+      if (isPlaying) {
+        ctx.shadowColor = "#ffffff";
+        ctx.shadowBlur = 8 * devicePixelRatio;
+        ctx.fillStyle = seg.color + "ff";
+        ctx.fillRect(x, y, w, h);
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = "#ffffff60";
+      } else {
+        ctx.shadowColor = "transparent";
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = seg.color + "e0";
+      }
+      ctx.fillRect(x, y, w, h);
+    }
+    ctx.shadowBlur = 0;
+    ctx.shadowColor = "transparent";
   }
 }
 
@@ -370,6 +398,7 @@ export function PianoRoll(props: { mode: string }) {
       >
         <AutoSizeCanvas painter={paintPianoRollBg} width={size.width} height={size.height} />
         <PianoRollCanvas width={size.width} height={size.height} />
+        
         <AutoSizeCanvas painter={paintWhiteKeyboard} width={size.width} height={size.height} />
         <HighlightCanvas painter={paintWhiteHighlight} width={size.width} height={size.height} />
         <AutoSizeCanvas
@@ -382,6 +411,7 @@ export function PianoRoll(props: { mode: string }) {
           width={size.width}
           height={size.height}
         />
+       
       </Box>
     </Card>
   );
