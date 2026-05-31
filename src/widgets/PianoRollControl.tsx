@@ -1,4 +1,4 @@
-import { Layers, Piano, ThreeDRotation, ZoomIn } from "@mui/icons-material";
+import { AutoAwesome, Layers, Piano, ThreeDRotation, ZoomIn } from "@mui/icons-material";
 import { Box, Slider, Switch } from "@mui/material";
 import { useContext } from "react";
 import { AppContext } from "../contexts/AppContext";
@@ -90,6 +90,12 @@ export function PianoRollControl() {
         checked={context.pianoRollLayered}
         sx={{ ml: 0.5, mr: 1 }}
         onClick={onLayerClick}
+      />
+      <AutoAwesome sx={{ ml: 1, fontSize: 16 }} />
+      <AntSwitch
+        checked={context.pianoRollShowParticles}
+        sx={{ ml: 0.5, mr: 1 }}
+        onClick={() => context.setPianoRollShowParticles(!context.pianoRollShowParticles)}
       />
       <Piano sx={{ ml: 1, fontSize: 16 }} />
       <AntSwitch

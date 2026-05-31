@@ -119,8 +119,8 @@ export function detectBPM(player: KSSPlayer): BPMInfo | null {
 
   // ---- BPM算出（60〜200の範囲に収める）----
   let bpm = 3600 / refinedLag;
-  while (bpm < 60)  bpm *= 2;
-  while (bpm > 200) bpm /= 2;
+  while (bpm < 75)  bpm *= 2;
+  while (bpm > 180) bpm /= 2;
 
   const framesPerBeat = Math.round(3600 / bpm);
   const fpbExact = 3600.0 / bpm;
@@ -131,5 +131,5 @@ export function detectBPM(player: KSSPlayer): BPMInfo | null {
   // ---- 実際の拍頭列をオンセットスナップで追跡 ----
   const beatFrames = trackBeats(onsets, start, end, firstOnset, fpbExact);
 
-  return { bpm: Math.round(bpm), framesPerBeat, phaseOffset, firstOnset, beatFrames };
+  return { bpm, framesPerBeat, phaseOffset, firstOnset, beatFrames };
 }

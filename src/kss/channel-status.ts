@@ -43,7 +43,7 @@ function createPSGStatus(
     const freq = fdiv > 0 ? 3579545 / 2 / 16 / 2 / fdiv : 0;
     if (ton && vol > 0 && freq != 0) {
       const kcode = 57 + Math.round(Math.log2(freq / A4) * 12);
-      return { id, freq, kcode, vol, voice };
+      return { id, freq, kcode, vol, voice, keyKeepFrames: keyKeepFrames[ch] };
     } else {
       return { id, freq, vol, voice };
     }
