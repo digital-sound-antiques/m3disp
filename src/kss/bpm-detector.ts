@@ -7,7 +7,7 @@ export type BPMInfo = {
   framesPerBeat: number;
   phaseOffset: number;
   firstOnset: number;
-  /** 実際の拍頭位置列（スナップショット配列インデックス）*/
+  /** Actual beat positions (snapshot array indices) */
   beatFrames: number[];
 };
 
@@ -22,9 +22,9 @@ const PROBE_CHANNELS: ChannelId[] = [
 ];
 
 /**
- * 理論的な拍位置を起点に、実際のオンセット信号に±snapWindow フレームでスナップし
- * 誤差拡散由来のジッタを補正した拍頭列を返す。
- * 近くにオンセットがなければ理論値（四捨五入）をそのまま使う。
+ * Starting from theoretical beat positions, snaps to actual onset signals within
+ * ±snapWindow frames to correct jitter from error diffusion.
+ * If no onset is found nearby, uses the rounded theoretical value as-is.
  */
 function trackBeats(
   onsets: Uint8Array,
@@ -35,13 +35,13 @@ function trackBeats(
 ): number[] {
   const beats: number[] = [];
   let pos = firstOnset;
-  const snapWindow = 2; // 誤差拡散の最大ジッタ ≈ ±1 フレームに余裕を持たせる
+  const snapWindow = 2; // Max jitter from error diffusion ≈ ±1 frame, with margin
 
   while (pos <= end) {
     beats.push(Math.round(pos));
     const nextNominal = pos + fpb;
 
-    // 次の理論拍位置の近傍にオンセットがあればそこにスナップ
+    // Snap to an onset near the next theoretical beat position if one exists
     let bestPos = nextNominal;
     let bestDist = Infinity;
     const lo = Math.round(nextNominal - snapWindow);
@@ -63,7 +63,7 @@ export function detectBPM(player: KSSPlayer): BPMInfo | null {
   const total = snapshots.length;
   if (total < 120) return null;
 
-  // ---- 先頭無音をスキップして最初のノートオン位置を探す ----
+  // ---- Skip leading silence and find the first note-on position ----
   let firstOnset = -1;
   outer:
   for (let i = 0; i < total; i++) {
@@ -73,13 +73,13 @@ export function detectBPM(player: KSSPlayer): BPMInfo | null {
   }
   if (firstOnset < 0) return null;
 
-  // ---- 解析ウィンドウ（first onset 以降、直近30秒）----
+  // ---- Analysis window (from first onset, last 30 seconds) ----
   const end   = Math.min(total, player._lastIndex + 1);
   const start = Math.max(firstOnset, end - 30 * 60);
   const len   = end - start;
   if (len < 60) return null;
 
-  // ---- オンセット信号を構築 ----
+  // ---- Build onset signal ----
   const onsets = new Uint8Array(len);
   for (const id of PROBE_CHANNELS) {
     let prev: number | null = null;
@@ -90,8 +90,8 @@ export function detectBPM(player: KSSPlayer): BPMInfo | null {
     }
   }
 
-  // ---- オートコリレーション（相関値を配列に保持）----
-  // BPM 60〜200 → lag 18〜60 フレーム
+  // ---- Autocorrelation (store correlation values in array) ----
+  // BPM 60~200 → lag 18~60 frames
   const minLag = 18;
   const maxLag = 60;
   const corrArr = new Float32Array(maxLag + 2);
@@ -107,7 +107,7 @@ export function detectBPM(player: KSSPlayer): BPMInfo | null {
   }
   if (corrArr[bestLag] < 4) return null;
 
-  // ---- 放物線補間でサブフレーム精度のlag推定 ----
+  // ---- Parabolic interpolation for sub-frame lag estimation ----
   let refinedLag = bestLag;
   if (bestLag > minLag && bestLag < maxLag) {
     const c0 = corrArr[bestLag - 1];
@@ -117,7 +117,7 @@ export function detectBPM(player: KSSPlayer): BPMInfo | null {
     if (denom < 0) refinedLag = bestLag - 0.5 * (c2 - c0) / denom;
   }
 
-  // ---- BPM算出（60〜200の範囲に収める）----
+  // ---- Calculate BPM (clamp to range 60~200) ----
   let bpm = 3600 / refinedLag;
   while (bpm < 75)  bpm *= 2;
   while (bpm > 180) bpm /= 2;
@@ -125,10 +125,10 @@ export function detectBPM(player: KSSPlayer): BPMInfo | null {
   const framesPerBeat = Math.round(3600 / bpm);
   const fpbExact = 3600.0 / bpm;
 
-  // ---- 位相は firstOnset を起点に浮動小数点で固定 ----
+  // ---- Fix phase as a float anchored at firstOnset ----
   const phaseOffset = firstOnset % fpbExact;
 
-  // ---- 実際の拍頭列をオンセットスナップで追跡 ----
+  // ---- Track actual beat positions using onset snapping ----
   const beatFrames = trackBeats(onsets, start, end, firstOnset, fpbExact);
 
   return { bpm, framesPerBeat, phaseOffset, firstOnset, beatFrames };

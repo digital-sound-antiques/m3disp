@@ -249,7 +249,7 @@ export type ChannelId = {
   index: number;
 };
 
-/** スナップショット1点から kcode を取り出す（BPM解析用） */
+/** Extract kcode from a single snapshot (for BPM analysis) */
 export function getKcodeAt(
   snapshot: KSSDecoderDeviceSnapshot | null | undefined,
   id: ChannelId
