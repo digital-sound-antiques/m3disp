@@ -1,7 +1,6 @@
 import * as Colors from "@mui/material/colors";
 import type { PlayerContextState } from "../contexts/PlayerContext";
 import { type ChannelId, type ChannelStatus, getStatusFromSnapshot } from "../kss/channel-status";
-import type { BPMInfo } from "../kss/bpm-detector";
 import type { KSSDecoderDeviceSnapshot } from "../kss/kss-decoder-worker";
 
 // ---- Channel definitions ----
@@ -228,43 +227,6 @@ export function paintKeyboardEdgeLine(canvas: HTMLCanvasElement) {
   ctx.stroke();
 }
 
-// ---- Beat lines ----
-
-export function paintBeatLines(
-  canvas: HTMLCanvasElement,
-  currentNtsc: number,
-  rangeInSec: number,
-  bpmInfo: BPMInfo,
-  measureFrameOffset: number
-) {
-  const ctx = canvas.getContext("2d")!;
-  const frames = Math.round(60 * rangeInSec);
-  const step = canvas.width / frames;
-  const nowIdx = Math.floor(frames * lpos);
-
-  const { beatFrames } = bpmInfo;
-  const winStart = currentNtsc - nowIdx;
-  const winEnd   = currentNtsc + (frames - nowIdx);
-
-  let startK = 0;
-  while (startK < beatFrames.length - 1 && beatFrames[startK] < winStart) startK++;
-
-  ctx.save();
-  ctx.strokeStyle = "rgba(255,255,255,0.12)";
-  ctx.lineWidth = 1;
-  for (let k = startK; k < beatFrames.length; k++) {
-    const bf = beatFrames[k];
-    if (bf > winEnd) break;
-    const i = Math.round(nowIdx + (bf - currentNtsc + measureFrameOffset));
-    if (i < 0 || i >= frames) continue;
-    ctx.beginPath();
-    ctx.moveTo(i * step, 0);
-    ctx.lineTo(i * step, canvas.height);
-    ctx.stroke();
-  }
-  ctx.restore();
-}
-
 // ---- Main piano roll drawing ----
 
 export function paintPianoRoll(
@@ -272,8 +234,6 @@ export function paintPianoRoll(
   playerContext: PlayerContextState,
   rangeInSec: number,
   layered: boolean,
-  bpmInfo: BPMInfo | null,
-  measureFrameOffset: number,
   showParticles: boolean
 ) {
   const now = performance.now();
@@ -299,8 +259,6 @@ export function paintPianoRoll(
   // currentFrame catches up.
   const decodedLen = playerContext.player._snapshots.length;
   if (decodedLen > 0 && currentNtsc >= decodedLen) currentNtsc = decodedLen - 1;
-
-  if (bpmInfo) paintBeatLines(canvas, currentNtsc, rangeInSec, bpmInfo, measureFrameOffset);
 
   const kh = canvas.height / 96;
   const h = kh - 2;
@@ -359,16 +317,20 @@ export function paintPianoRoll(
       if (isPlaying) {
         playingDraws.push({ x, y, w, color: seg.color, nowX, noteAge: nowIdx - seg.start });
       } else {
-        ctx.fillStyle = seg.color + "90";
+        ctx.fillStyle = seg.color + "60"; // dimmer when not sounding
         ctx.fillRect(x, y, w, h);
       }
     }
   }
 
-  // Pass 2: draw playing segments on top + emit particles (attack burst + trickle)
+  // Pass 2: draw playing segments on top, with a subtle glow + particles
   for (const d of playingDraws) {
+    ctx.save();
+    ctx.shadowColor = d.color;
+    ctx.shadowBlur = 4 * devicePixelRatio;
     ctx.fillStyle = d.color + "ff";
     ctx.fillRect(d.x, d.y, d.w, h);
+    ctx.restore();
 
     if (showParticles) {
       const burst = d.noteAge < 16 ? Math.round((1 - d.noteAge / 16) ** 2 * 4) : 0;
@@ -379,13 +341,4 @@ export function paintPianoRoll(
   }
 
   drawParticles(ctx, dt);
-
-  if (bpmInfo) {
-    const fontSize = Math.max(10, 11 * devicePixelRatio);
-    ctx.font = `${fontSize}px monospace`;
-    ctx.textAlign = "right";
-    ctx.textBaseline = "top";
-    ctx.fillStyle = "rgba(255,255,255,0.35)";
-    ctx.fillText(`♩=${Math.round(bpmInfo.bpm)}`, canvas.width - 6 * devicePixelRatio, 4 * devicePixelRatio);
-  }
 }

@@ -2,7 +2,6 @@ import { Box, Card } from "@mui/material";
 import { useContext, useEffect, useRef, useState } from "react";
 import { PlayerContext } from "../contexts/PlayerContext";
 import { AppContext } from "../contexts/AppContext";
-import { detectBPM, type BPMInfo } from "../kss/bpm-detector";
 import {
   channelIds,
   lpos,
@@ -77,7 +76,7 @@ function HighlightCanvas(props: {
   return <canvas ref={canvasRef} style={{ position: "absolute", top: 0, left: 0 }} />;
 }
 
-// ---- Main piano roll canvas (manages BPM detection and key input) ----
+// ---- Main piano roll canvas ----
 
 function PianoRollCanvas(props: { width: number; height: number }) {
   const appContext = useContext(AppContext);
@@ -85,9 +84,6 @@ function PianoRollCanvas(props: { width: number; height: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const appContextRef = useRef(appContext);
   appContextRef.current = appContext;
-
-  const bpmInfoRef = useRef<BPMInfo | null>(null);
-  const measureFrameOffsetRef = useRef(0.0);
 
   // Note: the status cache is synced inside paintPianoRoll (rAF). It detects
   // song changes via player._snapshots array identity, so no event listeners
@@ -102,33 +98,6 @@ function PianoRollCanvas(props: { width: number; height: number }) {
     canvas.style.height = `${props.height}px`;
   }, [props.width, props.height]);
 
-  // Re-analyze BPM every 8 beats
-  useEffect(() => {
-    let timerId: ReturnType<typeof setTimeout>;
-    const run = () => {
-      const info = detectBPM(playerContext.player);
-      if (info) bpmInfoRef.current = info;
-      const bpm = bpmInfoRef.current?.bpm ?? 120;
-      timerId = setTimeout(run, Math.round(8 * 60000 / bpm));
-    };
-    run();
-    return () => clearTimeout(timerId);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // Adjust beat line offset by 1/32 beat with left/right arrow keys
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.code !== "ArrowLeft" && e.code !== "ArrowRight") return;
-      e.preventDefault();
-      const fpb = bpmInfoRef.current ? 3600.0 / bpmInfoRef.current.bpm : 30;
-      measureFrameOffsetRef.current += e.code === "ArrowRight" ? fpb / 32 : -fpb / 32;
-    };
-    document.addEventListener("keydown", onKeyDown);
-    return () => document.removeEventListener("keydown", onKeyDown);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   // rAF render loop
   useEffect(() => {
     const renderFrame = () => {
@@ -140,8 +109,6 @@ function PianoRollCanvas(props: { width: number; height: number }) {
           playerContext,
           appContextRef.current.pianoRollRangeInSec,
           appContextRef.current.pianoRollLayered,
-          bpmInfoRef.current,
-          measureFrameOffsetRef.current,
           appContextRef.current.pianoRollShowParticles
         );
       }
