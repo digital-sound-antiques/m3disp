@@ -89,6 +89,10 @@ function PianoRollCanvas(props: { width: number; height: number }) {
   const bpmInfoRef = useRef<BPMInfo | null>(null);
   const measureFrameOffsetRef = useRef(0.0);
 
+  // Note: the status cache is synced inside paintPianoRoll (rAF). It detects
+  // song changes via player._snapshots array identity, so no event listeners
+  // are needed here for cache management.
+
   // Sync canvas size
   useEffect(() => {
     const canvas = canvasRef.current!;

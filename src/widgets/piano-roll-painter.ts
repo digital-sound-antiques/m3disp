@@ -1,7 +1,8 @@
 import * as Colors from "@mui/material/colors";
 import type { PlayerContextState } from "../contexts/PlayerContext";
-import type { ChannelId } from "../kss/channel-status";
+import { type ChannelId, type ChannelStatus, getStatusFromSnapshot } from "../kss/channel-status";
 import type { BPMInfo } from "../kss/bpm-detector";
+import type { KSSDecoderDeviceSnapshot } from "../kss/kss-decoder-worker";
 
 // ---- Channel definitions ----
 
@@ -52,7 +53,58 @@ export const lpos = 0.25;
 
 // ---- Types ----
 
-type Seg = { note: number; start: number; end: number; color: string };
+type Seg = { note: number; start: number; end: number; color: string; gap: boolean };
+
+// ---- Per-channel status cache, keyed by NTSC frame index ----
+//
+// Heavy register decoding (getStatusFromSnapshot) runs at most ONCE per NTSC
+// frame; results are cached and reused across rAF frames.
+//
+// Source of truth is player._snapshots. play()/abort() assign a brand-new
+// array, so we detect song changes purely by array identity — no dependency
+// on decodermessage / statechange event ordering.
+//
+// IMPORTANT — on-demand, NOT a [0, length) scan:
+// After a song switch, decodermessage callbacks still queued for the PREVIOUS
+// song (recycleDecoder reuses the worker) can land in the NEW _snapshots array
+// at large sparse indices, inflating .length. A length-based incremental scan
+// would mark the real new-song frames as "already processed" and never evaluate
+// them, leaving the roll permanently blank. We instead evaluate only the indices
+// actually read for the visible window, so stray far-away writes are ignored.
+// Undecoded frames are returned as null WITHOUT caching, so they fill in once
+// the decoder produces them.
+
+let cachedSnapshotsRef: (KSSDecoderDeviceSnapshot | undefined)[] | null = null;
+let statusCaches: (ChannelStatus | null)[][] = channelIds.map(() => []);
+
+/** Reset the cache when the snapshot array is replaced (song change / stop). */
+function resetCacheIfSongChanged(player: PlayerContextState["player"]) {
+  if (player._snapshots !== cachedSnapshotsRef) {
+    cachedSnapshotsRef = player._snapshots;
+    statusCaches = channelIds.map(() => []);
+  }
+}
+
+/**
+ * Cached status for (channel, ntsc), computed on first access.
+ * Undecoded frames (no snapshot yet) return null and are NOT cached.
+ */
+function getStatusCached(
+  player: PlayerContextState["player"],
+  ch: number,
+  ntsc: number
+): ChannelStatus | null {
+  if (ntsc < 0) return null;
+  const snap = player._snapshots[ntsc];
+  if (!snap) return null; // not decoded yet — do not cache
+  const cache = statusCaches[ch];
+  let v = cache[ntsc];
+  if (v === undefined) {
+    v = getStatusFromSnapshot(snap, channelIds[ch]);
+    cache[ntsc] = v;
+  }
+  return v;
+}
 
 type Particle = {
   x: number; y: number;
@@ -180,7 +232,7 @@ export function paintKeyboardEdgeLine(canvas: HTMLCanvasElement) {
 
 export function paintBeatLines(
   canvas: HTMLCanvasElement,
-  playerContext: PlayerContextState,
+  currentNtsc: number,
   rangeInSec: number,
   bpmInfo: BPMInfo,
   measureFrameOffset: number
@@ -189,11 +241,6 @@ export function paintBeatLines(
   const frames = Math.round(60 * rangeInSec);
   const step = canvas.width / frames;
   const nowIdx = Math.floor(frames * lpos);
-
-  const audioFrame = playerContext.player.progress?.renderer?.currentFrame ?? 0;
-  const latencySamples = (playerContext.player.outputLatency ?? 0)
-    * (playerContext.player.audioContext?.sampleRate ?? 44100);
-  const currentNtsc = Math.floor(Math.max(0, audioFrame - latencySamples) / 735);
 
   const { beatFrames } = bpmInfo;
   const winStart = currentNtsc - nowIdx;
@@ -236,64 +283,99 @@ export function paintPianoRoll(
   const ctx = canvas.getContext("2d")!;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  if (bpmInfo) paintBeatLines(canvas, playerContext, rangeInSec, bpmInfo, measureFrameOffset);
+  // Reset the status cache if the song changed (snapshot array replaced).
+  resetCacheIfSongChanged(playerContext.player);
 
+  // Compute latency-corrected current NTSC frame once, shared across channels
+  const audioFrame = playerContext.player.progress?.renderer?.currentFrame ?? 0;
+  const latencySamples = (playerContext.player.outputLatency ?? 0)
+    * (playerContext.player.audioContext?.sampleRate ?? 44100);
+  let currentNtsc = Math.floor(Math.max(0, audioFrame - latencySamples) / 735);
+
+  // During a song switch the renderer's currentFrame can briefly still point at
+  // the previous song's (later) position while the new song's _snapshots only
+  // holds a few decoded frames. Reading that undecoded future range would render
+  // blank. Clamp to the decoded range so the latest available data is shown until
+  // currentFrame catches up.
+  const decodedLen = playerContext.player._snapshots.length;
+  if (decodedLen > 0 && currentNtsc >= decodedLen) currentNtsc = decodedLen - 1;
+
+  if (bpmInfo) paintBeatLines(canvas, currentNtsc, rangeInSec, bpmInfo, measureFrameOffset);
+
+  const kh = canvas.height / 96;
+  const h = kh - 2;
+  const GAP = 2; // leading gap (canvas px) for hard breaks (real key-on / note change)
+
+  // Deferred draws for currently-playing segments so they always sit on top,
+  // giving a stable z-order regardless of channel index.
+  type Draw = { x: number; y: number; w: number; color: string; nowX: number; noteAge: number };
+  const playingDraws: Draw[] = [];
+
+  // Pass 1: build segments per channel, draw non-playing ones immediately
   for (let ch = 0; ch < channelIds.length; ch++) {
-    const kh = canvas.height / 96;
-    const h = kh - 2;
     const frames = Math.round(60 * rangeInSec) + (layered ? ch * 8 : 0);
     const step = canvas.width / frames;
     const nowIdx = Math.floor(frames * lpos);
     const nowX = nowIdx * step;
-    const id = channelIds[ch];
     const baseColor: string = (colorMap[ch] as any)["A200"];
 
-    const pastSpanInFrames = Math.floor(735 * frames * lpos);
-    const futureSpanInFrames = Math.floor(735 * frames * (1.0 - lpos));
-    const statuses = playerContext.player.getChannelStatusArray(id, pastSpanInFrames, futureSpanInFrames);
+    // Read statuses on demand (computed once per NTSC frame, then cached)
+    const windowStart = currentNtsc - Math.floor(frames * lpos);
 
     // Build segments (split on key-on edge even for the same note)
     const segments: Seg[] = [];
     let cur: Seg | null = null;
-    for (let i = 0; i < statuses.length; i++) {
-      const s = statuses[i];
+    for (let i = 0; i < frames; i++) {
+      const idx = windowStart + i;
+      const s = getStatusCached(playerContext.player, ch, idx);
       const note = s?.kcode ?? null;
       const isAttack = (s?.keyKeepFrames ?? Infinity) === 0;
       if (note != null && note >= 0 && note < 96) {
         const color = s?.vnum != null ? voiceColorMap[s.vnum % 16] : baseColor;
         if (cur === null || cur.note !== note || isAttack) {
-          cur = { note, start: i, end: i, color };
+          // Real key-on / note change → hard break (new block with a leading gap)
+          cur = { note, start: i, end: i, color, gap: true };
+          segments.push(cur);
+        } else if (cur.color !== color) {
+          // Timbre (vnum) change mid-note → soft break: split for the new color
+          // but with no gap, so the blocks stay visually contiguous.
+          cur = { note, start: i, end: i, color, gap: false };
           segments.push(cur);
         } else {
           cur.end = i;
-          cur.color = color;
         }
       } else {
         cur = null;
       }
     }
 
-    // Draw segments
-    const gap = 2;
     for (const seg of segments) {
-      const isPlaying = seg.start <= nowIdx && nowIdx <= seg.end;
-      const x = seg.start * step + gap;
-      const w = Math.max(1, (seg.end - seg.start + 1) * step - gap);
+      const g = seg.gap ? GAP : 0;
+      const x = seg.start * step + g;
+      const w = Math.max(1, (seg.end - seg.start + 1) * step - g);
       const y = canvas.height * (1.0 - (seg.note + 1) / 96) + (kh - h) / 2;
+      const isPlaying = seg.start <= nowIdx && nowIdx <= seg.end;
 
-      ctx.fillStyle = isPlaying ? seg.color + "ff" : seg.color + "90";
-      ctx.fillRect(x, y, w, h);
-
-      if (isPlaying && showParticles) {
-        const noteAge = nowIdx - seg.start;
-        const burst = noteAge < 16 ? Math.round((1 - noteAge / 16) ** 2 * 4) : 0;
-        const trickle = Math.random() < 0.35 ? 1 : 0;
-        const count = burst + trickle;
-        if (count > 0) spawnParticles(nowX, y + h / 2, seg.color, count);
+      if (isPlaying) {
+        playingDraws.push({ x, y, w, color: seg.color, nowX, noteAge: nowIdx - seg.start });
+      } else {
+        ctx.fillStyle = seg.color + "90";
+        ctx.fillRect(x, y, w, h);
       }
     }
-    ctx.shadowBlur = 0;
-    ctx.shadowColor = "transparent";
+  }
+
+  // Pass 2: draw playing segments on top + emit particles (attack burst + trickle)
+  for (const d of playingDraws) {
+    ctx.fillStyle = d.color + "ff";
+    ctx.fillRect(d.x, d.y, d.w, h);
+
+    if (showParticles) {
+      const burst = d.noteAge < 16 ? Math.round((1 - d.noteAge / 16) ** 2 * 4) : 0;
+      const trickle = Math.random() < 0.35 ? 1 : 0;
+      const count = burst + trickle;
+      if (count > 0) spawnParticles(d.nowX, d.y + h / 2, d.color, count);
+    }
   }
 
   drawParticles(ctx, dt);

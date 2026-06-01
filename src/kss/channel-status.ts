@@ -249,6 +249,22 @@ export type ChannelId = {
   index: number;
 };
 
+/** Extract full ChannelStatus from a single snapshot (for incremental caching) */
+export function getStatusFromSnapshot(
+  snapshot: KSSDecoderDeviceSnapshot | null | undefined,
+  id: ChannelId
+): ChannelStatus | null {
+  if (snapshot == null) return null;
+  try {
+    switch (id.device) {
+      case "psg":  return snapshot.psg  ? createPSGStatus(snapshot.psg,  id, snapshot.psgKeyKeepFrames  ?? []) : null;
+      case "scc":  return snapshot.scc  ? createSCCStatus(snapshot.scc,  id, snapshot.sccKeyKeepFrames  ?? []) : null;
+      case "opll": return snapshot.opll ? createOPLLStatus(snapshot.opll, id, snapshot.opllKeyKeepFrames ?? []) : null;
+      default:     return null;
+    }
+  } catch { return null; }
+}
+
 /** Extract kcode from a single snapshot (for BPM analysis) */
 export function getKcodeAt(
   snapshot: KSSDecoderDeviceSnapshot | null | undefined,
