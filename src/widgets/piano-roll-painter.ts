@@ -118,6 +118,28 @@ type Particle = {
 const particles: Particle[] = [];
 let lastRenderTime = 0;
 
+// Pre-rendered radial-gradient glow sprite per color. The blur is baked once,
+// so drawing a particle is just a (GPU) drawImage — far cheaper than setting
+// shadowBlur per particle, while still looking glowy.
+const glowSprites = new Map<string, HTMLCanvasElement>();
+function getGlowSprite(color: string): HTMLCanvasElement {
+  let s = glowSprites.get(color);
+  if (!s) {
+    const R = 16;
+    s = document.createElement("canvas");
+    s.width = s.height = R * 2;
+    const g = s.getContext("2d")!;
+    const grad = g.createRadialGradient(R, R, 0, R, R, R);
+    grad.addColorStop(0, "#ffffff");      // hot white core
+    grad.addColorStop(0.25, color);        // channel color
+    grad.addColorStop(1, color + "00");    // fade to transparent
+    g.fillStyle = grad;
+    g.fillRect(0, 0, R * 2, R * 2);
+    glowSprites.set(color, s);
+  }
+  return s;
+}
+
 export function spawnParticles(x: number, y: number, color: string, count: number) {
   for (let i = 0; i < count; i++) {
     const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.4;
@@ -127,29 +149,37 @@ export function spawnParticles(x: number, y: number, color: string, count: numbe
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
       life: 0.8 + Math.random() * 0.2,
-      size: (1.5 + Math.random() * 2.5) * devicePixelRatio,
+      size: (0.8 + Math.random() * 1.6) * devicePixelRatio,
       color,
     });
   }
 }
 
+// Draw via baked glow sprites with additive ("lighter") compositing: no
+// per-particle shadowBlur (the expensive part), yet dense bursts add up to a
+// bright flash. Lifetime is short (~0.4s) so the live count stays naturally
+// bounded without a hard cap.
 function drawParticles(ctx: CanvasRenderingContext2D, dt: number) {
+  // advance + cull
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     p.x += p.vx * dt;
     p.y += p.vy * dt;
     p.vy += 250 * devicePixelRatio * dt;
     p.life -= dt * 2.5;
-    if (p.life <= 0) { particles.splice(i, 1); continue; }
-    ctx.shadowColor = p.color;
-    ctx.shadowBlur = p.size * 3;
+    if (p.life <= 0) particles.splice(i, 1);
+  }
+  if (particles.length === 0) return;
+
+  ctx.globalCompositeOperation = "lighter";
+  for (let i = 0; i < particles.length; i++) {
+    const p = particles[i];
     ctx.globalAlpha = p.life * p.life;
-    ctx.fillStyle = "#ffffff";
-    ctx.fillRect(p.x - p.size / 2, p.y - p.size / 2, p.size, p.size);
+    const r = p.size * 2.5; // glow radius (wider than the core)
+    ctx.drawImage(getGlowSprite(p.color), p.x - r, p.y - r, r * 2, r * 2);
   }
   ctx.globalAlpha = 1.0;
-  ctx.shadowBlur = 0;
-  ctx.shadowColor = "transparent";
+  ctx.globalCompositeOperation = "source-over";
 }
 
 // ---- Keyboard / background ----

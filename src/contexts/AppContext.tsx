@@ -68,7 +68,7 @@ const defaultContextData: AppContextData = {
   pianoRollRangeInSec: 4.0,
   pianoRollLayered: false,
   pianoRollMode: "2d",
-  pianoRollShowParticles: true,
+  pianoRollShowParticles: false,
   pianoRollShowKeyboard: true,
   openMap: {},
   anchorElMap: {},
