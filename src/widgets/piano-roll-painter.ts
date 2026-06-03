@@ -140,7 +140,7 @@ function getGlowSprite(color: string): HTMLCanvasElement {
   return s;
 }
 
-export function spawnParticles(x: number, y: number, color: string, count: number) {
+export function spawnParticles(x: number, y: number, color: string, count: number, sizeScale = 1) {
   for (let i = 0; i < count; i++) {
     const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.4;
     const speed = (60 + Math.random() * 140) * devicePixelRatio;
@@ -149,7 +149,7 @@ export function spawnParticles(x: number, y: number, color: string, count: numbe
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
       life: 0.8 + Math.random() * 0.2,
-      size: (0.8 + Math.random() * 1.6) * devicePixelRatio,
+      size: (0.8 + Math.random() * 1.6) * devicePixelRatio * sizeScale,
       color,
     });
   }
@@ -296,7 +296,7 @@ export function paintPianoRoll(
 
   // Deferred draws for currently-playing segments so they always sit on top,
   // giving a stable z-order regardless of channel index.
-  type Draw = { x: number; y: number; w: number; color: string; nowX: number; noteAge: number };
+  type Draw = { x: number; y: number; w: number; color: string; nowX: number; noteAge: number; vol: number };
   const playingDraws: Draw[] = [];
 
   // Pass 1: build segments per channel, draw non-playing ones immediately
@@ -345,7 +345,9 @@ export function paintPianoRoll(
       const isPlaying = seg.start <= nowIdx && nowIdx <= seg.end;
 
       if (isPlaying) {
-        playingDraws.push({ x, y, w, color: seg.color, nowX, noteAge: nowIdx - seg.start });
+        // Volume at the play head (0-15); windowStart + nowIdx === currentNtsc.
+        const vol = getStatusCached(playerContext.player, ch, windowStart + nowIdx)?.vol ?? 15;
+        playingDraws.push({ x, y, w, color: seg.color, nowX, noteAge: nowIdx - seg.start, vol });
       } else {
         ctx.fillStyle = seg.color + "60"; // dimmer when not sounding
         ctx.fillRect(x, y, w, h);
@@ -366,7 +368,9 @@ export function paintPianoRoll(
       const burst = d.noteAge < 16 ? Math.round((1 - d.noteAge / 16) ** 2 * 4) : 0;
       const trickle = Math.random() < 0.35 ? 1 : 0;
       const count = burst + trickle;
-      if (count > 0) spawnParticles(d.nowX, d.y + h / 2, d.color, count);
+      // Scale particle size by channel volume: vol 0 → 50%, vol 15 → 100%.
+      const sizeScale = 0.5 + 0.5 * (Math.max(0, Math.min(15, d.vol)) / 15);
+      if (count > 0) spawnParticles(d.nowX, d.y + h / 2, d.color, count, sizeScale);
     }
   }
 
