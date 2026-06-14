@@ -12,6 +12,7 @@ import {
   paintWhiteHighlight,
   paintBlackHighlight,
   paintKeyboardEdgeLine,
+  defaultVoiceColors,
 } from "./piano-roll-painter";
 
 // ---- Canvas utility components ----
@@ -104,12 +105,18 @@ function PianoRollCanvas(props: { width: number; height: number }) {
       const canvas = canvasRef.current;
       if (canvas != null) {
         requestAnimationFrame(renderFrame);
+        const ac = appContextRef.current;
         paintPianoRoll(
           canvas,
           playerContext,
-          appContextRef.current.pianoRollRangeInSec,
-          appContextRef.current.pianoRollLayered,
-          appContextRef.current.pianoRollShowParticles
+          ac.pianoRollRangeInSec,
+          ac.pianoRollLayered,
+          ac.pianoRollShowParticles,
+          {
+            mode: ac.pianoRollColorMode,
+            channelColors: ac.pianoRollChannelColors,
+            voiceColors: defaultVoiceColors,
+          }
         );
       }
     };

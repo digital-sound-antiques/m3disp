@@ -30,6 +30,7 @@ import { OptionMenu } from "./OptionMenu";
 import { PlayListCard, PlayListView } from "./PlayListView";
 import { PlayControl, PlayControlCard } from "./PlayerControl";
 import { SettingsDialog } from "./SettingsDialog";
+import { PianoRollColorDialog } from "./PianoRollColorDialog";
 
 import packageJson from "../../package.json";
 import ghlogo from "../assets/github-mark-white.svg";
@@ -59,6 +60,7 @@ function AppRoot() {
   return (
     <Fragment>
       <SettingsDialog id="settings-dialog" />
+      <PianoRollColorDialog />
       <OptionMenu id="option-menu" />
       <AboutDialog />
       <AppProgressDialog />

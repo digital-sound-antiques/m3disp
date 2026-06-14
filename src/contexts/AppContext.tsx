@@ -2,6 +2,7 @@ import { Palette, Theme, createTheme } from "@mui/material";
 import { teal } from "@mui/material/colors";
 import { PropsWithChildren, createContext, useEffect, useState } from "react";
 import AppGlobal from "./AppGlobal";
+import { defaultChannelColors, type PianoRollColorMode } from "../widgets/piano-roll-painter";
 
 const defaultTheme = createTheme({
   palette: {
@@ -32,6 +33,44 @@ const defaultTheme = createTheme({
 
 export type KeyHighlightColorType = "primary" | "secondary";
 export type PianoRollMode = "2d" | "3d";
+export type PianoRollColorModeMap = {
+  opll: PianoRollColorMode;
+  psg: PianoRollColorMode;
+  scc: PianoRollColorMode;
+};
+
+// How the flat pianoRollChannelColors[] array maps onto each device, matching
+// the channelIds[] layout in piano-roll-painter.ts. Used to persist channel
+// colors grouped by device (e.g. {"opll":[...], "psg":[...], "scc":[...]}).
+const channelColorGroups: { device: keyof PianoRollColorModeMap; base: number; count: number }[] = [
+  { device: "opll", base: 0, count: 14 },
+  { device: "psg", base: 14, count: 6 },
+  { device: "scc", base: 20, count: 5 },
+];
+
+function channelColorsToMap(colors: string[]): { [device: string]: string[] } {
+  const map: { [device: string]: string[] } = {};
+  for (const g of channelColorGroups) {
+    map[g.device] = colors.slice(g.base, g.base + g.count);
+  }
+  return map;
+}
+
+/** Rebuild the flat color array from a stored device map, or null if malformed. */
+function channelColorsFromMap(obj: unknown, fallback: string[]): string[] | null {
+  if (obj == null || typeof obj !== "object") return null;
+  const map = obj as { [device: string]: unknown };
+  const result = fallback.slice();
+  for (const g of channelColorGroups) {
+    const arr = map[g.device];
+    if (!Array.isArray(arr) || arr.length !== g.count) return null;
+    for (let i = 0; i < g.count; i++) {
+      if (typeof arr[i] !== "string") return null;
+      result[g.base + i] = arr[i];
+    }
+  }
+  return result;
+}
 
 type AppContextData = {
   theme: Theme;
@@ -41,6 +80,8 @@ type AppContextData = {
   pianoRollMode: string;
   pianoRollShowParticles: boolean;
   pianoRollShowKeyboard: boolean;
+  pianoRollColorMode: PianoRollColorModeMap;
+  pianoRollChannelColors: string[];
   openMap: { [key: string]: boolean };
   anchorElMap: { [key: string]: HTMLElement | null };
   isOpen: (id: string) => boolean;
@@ -56,6 +97,8 @@ type AppContextData = {
   setPianoRollMode: (value: PianoRollMode) => void;
   setPianoRollShowParticles: (value: boolean) => void;
   setPianoRollShowKeyboard: (value: boolean) => void;
+  setPianoRollColorMode: (value: PianoRollColorModeMap) => void;
+  setPianoRollChannelColors: (value: string[]) => void;
 };
 
 const noop = () => {
@@ -70,6 +113,8 @@ const defaultContextData: AppContextData = {
   pianoRollMode: "2d",
   pianoRollShowParticles: false,
   pianoRollShowKeyboard: true,
+  pianoRollColorMode: { opll: "voice", psg: "voice", scc: "voice" },
+  pianoRollChannelColors: [...defaultChannelColors],
   openMap: {},
   anchorElMap: {},
   isOpen: () => false,
@@ -85,6 +130,8 @@ const defaultContextData: AppContextData = {
   setPianoRollMode: noop,
   setPianoRollShowParticles: noop,
   setPianoRollShowKeyboard: noop,
+  setPianoRollColorMode: noop,
+  setPianoRollChannelColors: noop,
 };
 
 export const AppContext = createContext(defaultContextData);
@@ -95,6 +142,8 @@ const keyKeyHighlightColorType = "m3disp.keyHighlightColorType";
 const keyPianoRollRangeInSec = "m3disp.pianoRoll.rangeInSec";
 const keyPianoRollLayered = "m3disp.pianoRoll.layered";
 const keyPianoRollMode = "m3disp.pianoRoll.mode";
+const keyPianoRollColorMode = "m3disp.pianoRoll.colorMode";
+const keyPianoRollChannelColors = "m3disp.pianoRoll.channelColors";
 
 export function AppContextProvider(props: PropsWithChildren) {
   const isOpen = (id: string) => {
@@ -191,6 +240,20 @@ export function AppContextProvider(props: PropsWithChildren) {
     setState((oldState) => ({ ...oldState, pianoRollShowKeyboard: value }));
   };
 
+  const setPianoRollColorMode = (value: PianoRollColorModeMap, save: boolean = true) => {
+    setState((oldState) => ({ ...oldState, pianoRollColorMode: value }));
+    if (save) {
+      localStorage.setItem(keyPianoRollColorMode, JSON.stringify(value));
+    }
+  };
+
+  const setPianoRollChannelColors = (value: string[], save: boolean = true) => {
+    setState((oldState) => ({ ...oldState, pianoRollChannelColors: value }));
+    if (save) {
+      localStorage.setItem(keyPianoRollChannelColors, JSON.stringify(channelColorsToMap(value)));
+    }
+  };
+
   const [state, setState] = useState(defaultContextData);
   const [initialized, setInitialized] = useState(false);
 
@@ -218,6 +281,29 @@ export function AppContextProvider(props: PropsWithChildren) {
     if (str != null) {
       setPianoRollLayered(str == "true", false);
     }
+
+    const colorModeStr = localStorage.getItem(keyPianoRollColorMode);
+    if (colorModeStr != null) {
+      try {
+        const m = JSON.parse(colorModeStr);
+        const pick = (v: unknown): PianoRollColorMode => (v === "channel" ? "channel" : "voice");
+        setPianoRollColorMode({ opll: pick(m?.opll), psg: pick(m?.psg), scc: pick(m?.scc) }, false);
+      } catch {
+        /* ignore malformed value */
+      }
+    }
+
+    const chColorsStr = localStorage.getItem(keyPianoRollChannelColors);
+    if (chColorsStr != null) {
+      try {
+        const colors = channelColorsFromMap(JSON.parse(chColorsStr), defaultChannelColors);
+        if (colors != null) {
+          setPianoRollChannelColors(colors, false);
+        }
+      } catch {
+        /* ignore malformed value */
+      }
+    }
   }, []);
 
   useEffect(() => {
@@ -244,6 +330,8 @@ export function AppContextProvider(props: PropsWithChildren) {
         setPianoRollMode,
         setPianoRollShowParticles,
         setPianoRollShowKeyboard,
+        setPianoRollColorMode,
+        setPianoRollChannelColors,
       }}
     >
       {initialized ? props.children : null}

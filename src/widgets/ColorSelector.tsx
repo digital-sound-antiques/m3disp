@@ -169,15 +169,22 @@ function VariantSelector(props: {
   );
 }
 
-export function ColorBall(props: { color: string; selected?: boolean; onClick?: () => void }) {
+export function ColorBall(props: {
+  color: string;
+  selected?: boolean;
+  size?: number;
+  onClick?: () => void;
+}) {
+  const inner = props.size ?? 16;
+  const outer = inner + 6;
   return (
     <Box
       style={{
         border: props.selected ? `2px solid ${props.color}` : undefined,
-        width: "22px",
-        height: "22px",
+        width: `${outer}px`,
+        height: `${outer}px`,
         marginRight: "8px",
-        borderRadius: "11px",
+        borderRadius: `${outer / 2}px`,
         justifyContent: "center",
         alignItems: "center",
         display: "inline-flex",
@@ -186,9 +193,9 @@ export function ColorBall(props: { color: string; selected?: boolean; onClick?: 
       <Box
         onClick={props.onClick}
         style={{
-          width: "16px",
-          height: "16px",
-          borderRadius: "8px",
+          width: `${inner}px`,
+          height: `${inner}px`,
+          borderRadius: `${inner / 2}px`,
           backgroundColor: props.color,
         }}
       />

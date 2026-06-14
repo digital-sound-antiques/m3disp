@@ -33,10 +33,27 @@ export const channelIds: ChannelId[] = [
   { device: "scc", index: 4 },
 ];
 
-const voiceColorMap = [
+// Default 16-color palette for the "by tone" (voice) coloring mode. Indexed by
+// the channel's voice number (vnum % 16). Editable via the color settings dialog.
+export const defaultVoiceColors: string[] = [
   "#00cccc", "#888888", "#3eb849", "#74d07d", "#5955e0", "#8076f1",
   "#b95e51", "#65dbef", "#db6559", "#ff897d", "#ccc35e", "#ded087",
   "#3aa241", "#b766b5", Colors.pink[700], Colors.brown[400],
+];
+
+// Default per-channel palette for the "by channel" coloring mode in "simple"
+// style. One entry per channelIds[] slot (25 total). Each chip family keeps a
+// recognizable hue band while individual channels stay distinguishable.
+export const defaultChannelColors: string[] = [
+  // OPLL FM 1-9 (teal / green / cyan)
+  "#00cccc", "#1ec8a8", "#3eb849", "#74d07d", "#26c6da",
+  "#4dd0e1", "#80cbc4", "#a5d6a7", "#66bb6a",
+  // OPLL rhythm BD/SD/TOM/CYM/HH (pink / magenta)
+  "#ec407a", "#f06292", "#ba68c8", "#ab47bc", "#ce93d8",
+  // PSG tone 1-3 (blue), noise 1-3 (red) — brightness matched per pair
+  "#1e88e5", "#42a5f5", "#82b1ff", "#e53935", "#ef5350", "#ff8a80",
+  // SCC 1-5 (warm red / orange / yellow)
+  "#ef5350", "#ff7043", "#ffa726", "#ffca28", "#ffee58",
 ];
 
 const colorMap = [
@@ -47,6 +64,24 @@ const colorMap = [
   Colors.red, Colors.red, Colors.red,
   Colors.yellow, Colors.yellow, Colors.yellow, Colors.yellow, Colors.yellow,
 ];
+
+export type PianoRollColorMode = "voice" | "channel";
+
+/** Per-render color configuration resolved by the caller from app settings. */
+export type PianoRollColorConfig = {
+  /** Coloring mode per device. A missing device defaults to "voice". */
+  mode: { [device: string]: PianoRollColorMode };
+  /** Resolved per-channel colors (length === channelIds.length). */
+  channelColors: string[];
+  /** Resolved 16-entry voice palette (indexed by vnum % 16). */
+  voiceColors: string[];
+};
+
+const defaultColorConfig: PianoRollColorConfig = {
+  mode: { opll: "voice", psg: "voice", scc: "voice" },
+  channelColors: defaultChannelColors,
+  voiceColors: defaultVoiceColors,
+};
 
 export const lpos = 0.25;
 
@@ -264,7 +299,8 @@ export function paintPianoRoll(
   playerContext: PlayerContextState,
   rangeInSec: number,
   layered: boolean,
-  showParticles: boolean
+  showParticles: boolean,
+  colorConfig: PianoRollColorConfig = defaultColorConfig
 ) {
   const now = performance.now();
   const dt = Math.min((now - lastRenderTime) / 1000, 1 / 20);
@@ -306,6 +342,7 @@ export function paintPianoRoll(
     const nowIdx = Math.floor(frames * lpos);
     const nowX = nowIdx * step;
     const baseColor: string = (colorMap[ch] as any)["A200"];
+    const channelMode = colorConfig.mode[channelIds[ch].device] ?? "voice";
 
     // Read statuses on demand (computed once per NTSC frame, then cached)
     const windowStart = currentNtsc - Math.floor(frames * lpos);
@@ -319,7 +356,12 @@ export function paintPianoRoll(
       const note = s?.kcode ?? null;
       const isAttack = (s?.keyKeepFrames ?? Infinity) === 0;
       if (note != null && note >= 0 && note < 96) {
-        const color = s?.vnum != null ? voiceColorMap[s.vnum % 16] : baseColor;
+        const color =
+          channelMode === "channel"
+            ? colorConfig.channelColors[ch] ?? baseColor
+            : s?.vnum != null
+              ? colorConfig.voiceColors[s.vnum % 16] ?? baseColor
+              : baseColor;
         if (cur === null || cur.note !== note || isAttack) {
           // Real key-on / note change → hard break (new block with a leading gap)
           cur = { note, start: i, end: i, color, gap: true };

@@ -1,8 +1,11 @@
-import { AutoAwesome, Layers, Piano, ThreeDRotation, ZoomIn } from "@mui/icons-material";
-import { Box, Slider, Switch } from "@mui/material";
-import { useContext } from "react";
+import { AutoAwesome, Layers, MoreVert, Piano, ThreeDRotation, ZoomIn } from "@mui/icons-material";
+import { Box, IconButton, Menu, MenuItem, Slider, Switch } from "@mui/material";
+import { useContext, useRef } from "react";
 import { AppContext } from "../contexts/AppContext";
 import { styled } from "@mui/material/styles";
+
+export const pianoRollColorDialogId = "piano-roll-color-dialog";
+const pianoRollMenuId = "piano-roll-menu";
 
 const TimeSlider = styled(Slider)(({ theme }) => ({
   "&": {
@@ -54,6 +57,7 @@ const AntSwitch = styled(Switch)(({ theme }) => ({
 
 export function PianoRollControl() {
   const context = useContext(AppContext);
+  const menuButtonRef = useRef<HTMLButtonElement>(null);
 
   const onRangeChange = (value: number) => {
     context.setPianoRollRangeInSec(value);
@@ -109,6 +113,28 @@ export function PianoRollControl() {
         sx={{ ml: 0.5, mr: 1 }}
         onClick={onModeClick}
       />
+      <IconButton
+        ref={menuButtonRef}
+        size="small"
+        sx={{ ml: 0.5 }}
+        onClick={() => context.openPopup(pianoRollMenuId, menuButtonRef.current!)}
+      >
+        <MoreVert sx={{ fontSize: 18 }} />
+      </IconButton>
+      <Menu
+        open={context.isOpen(pianoRollMenuId)}
+        anchorEl={context.anchorElMap[pianoRollMenuId]}
+        onClose={() => context.closePopup(pianoRollMenuId)}
+      >
+        <MenuItem
+          onClick={() => {
+            context.closePopup(pianoRollMenuId);
+            context.openDialog(pianoRollColorDialogId);
+          }}
+        >
+          Color Settings…
+        </MenuItem>
+      </Menu>
     </Box>
   );
 }
