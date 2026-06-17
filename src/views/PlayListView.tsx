@@ -17,9 +17,8 @@ import {
 
 import { useContext, useRef, useState } from "react";
 
-import { DragDropContext, Draggable, DropResult } from "@hello-pangea/dnd";
+import { DragDropContext, Draggable, Droppable, DropResult } from "@hello-pangea/dnd";
 import { PlayListEntry, PlayerContext } from "../contexts/PlayerContext";
-import { StrictModeDroppable as Droppable } from "../widgets/StrictModeDroppable";
 
 import { FileDrop } from "react-file-drop";
 import { useFileDrop } from "../contexts/FileDropContext";
