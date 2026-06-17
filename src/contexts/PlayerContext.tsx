@@ -268,9 +268,8 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
   const onWindowMessage = async (ev: MessageEvent) => {
     if (ev.data instanceof Uint8Array && ev.data.length <= 65536) {
       reducer.clearEntries();
-      const file = new File([ev.data], "external.mgs");
       const entries = await loadEntriesFromFileList(state.storage, [
-        new File([ev.data], file.name),
+        new File([ev.data as BlobPart], "external.mgs"),
       ]);
       reducer.addEntries(entries, 0);
       reducer.resume();

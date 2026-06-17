@@ -80,7 +80,7 @@ export async function loadEntriesFromZip(
   const files: File[] = [];
   for (const name in unzipped) {
     const data = unzipped[name];
-    files.push(new File([data], name));
+    files.push(new File([data as BlobPart], name));
   }
   return createEntriesFromFileList(storage, files, progressCallback);
 }
@@ -315,7 +315,7 @@ async function loadFromFile(blob: Blob): Promise<Uint8Array | string> {
 
 const registerFile = async (
   storage: BinaryDataStorage,
-  file: Blob
+  file: File
 ): Promise<{ title: string; dataId: string }> => {
   const data = await loadFromFile(file);
   if (data instanceof Uint8Array) {

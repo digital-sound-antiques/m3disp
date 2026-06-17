@@ -44,7 +44,7 @@ function createExtendedM3U(entries: (PlayListEntry & { exportName?: string | nul
 }
 
 export function saveAs(input: Uint8Array | string, filename: string) {
-  const blob = new Blob([input]);
+  const blob = new Blob([input as BlobPart]);
   const a = document.createElement("a");
   a.href = window.URL.createObjectURL(blob);
   a.download = filename;
