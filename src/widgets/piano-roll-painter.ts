@@ -42,18 +42,24 @@ export const defaultVoiceColors: string[] = [
 ];
 
 // Default per-channel palette for the "by channel" coloring mode in "simple"
-// style. One entry per channelIds[] slot (25 total). Each chip family keeps a
-// recognizable hue band while individual channels stay distinguishable.
+// style. One entry per channelIds[] slot (25 total). Generated in the OKLCH
+// perceptual color space at fixed perceptual lightness/chroma (L=0.70, C=0.165,
+// trimmed per-hue only where needed to stay in the sRGB gamut) so every color
+// reads as equally bright and vivid — uniform perceptual L/C is what gives
+// cohesion across the full hue range (plain HSL does not). The PSG noise
+// channels are grouped into a red family on purpose; the remaining tonal
+// channels take non-red hues spread by the golden angle so neighbours land far
+// apart on the wheel.
 export const defaultChannelColors: string[] = [
-  // OPLL FM 1-9 (teal / green / cyan)
-  "#00cccc", "#1ec8a8", "#3eb849", "#74d07d", "#26c6da",
-  "#4dd0e1", "#80cbc4", "#a5d6a7", "#66bb6a",
-  // OPLL rhythm BD/SD/TOM/CYM/HH (pink / magenta)
-  "#ec407a", "#f06292", "#ba68c8", "#ab47bc", "#ce93d8",
-  // PSG tone 1-3 (blue), noise 1-3 (red) — brightness matched per pair
-  "#1e88e5", "#42a5f5", "#82b1ff", "#e53935", "#ef5350", "#ff8a80",
-  // SCC 1-5 (warm red / orange / yellow)
-  "#ef5350", "#ff7043", "#ffa726", "#ffca28", "#ffee58",
+  // OPLL FM 1-9
+  "#b99c1c", "#20ace5", "#47b95f", "#968efa", "#e18516",
+  "#1fb3ba", "#dd72c2", "#9ca911", "#4fa1fb",
+  // OPLL rhythm BD/SD/TOM/CYM/HH
+  "#1db98d", "#b780ef", "#c8951c", "#22afd2", "#6eb441",
+  // PSG tone 1-3 / noise 1-3 (noise = red)
+  "#7f95fe", "#07b6ac", "#d176d6", "#e75f66", "#fb8370", "#e56636",
+  // SCC 1-5
+  "#b0a106", "#1aa9f4", "#1fbb6f", "#a388fb", "#d78c18",
 ];
 
 const colorMap = [
