@@ -17,7 +17,7 @@ import {
 
 import { useContext, useRef, useState } from "react";
 
-import { DragDropContext, Draggable, DropResult } from "react-beautiful-dnd";
+import { DragDropContext, Draggable, DropResult } from "@hello-pangea/dnd";
 import { PlayListEntry, PlayerContext } from "../contexts/PlayerContext";
 import { StrictModeDroppable as Droppable } from "../widgets/StrictModeDroppable";
 

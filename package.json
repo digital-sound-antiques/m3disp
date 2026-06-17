@@ -13,6 +13,7 @@
     "@emotion/react": "^11.11.0",
     "@emotion/styled": "^11.11.0",
     "@fontsource/roboto": "^5.0.8",
+    "@hello-pangea/dnd": "^18.0.1",
     "@mui/icons-material": "^5.14.19",
     "@mui/material": "^5.14.20",
     "@types/sha1": "^1.1.5",
@@ -21,7 +22,6 @@
     "mgsc-js": "^2.0.0",
     "mgsrc-js": "^2.0.0",
     "react": "^18.2.0",
-    "react-beautiful-dnd": "^13.1.1",
     "react-dom": "^18.2.0",
     "react-file-drop": "^3.1.6",
     "webaudio-stream-player": "^1.2.1"
@@ -29,7 +29,6 @@
   "devDependencies": {
     "@types/md5": "^2.3.2",
     "@types/react": "^18.0.28",
-    "@types/react-beautiful-dnd": "^13.1.4",
     "@types/react-dom": "^18.0.11",
     "@vitejs/plugin-react": "^6.0.2",
     "fflate": "^0.8.1",
