@@ -140,7 +140,7 @@ function DesktopAppBar() {
             M<sup>3</sup>disp
           </Typography>
           <Box sx={{ flexGrow: 1 }} />
-          <Box sx={{ width: "128px", mx: 2 }}>
+          <Box sx={{ width: "168px", mx: 2 }}>
             <VolumeControl />
           </Box>
           <IconButton

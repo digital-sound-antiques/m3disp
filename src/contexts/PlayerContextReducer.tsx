@@ -1,4 +1,5 @@
 import { KSSChannelMask } from "../kss/kss-device";
+import { SurroundMode } from "../utils/surround";
 import { PlayListEntry, PlayerContextState, RepeatMode } from "./PlayerContext";
 
 export class PlayerContextReducer {
@@ -11,6 +12,12 @@ export class PlayerContextReducer {
   setMasterGain(value: number): void {
     this.setState((oldState) => {
       return { ...oldState, masterGain: value };
+    });
+  }
+
+  setSurroundMode(value: SurroundMode): void {
+    this.setState((oldState) => {
+      return { ...oldState, surroundMode: value };
     });
   }
 

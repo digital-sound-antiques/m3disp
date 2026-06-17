@@ -10,6 +10,7 @@ import AppGlobal from "./AppGlobal";
 import { PlayerContextReducer } from "./PlayerContextReducer";
 import { AppProgressContext } from "./AppProgressContext";
 import { KSSDecoderStartOptions } from "../kss/kss-decoder-worker";
+import { SurroundEffect, SurroundMode } from "../utils/surround";
 
 export type PlayListEntry = {
   title?: string | null;
@@ -26,6 +27,8 @@ export type RepeatMode = "none" | "all" | "single";
 export interface PlayerContextState {
   audioContext: AudioContext;
   gainNode: GainNode;
+  surround: SurroundEffect;
+  surroundMode: SurroundMode;
   storage: BinaryDataStorage;
   masterGain: number;
   player: KSSPlayer;
@@ -56,6 +59,8 @@ const createDefaultContextState = () => {
   const state: PlayerContextState = {
     audioContext: audioContext,
     gainNode: new GainNode(audioContext),
+    surround: new SurroundEffect(audioContext),
+    surroundMode: "off",
     storage: new BinaryDataStorage(),
     // Workaround: AudioWorklet's playback is broken in iOS 17.5.1
     player: new KSSPlayer(isIOS ? "script" : "worklet"),
@@ -82,7 +87,8 @@ const createDefaultContextState = () => {
   };
 
   state.gainNode.gain.value = state.masterGain;
-  state.gainNode.connect(state.audioContext.destination);
+  state.gainNode.connect(state.surround.input);
+  state.surround.output.connect(state.audioContext.destination);
   state.player.connect(state.gainNode);
   autoResumeAudioContext(state.audioContext);
 
@@ -95,6 +101,8 @@ const createDefaultContextState = () => {
     state.masterGain = json.masterGain ?? state.masterGain;
     state.gainNode.gain.value = state.masterGain;
     state.repeatMode = json.repeatMode ?? state.repeatMode;
+    state.surroundMode = json.surroundMode ?? state.surroundMode;
+    state.surround.setMode(state.surroundMode);
     state.defaultLoopCount = json.defaultLoopCount ?? state.defaultLoopCount;
     state.defaultDuration = json.defaultDuration ?? state.defaultDuration;
   } catch (e) {
@@ -177,6 +185,10 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
     state.gainNode.gain.value = state.masterGain;
   }, [state.masterGain]);
 
+  useEffect(() => {
+    state.surround.setMode(state.surroundMode);
+  }, [state.surroundMode]);
+
   const reducer = new PlayerContextReducer(setState);
   const [initialized, setInitialized] = useState(false);
 
@@ -229,7 +241,8 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
   };
 
   const save = () => {
-    const { defaultLoopCount, defaultDuration, channelMask, repeatMode, masterGain } = state;
+    const { defaultLoopCount, defaultDuration, channelMask, repeatMode, masterGain, surroundMode } =
+      state;
     const data = {
       version: 1,
       defaultLoopCount,
@@ -237,6 +250,7 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
       channelMask,
       masterGain,
       repeatMode,
+      surroundMode,
     };
     localStorage.setItem("m3disp.playerContext", JSON.stringify(data));
   };
@@ -249,6 +263,7 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
     state.defaultDuration,
     state.channelMask,
     state.repeatMode,
+    state.surroundMode,
   ]);
 
   const saveEntries = (entries: PlayListEntry[]) => {
