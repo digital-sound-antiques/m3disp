@@ -391,17 +391,28 @@ export function paintPianoRoll(
         const vol = getStatusCached(playerContext.player, ch, windowStart + nowIdx)?.vol ?? 15;
         playingDraws.push({ x, y, w, color: seg.color, nowX, noteAge: nowIdx - seg.start, vol });
       } else {
-        ctx.fillStyle = seg.color + "60"; // dimmer when not sounding
+        ctx.fillStyle = seg.color + "99"; // dimmer when not sounding
         ctx.fillRect(x, y, w, h);
       }
     }
   }
 
-  // Pass 2: draw playing segments on top, with a subtle glow + particles
+  // Pass 2: draw playing segments on top, with a glow + particles
   for (const d of playingDraws) {
     ctx.save();
+    // Outer halo: a wide, additive bloom around the note.
+    ctx.globalCompositeOperation = "lighter";
     ctx.shadowColor = d.color;
-    ctx.shadowBlur = 4 * devicePixelRatio;
+    ctx.shadowBlur = 10 * devicePixelRatio;
+    ctx.fillStyle = d.color + "ff";
+    ctx.fillRect(d.x, d.y, d.w, h);
+    // Second additive pass tightens the glow into a brighter core.
+    ctx.shadowBlur = 3 * devicePixelRatio;
+    ctx.fillRect(d.x, d.y, d.w, h);
+    ctx.restore();
+
+    // Solid body on top so the note color stays true at its center.
+    ctx.save();
     ctx.fillStyle = d.color + "ff";
     ctx.fillRect(d.x, d.y, d.w, h);
     ctx.restore();
