@@ -70,6 +70,12 @@ class KSSDecoderWorker extends AudioDecoderWorker {
         case "config":
           if (d.lookaheadMs != null) this._lookaheadMs = d.lookaheadMs;
           return;
+        case "setChannelMask":
+          // live channel mute: apply to BOTH engines so keyframes stay consistent
+          this._channelMask = d.mask;
+          this._applyChannelMask(this._player);
+          this._applyChannelMask(this._keyframer);
+          return;
         default:
           // The base abort awaits the in-flight process(); set our flag here so
           // the throttle/fast-forward loops break immediately.
@@ -93,6 +99,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
   private _originFrame = 0; // frame the keyframe schedule starts from (0, or post-debug-skip)
   private _nextKeyframeFrame = 0; // next scheduled capture frame
   private _bufferedHWM = 0; // furthest keyframer position (drives the seek buffer bar)
+  private _endFrame = 0; // actual total length (intro + loops + fade), 0 until the keyframer finds it
 
   private _duration = defaultDuration;
   private _fadeDuration = defaultFadeDuration;
@@ -104,6 +111,9 @@ class KSSDecoderWorker extends AudioDecoderWorker {
   private _playhead = 0;
   private _lookaheadMs = 500;
   private _aborted = false;
+  // current per-device channel mute mask; applied to both engines and re-applied
+  // after every loadState/reset so a keyframe's mask never overrides the live one
+  private _channelMask: KSSChannelMask = { psg: 0, scc: 0, opll: 0, opl: 0 };
 
   private get _keyframeFrames() {
     return KEYFRAME_SECONDS * this.sampleRate;
@@ -130,11 +140,17 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     } else {
       kssplay.setRCF(0, 0);
     }
-    kssplay.setChannelMask("psg", args.channelMask?.psg ?? 0);
-    kssplay.setChannelMask("scc", args.channelMask?.scc ?? 0);
-    kssplay.setChannelMask("opll", args.channelMask?.opll ?? 0);
-    kssplay.setChannelMask("opl", args.channelMask?.opl ?? 0);
+    this._applyChannelMask(kssplay);
     kssplay.setSilentLimit(15 * 1000);
+  }
+
+  /** Apply the current channel mask to one engine (all four devices). */
+  private _applyChannelMask(kssplay: KSSPlay | null) {
+    if (kssplay == null) return;
+    kssplay.setChannelMask("psg", this._channelMask.psg);
+    kssplay.setChannelMask("scc", this._channelMask.scc);
+    kssplay.setChannelMask("opll", this._channelMask.opll);
+    kssplay.setChannelMask("opl", this._channelMask.opl);
   }
 
   async start(args: KSSDecoderStartOptions): Promise<void> {
@@ -174,6 +190,12 @@ class KSSDecoderWorker extends AudioDecoderWorker {
       this._kss = new KSS(u8, args.label ?? "");
       this._song = args.song ?? 0;
       this._cpu = args.cpu ?? 0;
+      this._channelMask = {
+        psg: args.channelMask?.psg ?? 0,
+        scc: args.channelMask?.scc ?? 0,
+        opll: args.channelMask?.opll ?? 0,
+        opl: args.channelMask?.opl ?? 0,
+      };
 
       this._configureEngine(this._player!, args);
       this._configureEngine(this._keyframer!, args);
@@ -182,6 +204,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
       this._playerFrames = 0;
       this._keyframerFrames = 0;
       this._bufferedHWM = 0;
+      this._endFrame = 0;
       this._resetKeyState();
 
       if (this._hasDebugMarker) {
@@ -216,6 +239,8 @@ class KSSDecoderWorker extends AudioDecoderWorker {
       player.reset(this._song, this._cpu);
       this._playerFrames = 0;
     }
+    // keyframe carries the mask it was captured with; force the current one
+    this._applyChannelMask(player);
     await this._fastForward(
       player,
       () => this._playerFrames,
@@ -233,12 +258,14 @@ class KSSDecoderWorker extends AudioDecoderWorker {
       this._keyframer!.loadState(kf.data);
       this._keyframerFrames = kf.frame;
       this._nextKeyframeFrame = kf.frame + this._keyframeFrames;
+      this._applyChannelMask(this._keyframer);
     } else if (kf == null) {
       this._keyframer!.reset(this._song, this._cpu);
       this._keyframerFrames = 0;
       this._originFrame = 0;
       this._nextKeyframeFrame = 0;
       this._resetKeyState();
+      this._applyChannelMask(this._keyframer);
     }
   }
 
@@ -462,8 +489,11 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     const kf = this._keyframer;
     if (kf == null) return;
     const step = Math.floor(this.sampleRate / 60);
+    const fadeFrames = (this.sampleRate * this._fadeDuration) / 1000;
     const endLimit = (this.sampleRate * (this._duration + this._fadeDuration)) / 1000;
-    const hardTarget = Math.min(target, endLimit);
+    // once the actual end is known, don't scan past it
+    const scanLimit = this._endFrame > 0 ? this._endFrame : endLimit;
+    const hardTarget = Math.min(target, scanLimit);
     const snapshots: KSSDecoderDeviceSnapshot[] = [];
     let guard = 0;
     while (
@@ -475,6 +505,12 @@ class KSSDecoderWorker extends AudioDecoderWorker {
       kf.calcSilent(step);
       this._updateKeyOnFrames(step);
       this._keyframerFrames += step;
+      // Determine the actual song length: the driver fades once it has looped
+      // `maxLoop` times, ending fadeFrames later. (The audible player applies the
+      // same policy; the keyframer just discovers the frame first.)
+      if (this._endFrame === 0 && kf.getLoopCount() >= this._maxLoop) {
+        this._reportDuration(this._keyframerFrames + fadeFrames);
+      }
       snapshots.push({
         frame: this._keyframerFrames - step,
         psg: kf.readDeviceRegs("psg"),
@@ -489,6 +525,11 @@ class KSSDecoderWorker extends AudioDecoderWorker {
         this._nextKeyframeFrame += this._keyframeFrames;
       }
     }
+    // Natural end: the song stopped on its own, or reached the duration cap
+    // (non-looping / silence). The keyframer's current frame is the total length.
+    if (this._endFrame === 0 && (kf.getStopFlag() != 0 || this._keyframerFrames >= endLimit)) {
+      this._reportDuration(this._keyframerFrames);
+    }
     if (snapshots.length > 0) {
       this.worker.postMessage({ type: "snapshots", data: snapshots, token: this._loadedToken });
     }
@@ -496,6 +537,12 @@ class KSSDecoderWorker extends AudioDecoderWorker {
       this._bufferedHWM = this._keyframerFrames;
       this._postBuffered();
     }
+  }
+
+  /** Record and announce the actual total length (once). */
+  private _reportDuration(frame: number): void {
+    this._endFrame = frame;
+    this.worker.postMessage({ type: "duration", frame, token: this._loadedToken });
   }
 
   private _postBuffered(): void {

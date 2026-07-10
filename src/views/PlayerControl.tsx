@@ -6,111 +6,55 @@ import {
   RepeatOneOn,
   SkipNext,
   SkipPrevious,
-  Stop
+  Stop,
 } from "@mui/icons-material";
-import { Box, Card, IconButton, Typography, useTheme } from "@mui/material";
 import { useContext, useEffect, useState } from "react";
 import { AudioPlayerState } from "webaudio-stream-player";
 import { PlayerContext, RepeatMode } from "../contexts/PlayerContext";
 import { Marquee } from "../widgets/Marquee";
 
-export function PlayControl(props: { small: boolean }) {
+export function PlayControl() {
   const context = useContext(PlayerContext);
   const [playState, setPlayState] = useState(context.player.state);
-  const onStateChange = (ev: CustomEvent<AudioPlayerState>) => {
-    setPlayState(ev.detail);
-  };
+  const onStateChange = (ev: CustomEvent<AudioPlayerState>) => setPlayState(ev.detail);
   useEffect(() => {
     context.player.addEventListener("statechange", onStateChange);
-    return () => {
-      context.player.removeEventListener("statechange", onStateChange);
-    };
+    return () => context.player.removeEventListener("statechange", onStateChange);
   });
-
-  const theme = useTheme();
-  const withCircle = (child: React.ReactNode) => (
-    <Box
-      sx={{
-        display: "flex",
-        width: "40px",
-        height: "40px",
-        borderRadius: "20px",
-        justifyContent: "center",
-        alignItems: "center",
-        backgroundColor: theme.palette.primary.main,
-      }}
-    >
-      {child}
-    </Box>
-  );
-
-  let playIcon = playState == "playing" ? <Pause /> : <PlayArrow />;
-
-  if (!(props.small ?? false)) {
-    playIcon = withCircle(playIcon);
-  }
 
   const toggleRepeatMode = () => {
     const modes: RepeatMode[] = ["none", "all", "single"];
     const index = modes.indexOf(context.repeatMode);
-    const next = modes[(index + 1) % modes.length];
-    context.reducer.setRepeatMode(next);
+    context.reducer.setRepeatMode(modes[(index + 1) % modes.length]);
   };
-
   const repeatModeIcon = {
     none: <Repeat />,
     all: <RepeatOn />,
     single: <RepeatOneOn />,
   }[context.repeatMode];
 
+  const playing = playState == "playing";
+
   return (
-    <Box
-      sx={{
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        ...(props.small ? undefined : { p: 2, gap: 2 }),
-      }}
-    >
-      {props.small ? null : (
+    <div className="transport-controls">
+      <div className="transport-title">
         <Marquee play={true}>
-          <Typography
-            sx={{
-              fontWeight: "bold",
-              fontSize: "0.9rem",
-            }}
-            noWrap={true}
-          >
-            {context.currentEntry?.title ?? "-"}
-          </Typography>
+          <span>{context.currentEntry?.title ?? "-"}</span>
         </Marquee>
-      )}
-      <Box
-        sx={{
-          display: "flex",
-          width: "100%",
-          maxWidth: "480px",
-          flexDirection: "row",
-          justifyContent: "space-around",
-          alignItems: "center",
-        }}
-      >
-        <IconButton onClick={() => context.reducer.prev()}>
+      </div>
+      <div className="transport-buttons">
+        <button className="tbtn" onClick={() => context.reducer.prev()} title="Previous">
           <SkipPrevious />
-        </IconButton>
-        <IconButton onClick={toggleRepeatMode}>{repeatModeIcon}</IconButton>
-        {/* <IconButton
-          onClick={() => {
-            context.player.seekInTime(0);
-            if (playState == "paused") {
-              context.player.resume();
-            }
-          }}
+        </button>
+        <button
+          className={`tbtn${context.repeatMode !== "none" ? " active" : ""}`}
+          onClick={toggleRepeatMode}
+          title="Repeat"
         >
-          <Replay />
-        </IconButton> */}
-        <IconButton
-          sx={{ p: 0 }}
+          {repeatModeIcon}
+        </button>
+        <button
+          className="tbtn play"
           onClick={async () => {
             if (playState == "playing") {
               context.reducer.pause();
@@ -121,37 +65,17 @@ export function PlayControl(props: { small: boolean }) {
               context.reducer.play();
             }
           }}
+          title={playing ? "Pause" : "Play"}
         >
-          {playIcon}
-        </IconButton>
-        <IconButton
-          onClick={() => {
-            context.reducer.stop();
-          }}
-        >
+          {playing ? <Pause /> : <PlayArrow />}
+        </button>
+        <button className="tbtn" onClick={() => context.reducer.stop()} title="Stop">
           <Stop />
-        </IconButton>
-        <IconButton onClick={() => context.reducer.next()}>
+        </button>
+        <button className="tbtn" onClick={() => context.reducer.next()} title="Next">
           <SkipNext />
-        </IconButton>
-      </Box>
-    </Box>
-  );
-}
-
-export function PlayControlCard() {
-  return (
-    <Card
-      sx={{
-        flexShrink: 0,
-        width: "100%",
-        display: "flex",
-        justifyContent: "center",
-        alignItems: "stretch",
-        flexDirection: "column",
-      }}
-    >
-      <PlayControl small={false} />
-    </Card>
+        </button>
+      </div>
+    </div>
   );
 }

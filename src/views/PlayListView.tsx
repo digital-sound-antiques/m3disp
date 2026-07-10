@@ -1,20 +1,3 @@
-import { DragHandle, Pause, PlayArrow, Remove } from "@mui/icons-material";
-import {
-  Box,
-  Button,
-  Card,
-  IconButton,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemText,
-  SxProps,
-  Theme,
-  Typography,
-  useMediaQuery,
-  useTheme,
-} from "@mui/material";
-
 import { useContext, useRef, useState } from "react";
 
 import { DragDropContext, Draggable, Droppable, DropResult } from "@hello-pangea/dnd";
@@ -22,263 +5,114 @@ import { PlayListEntry, PlayerContext } from "../contexts/PlayerContext";
 
 import { FileDrop } from "react-file-drop";
 import { useFileDrop } from "../contexts/FileDropContext";
-import { PlayListToolBar } from "../widgets/PlayListToolBar";
 import { AppContext } from "../contexts/AppContext";
-import { saveEntriesAsZip } from "../utils/saver";
 
-export function PlayListBody(props: {
-  onAddClick: () => void;
-  editMode: boolean;
-  sx?: SxProps<Theme> | null;
-}) {
-  const context = useContext(PlayerContext);
-
-  const [isListItemDragging, setListItemDragging] = useState(false);
-
-  const onListItemDragStart = () => {
-    setListItemDragging(true);
-  };
-
-  const onListItemDragEnd = async (result: DropResult) => {
-    setListItemDragging(false);
-    const { source, destination } = result;
-    if (!destination) {
-      return;
-    }
-    context.reducer.reorderEntry(source.index, destination.index);
-  };
-
-  const theme = useTheme();
-  const isXs = useMediaQuery(theme.breakpoints.down("sm"));
+export function PlayListView() {
   const app = useContext(AppContext);
+  const context = useContext(PlayerContext);
+  const { fileDropRef, fileDropProps, isDraggingOver, onFileInputChange } = useFileDrop(false);
+  const [editMode, setEditMode] = useState(false);
+  const [dragging, setDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  if (context.entries.length == 0) {
-    return (
-      <Box
-        sx={{
-          display: "flex",
-          flex: 1,
-          flexDirection: "column",
-          overflow: "auto",
-          ...props.sx,
-          justifyContent: "center",
-          alignItems: "center",
-          pb: 4,
-        }}
-      >
-        {isXs ? (
-          <Button variant="contained" onClick={props.onAddClick}>
-            Open File...
-          </Button>
-        ) : null}
-        {!isXs ? (
-          <Box
-            sx={{ m: 1, border: "2px dashed", borderColor: "primary.main", p: 3, borderRadius: 4 }}
-          >
-            <Typography variant="body2" color="primary.main" sx={{ m: 1 }}>
-              Drag and Drop your MGS files here
-            </Typography>
-          </Box>
-        ) : null}
-        <Typography variant="body2" sx={{ m: 2 }}>
-          Or
-        </Typography>
-        <Button variant="contained" onClick={() => app.openDialog("sample-dialog")}>
-          Open Samples
-        </Button>
-      </Box>
-    );
-  }
-
-  const onRemoveClick = (entry: PlayListEntry) => {
-    context.reducer.removeEntry(entry);
+  const onAddClick = () => {
+    fileInputRef.current!.value = "";
+    fileInputRef.current!.click();
   };
 
-  const onPlayListItemClick = async (entry: PlayListEntry) => {
-    if (context.currentEntry == entry) {
-      switch (context.playState) {
-        case "paused":
-          context.reducer.resume();
-          return;
-        case "playing":
-          context.reducer.pause();
-          return;
-        case "stopped":
-          break;
-      }
-    }
+  const onDragEnd = (result: DropResult) => {
+    setDragging(false);
+    const { source, destination } = result;
+    if (destination) context.reducer.reorderEntry(source.index, destination.index);
+  };
 
+  const onItemClick = async (entry: PlayListEntry) => {
+    if (context.currentEntry == entry) {
+      if (context.playState == "paused") return context.reducer.resume();
+      if (context.playState == "playing") return context.reducer.pause();
+    }
     await context.unmute();
     context.reducer.play(entry);
   };
 
+  const entries = context.entries;
+
   return (
-    <Box sx={{ flex: 1, overflow: "auto", ...props.sx }}>
-      <DragDropContext onDragStart={onListItemDragStart} onDragEnd={onListItemDragEnd}>
-        <Droppable droppableId="dnd-list">
-          {(provided) => {
-            return (
-              <List ref={provided.innerRef} {...provided.droppableProps}>
-                {context.entries.map((e, index) => {
-                  const selected = !isListItemDragging && e == context.currentEntry;
-                  const isPlaying = selected && context.playState == "playing";
-                  const secondaryAction = createSecondaryAction(
-                    isListItemDragging,
-                    isPlaying,
-                    props.editMode,
-                    props.editMode ? () => onRemoveClick(e) : () => onPlayListItemClick(e)
-                  );
-                  return (
-                    <Draggable
-                      isDragDisabled={!props.editMode}
-                      key={index}
-                      draggableId={`${index}`}
-                      index={index}
-                    >
-                      {(provided) => (
-                        <ListItem
-                          ref={provided.innerRef}
-                          {...provided.draggableProps}
-                          {...provided.dragHandleProps}
-                          disablePadding
-                          secondaryAction={secondaryAction}
-                        >
-                          <ListItemButton
-                            selected={selected}
-                            onClick={() => onPlayListItemClick(context.entries[index])}
+    <div className="pl">
+      <div className="pl-toolbar">
+        <button className="pl-open" onClick={onAddClick}>
+          Open…
+        </button>
+        <button onClick={() => app.openDialog("sample-dialog")}>Samples</button>
+        <span className="pl-spacer" />
+        {entries.length > 0 && (
+          <>
+            <button onClick={() => app.openDialog("save-as-zip-dialog")}>Save</button>
+            <button className={editMode ? "active" : ""} onClick={() => setEditMode(!editMode)}>
+              {editMode ? "Done" : "Edit"}
+            </button>
+            {editMode && <button onClick={() => context.reducer.clearEntries()}>Clear</button>}
+          </>
+        )}
+      </div>
+      <FileDrop
+        ref={fileDropRef}
+        {...fileDropProps}
+        className={`pl-drop${isDraggingOver ? " over" : ""}`}
+      >
+        {entries.length == 0 ? (
+          <div className="pl-empty">Drag &amp; drop MGS / KSS files here, or use Open…</div>
+        ) : (
+          <DragDropContext onDragStart={() => setDragging(true)} onDragEnd={onDragEnd}>
+            <Droppable droppableId="pl-list">
+              {(provided) => (
+                <ol className="playlist" ref={provided.innerRef} {...provided.droppableProps}>
+                  {entries.map((e, index) => {
+                    const selected = !dragging && e == context.currentEntry;
+                    const playing = selected && context.playState == "playing";
+                    return (
+                      <Draggable
+                        key={index}
+                        draggableId={`${index}`}
+                        index={index}
+                        isDragDisabled={!editMode}
+                      >
+                        {(p) => (
+                          <li
+                            ref={p.innerRef}
+                            {...p.draggableProps}
+                            {...p.dragHandleProps}
+                            className={selected ? "active" : ""}
+                            onClick={() => onItemClick(e)}
+                            title={e.title ?? e.filename}
                           >
-                            {props.editMode ? <DragHandle sx={{ mr: 1 }} /> : null}
-                            <ListItemText disableTypography={true}>
-                              <Typography
-                                sx={{
-                                  fontWeight: "bold",
-                                  fontSize: { xs: "1rem", sm: "0.8rem" },
+                            <span className="num">{index + 1}</span>
+                            <span className="pl-title">{e.title || e.filename}</span>
+                            {editMode ? (
+                              <button
+                                className="pl-act del"
+                                title="Remove"
+                                onClick={(ev) => {
+                                  ev.stopPropagation();
+                                  context.reducer.removeEntry(e);
                                 }}
-                                noWrap={true}
                               >
-                                {e.title ?? e.filename}
-                              </Typography>
-                            </ListItemText>
-                          </ListItemButton>
-                        </ListItem>
-                      )}
-                    </Draggable>
-                  );
-                })}
-                {provided.placeholder}
-              </List>
-            );
-          }}
-        </Droppable>
-      </DragDropContext>
-    </Box>
-  );
-}
-
-function createSecondaryAction(
-  isDragging: boolean,
-  isPlaying: boolean,
-  deleteMode: boolean,
-  onClick: React.MouseEventHandler<HTMLButtonElement>
-): React.ReactNode | null {
-  if (deleteMode) {
-    return (
-      <IconButton
-        onClick={onClick}
-        color="default"
-        sx={{
-          borderRadius: "12px",
-          width: "24px",
-          height: "24px",
-          backgroundColor: "red",
-        }}
-      >
-        <Remove sx={{ fontSize: 16 }} />
-      </IconButton>
-    );
-  }
-  if (isPlaying) {
-    return (
-      <IconButton
-        onClick={onClick}
-        color="primary"
-        sx={{
-          borderRadius: "12px",
-          width: "24px",
-          height: "24px",
-          backgroundColor: "white",
-          opacity: isDragging ? 0.5 : undefined,
-        }}
-      >
-        <Pause sx={{ fontSize: 16 }} />
-      </IconButton>
-    );
-  }
-  return (
-    <IconButton
-      onClick={onClick}
-      sx={{
-        borderRadius: "12px",
-        width: "24px",
-        height: "24px",
-        backgroundColor: "primary.main",
-        opacity: isDragging ? 0.5 : undefined,
-      }}
-    >
-      <PlayArrow sx={{ fontSize: 16 }} />
-    </IconButton>
-  );
-}
-
-export function PlayListView(props: { toolbarAlignment?: "top" | "bottom" }) {
-  const app = useContext(AppContext);
-  const { fileDropRef, fileDropProps, isDraggingOver, onFileInputChange } = useFileDrop(false);
-  const border = isDraggingOver ? `2px solid` : null;
-  const [deleteMode, setDeleteMode] = useState(false);
-  const theme = useTheme();
-
-  let barSx;
-  let bodySx;
-  if (props.toolbarAlignment != "bottom") {
-    barSx = { position: "absolute", top: 0, left: 0, right: 0 };
-    bodySx = { position: "absolute", left: 0, right: 0, top: "48px", bottom: 0 };
-  } else {
-    barSx = { position: "absolute", bottom: 0, left: 0, right: 0 };
-    bodySx = { position: "absolute", left: 0, right: 0, bottom: "48px", top: 0 };
-  }
-
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const onAddClick = () => {
-    fileInputRef.current!.value = ""; // clear the last file info
-    fileInputRef.current!.click();
-  };
-
-  const context = useContext(PlayerContext);
-  const onExportClick = () => {
-    app.openDialog("save-as-zip-dialog");
-  };
-
-  return (
-    <Box
-      sx={{
-        position: "absolute",
-        left: 0,
-        right: 0,
-        top: 0,
-        bottom: 0,
-        border,
-        borderColor: theme.palette.secondary.main,
-      }}
-    >
-      <FileDrop ref={fileDropRef} {...fileDropProps}>
-        <PlayListToolBar
-          deleteMode={deleteMode}
-          setEditMode={setDeleteMode}
-          onAddClick={onAddClick}
-          onExportClick={onExportClick}
-          sx={{ boxShadow: "0 0 2px 0 #00000080", ...barSx }}
-        />
-        <PlayListBody onAddClick={onAddClick} editMode={deleteMode} sx={bodySx} />
+                                ✕
+                              </button>
+                            ) : (
+                              <span className="pl-act">{playing ? "⏸" : "▶"}</span>
+                            )}
+                          </li>
+                        )}
+                      </Draggable>
+                    );
+                  })}
+                  {provided.placeholder}
+                </ol>
+              )}
+            </Droppable>
+          </DragDropContext>
+        )}
       </FileDrop>
       <input
         onChange={onFileInputChange}
@@ -287,24 +121,6 @@ export function PlayListView(props: { toolbarAlignment?: "top" | "bottom" }) {
         multiple
         style={{ display: "none" }}
       />
-    </Box>
-  );
-}
-
-export function PlayListCard() {
-  return (
-    <Card
-      sx={{
-        position: "relative",
-        flex: 1,
-        width: "100%",
-        display: "flex",
-        flexDirection: "column",
-        justifyContent: "space-between",
-        alignItems: "stretch",
-      }}
-    >
-      <PlayListView />
-    </Card>
+    </div>
   );
 }

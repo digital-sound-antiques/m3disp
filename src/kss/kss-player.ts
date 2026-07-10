@@ -1,5 +1,6 @@
 import { AudioPlayer, AudioRendererType } from "webaudio-stream-player";
 import { KSSDecoderStartOptions, type KSSDecoderDeviceSnapshot } from "./kss-decoder-worker";
+import { KSSChannelMask } from "./kss-device";
 
 import workletUrl from "./renderer-worklet.ts?worker&url";
 import {
@@ -43,6 +44,10 @@ export class KSSPlayer extends AudioPlayer {
         }
       } else if (detail.type == "buffered") {
         this._buffered = detail.frame | 0;
+      } else if (detail.type == "duration") {
+        if (detail.token == null || detail.token === this._currentToken) {
+          this._totalFrame = detail.frame | 0;
+        }
       } else if (detail.type == "seeking") {
         this.dispatchEvent(
           new CustomEvent("seekprogress", { detail: detail.done ? null : detail.ratio })
@@ -73,6 +78,8 @@ export class KSSPlayer extends AudioPlayer {
   baseFrame = 0;
   // absolute song frame the keyframer has pre-synthesised to (instant-seek range)
   private _buffered = 0;
+  // actual total length in frames (intro + loops + fade), 0 until the worker reports it
+  private _totalFrame = 0;
   // token identifying the loaded track; a seek reuses it, a fresh track bumps it
   private _currentToken = 0;
 
@@ -86,6 +93,10 @@ export class KSSPlayer extends AudioPlayer {
   /** Absolute frame up to which a forward seek is (near-)instant. */
   get bufferedFrame(): number {
     return this._buffered;
+  }
+  /** Actual total length in frames (0 until the worker has found the loop/end). */
+  get totalFrame(): number {
+    return this._totalFrame;
   }
 
   /** Serialize play()/seek() so a burst of seeks collapses to the latest target
@@ -105,6 +116,7 @@ export class KSSPlayer extends AudioPlayer {
         if (!a.seek) {
           this._snapshots = [];
           this._buffered = this.baseFrame;
+          this._totalFrame = 0;
         }
         await super.play(a);
       }
@@ -142,6 +154,11 @@ export class KSSPlayer extends AudioPlayer {
   override async abort() {
     this._snapshots = [];
     await super.abort();
+  }
+
+  /** Apply a channel mute mask to the running decoder live (no re-decode). */
+  setChannelMask(mask: KSSChannelMask): void {
+    this._decoderWorker?.postMessage({ type: "setChannelMask", mask });
   }
 
   /** Voice state at a given output frame (relative to the stream start). The

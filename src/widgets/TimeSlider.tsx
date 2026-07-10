@@ -1,6 +1,5 @@
-import React, { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 
-import { Box, Slider, Typography } from "@mui/material";
 import { AudioPlayerProgress } from "webaudio-stream-player";
 import { PlayerContext } from "../contexts/PlayerContext";
 
@@ -13,11 +12,18 @@ function toTimeString(sec: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
+/** Red played region up to the head, light-gray keyframe-buffered region, dark
+ *  unbuffered — as an inline linear-gradient behind the native range track. */
+function seekBackground(current: number, buffered: number, max: number): string {
+  const played = (Math.min(current, max) / Math.max(max, 1)) * 100;
+  const buf = Math.max(played, (Math.min(buffered, max) / Math.max(max, 1)) * 100);
+  return `linear-gradient(to right, #ff4d4f ${played}%, #6b7480 ${played}%, #6b7480 ${buf}%, #30363d ${buf}%)`;
+}
+
 export function TimeSlider() {
   const context = useContext(PlayerContext);
   const [currentSec, setCurrentSec] = useState(0);
   const [bufferedSec, setBufferedSec] = useState(0);
-  // while dragging / just after a seek, show the target until playback catches up
   const [seekingTo, setSeekingTo] = useState<number | null>(null);
   const seekingRef = useRef<number | null>(null);
   seekingRef.current = seekingTo;
@@ -30,7 +36,6 @@ export function TimeSlider() {
       const absSec = (player.seekBaseFrame + (ev.detail.renderer.currentFrame ?? 0)) / rate;
       setCurrentSec(absSec);
       setBufferedSec(player.bufferedFrame / rate);
-      // the new stream has reached the seek target: release the held thumb
       if (seekingRef.current != null && Math.abs(absSec - seekingRef.current) < 1) {
         setSeekingTo(null);
       }
@@ -39,57 +44,47 @@ export function TimeSlider() {
     return () => context.player.removeEventListener("progress", handleProgress);
   }, [context.player, rate]);
 
-  // total playback length (ms) known up front (KSS has no intrinsic length):
-  // per-entry duration + fade, else the global default cap.
+  // Prefer the actual length the decoder found (intro + loops + fade). Until it
+  // is known, fall back to the per-entry duration or the global cap estimate.
   const entry = context.currentEntry;
-  const totalMs =
+  const capMs =
     entry?.duration != null
       ? entry.duration + (entry.fadeDuration ?? DEFAULT_FADE_MS)
       : context.defaultDuration;
-  const totalSec = totalMs / 1000;
+  const reportedSec = context.player.totalFrame > 0 ? context.player.totalFrame / rate : 0;
+  // while the decoder is still measuring the real length, keep a moving slider
+  // range from the estimate but show the total as "measuring" rather than 5:00.
+  const measuring = entry != null && reportedSec <= 0;
+  const totalSec = reportedSec > 0 ? reportedSec : capMs / 1000;
 
   const displaySec = seekingTo ?? currentSec;
   const maxSec = Math.max(totalSec, displaySec, 1);
-  const bufPct = Math.min(1, bufferedSec / maxSec) * 100;
-
-  const onChange = (_: Event, v: number | number[]) => {
-    setSeekingTo(v as number);
-  };
-  const onCommit = (_: React.SyntheticEvent | Event, v: number | number[]) => {
-    const sec = v as number;
-    setSeekingTo(sec);
-    context.player.seek(sec);
-  };
 
   return (
-    <Box sx={{ px: 1.5, py: 0.5 }}>
-      <Slider
-        size="small"
-        color="secondary"
-        min={0}
-        max={maxSec}
-        step={0.05}
-        value={Math.min(displaySec, maxSec)}
-        onChange={onChange}
-        onChangeCommitted={onCommit}
-        sx={{
-          py: 1,
-          "& .MuiSlider-rail": {
-            opacity: 1,
-            background: `linear-gradient(to right, #6b7480 ${bufPct}%, #30363d ${bufPct}%)`,
-          },
-          "& .MuiSlider-thumb": { transition: "none" },
-          "& .MuiSlider-track": { transition: "none" },
-        }}
-      />
-      <Box sx={{ display: "flex", justifyContent: "space-between", mt: -0.5 }}>
-        <Typography variant="caption" color="text.secondary">
-          {toTimeString(displaySec)}
-        </Typography>
-        <Typography variant="caption" color="text.secondary">
-          {toTimeString(totalSec)}
-        </Typography>
-      </Box>
-    </Box>
+    <div className="transport-seek">
+      <div className="time">
+        <span>{toTimeString(displaySec)}</span>
+        <input
+          className="seek"
+          type="range"
+          min={0}
+          max={maxSec}
+          step={0.05}
+          value={Math.min(displaySec, maxSec)}
+          disabled={entry == null}
+          style={{ background: seekBackground(displaySec, bufferedSec, maxSec) }}
+          onChange={(e) => setSeekingTo(Number(e.target.value))}
+          onPointerUp={(e) => context.player.seek(Number((e.target as HTMLInputElement).value))}
+          onKeyUp={(e) => {
+            if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
+              context.player.seek(Number((e.target as HTMLInputElement).value));
+            }
+          }}
+        />
+        <span className={measuring ? "measuring" : undefined}>
+          {measuring ? "計測中…" : toTimeString(totalSec)}
+        </span>
+      </div>
+    </div>
   );
 }

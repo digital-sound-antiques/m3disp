@@ -1,63 +1,43 @@
-import { ThemeProvider, useTheme } from "@mui/material/styles";
+import { ThemeProvider } from "@mui/material/styles";
+import { CssBaseline } from "@mui/material";
+import { MoreVert, Piano } from "@mui/icons-material";
+import { useContext, useEffect, useRef, useState } from "react";
 
-import {
-  AppBar,
-  Box,
-  Container,
-  CssBaseline,
-  Divider,
-  Unstable_Grid2 as Grid,
-  IconButton,
-  Stack,
-  Tab,
-  Tabs,
-  Toolbar,
-  Typography,
-  useMediaQuery,
-} from "@mui/material";
-
-import { MoreVert } from "@mui/icons-material";
-import React, { Fragment, useContext, useEffect, useRef, useState } from "react";
 import { AppContext } from "../contexts/AppContext";
 import { FileDropContext } from "../contexts/FileDropContext";
 import { PlayerContext } from "../contexts/PlayerContext";
-import { KeyboardList } from "../widgets/KeyboardList";
-import { VolumeControl } from "../widgets/VolumeControl";
-import "./App.css";
-import { AppProgressDialog } from "./AppProgressDialog";
-import { OptionMenu } from "./OptionMenu";
-import { PlayListCard, PlayListView } from "./PlayListView";
-import { PlayControl, PlayControlCard } from "./PlayerControl";
-import { SettingsDialog } from "./SettingsDialog";
-import { PianoRollColorDialog } from "./PianoRollColorDialog";
 
-import packageJson from "../../package.json";
-import ghlogo from "../assets/github-mark-white.svg";
+import { ChannelMaskPanel } from "./ChannelMaskPanel";
 import { PianoRoll } from "../widgets/PianoRoll";
 import { PianoRollControl } from "../widgets/PianoRollControl";
 import { TimeSlider } from "../widgets/TimeSlider";
-import { AboutDialog } from "./AboutDialog";
-import { OpenUrlDialog } from "./OpenUrlDialog";
-import { SampleDialog } from "./SampleDialog";
-import { SaveAsZipDialog } from "./SaveAsZipDialog";
+import { PlayControl } from "./PlayerControl";
+import { PlayListView } from "./PlayListView";
+import { VolumeControl } from "../widgets/VolumeControl";
 
-const gap = { xs: 0, sm: 1, md: 1.5, lg: 2 };
+import { KeyboardDialog, keyboardDialogId } from "./KeyboardDialog";
+import { SettingsDialog } from "./SettingsDialog";
+import { PianoRollColorDialog } from "./PianoRollColorDialog";
+import { OptionMenu } from "./OptionMenu";
+import { AboutDialog } from "./AboutDialog";
+import { AppProgressDialog } from "./AppProgressDialog";
+import { OpenUrlDialog } from "./OpenUrlDialog";
+import { SaveAsZipDialog } from "./SaveAsZipDialog";
+import { SampleDialog } from "./SampleDialog";
+
+import packageJson from "../../package.json";
+import ghlogo from "../assets/github-mark-white.svg";
+import "./App.css";
+
+const SIDE_MIN = 220;
+const SIDE_MAX = 560;
 
 export function App() {
   const app = useContext(AppContext);
   return (
     <ThemeProvider theme={app.theme}>
       <CssBaseline />
-      <AppRoot />
-    </ThemeProvider>
-  );
-}
-
-function AppRoot() {
-  const theme = useTheme();
-  const isXs = useMediaQuery(theme.breakpoints.down("sm"));
-  return (
-    <Fragment>
+      {/* secondary dialogs (still MUI) — render unconditionally, self-gated */}
       <SettingsDialog id="settings-dialog" />
       <PianoRollColorDialog />
       <OptionMenu id="option-menu" />
@@ -66,224 +46,139 @@ function AppRoot() {
       <OpenUrlDialog />
       <SaveAsZipDialog />
       <SampleDialog />
-      {isXs ? <AppRootMobile /> : <AppRootDesktop />}
-    </Fragment>
+      <KeyboardDialog />
+      <Layout />
+    </ThemeProvider>
   );
 }
 
-function MobileAppBar() {
-  const theme = useTheme();
+function Layout() {
   const app = useContext(AppContext);
-  const moreIconRef = useRef(null);
-
-  return (
-    <AppBar component="nav" sx={{ backgroundColor: theme.palette.background.default }}>
-      <Toolbar>
-        <Typography variant="h6" component="div">
-          M<sup>3</sup>disp
-        </Typography>
-        <Box sx={{ flexGrow: 1 }} />
-        <IconButton
-          ref={moreIconRef}
-          onClick={() => {
-            app.openPopup("option-menu", moreIconRef.current!);
-          }}
-        >
-          <MoreVert />
-        </IconButton>
-      </Toolbar>
-    </AppBar>
-  );
-}
-
-function AppRootMobile() {
-  return (
-    <Box sx={{ position: "fixed", top: 0, bottom: 0, left: 0, right: 0 }}>
-      <MobileAppBar />
-      <Box
-        sx={{
-          display: "flex",
-          flexDirection: "column",
-          alignItems: "stretch",
-          position: "absolute",
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-        }}
-      >
-        <Toolbar />
-        <KeyboardList spacing={0} />
-        <TimeSlider />
-        <Box sx={{ p: 1, boxShadow: "0 0 2px 0px #00000080" }}>
-          <PlayControl small={true} />
-        </Box>
-        <Box sx={{ position: "relative", flexGrow: 1 }}>
-          <PlayListView toolbarAlignment="bottom" />
-        </Box>
-      </Box>
-    </Box>
-  );
-}
-
-function DesktopAppBar() {
-  const theme = useTheme();
-  const moreIconRef = useRef(null);
-  const app = useContext(AppContext);
-
-  return (
-    <AppBar component="nav" sx={{ backgroundColor: theme.palette.background.default }}>
-      <Container maxWidth="xl" sx={{ minWidth: "320px" }}>
-        <Toolbar variant="regular">
-          <Typography variant="h6" color="inherit" component="div">
-            M<sup>3</sup>disp
-          </Typography>
-          <Box sx={{ flexGrow: 1 }} />
-          <Box sx={{ width: "168px", mx: 2 }}>
-            <VolumeControl />
-          </Box>
-          <IconButton
-            ref={moreIconRef}
-            edge="end"
-            onClick={() => {
-              app.openPopup("option-menu", moreIconRef.current!);
-            }}
-          >
-            <MoreVert />
-          </IconButton>
-        </Toolbar>
-      </Container>
-    </AppBar>
-  );
-}
-
-function AppRootDesktop() {
-  const appContext = useContext(AppContext);
   const context = useContext(PlayerContext);
-  const [panelHeight, setPanelHeight] = useState<number | null>(null);
-  const leftPaneRef = useRef<HTMLDivElement>(null);
-  const onResize = () => setPanelHeight(leftPaneRef.current!.clientHeight);
-  const resizeObserver = new ResizeObserver(onResize);
+  const optionsRef = useRef<HTMLButtonElement>(null);
 
-  const theme = useTheme();
-  const isMd = useMediaQuery(theme.breakpoints.down("md"));
+  const [channelsCollapsed, setChannelsCollapsed] = useState(
+    () => localStorage.getItem("m3disp.channelsCollapsed") === "1"
+  );
+  const [sideCollapsed, setSideCollapsed] = useState(
+    () => localStorage.getItem("m3disp.sideCollapsed") === "1"
+  );
+  const [sideWidth, setSideWidth] = useState(() => {
+    const v = parseInt(localStorage.getItem("m3disp.sideWidth") ?? "", 10);
+    return isNaN(v) ? 300 : Math.min(SIDE_MAX, Math.max(SIDE_MIN, v));
+  });
 
   useEffect(() => {
-    resizeObserver.observe(leftPaneRef.current!);
-    return () => {
-      resizeObserver.disconnect();
-    };
-  }, []);
+    localStorage.setItem("m3disp.channelsCollapsed", channelsCollapsed ? "1" : "0");
+  }, [channelsCollapsed]);
+  useEffect(() => {
+    localStorage.setItem("m3disp.sideCollapsed", sideCollapsed ? "1" : "0");
+  }, [sideCollapsed]);
+  useEffect(() => {
+    localStorage.setItem("m3disp.sideWidth", String(sideWidth));
+  }, [sideWidth]);
 
-  const [tabIndex, setTabIndex] = useState(0);
-
-  const handleTabChange = (event: React.SyntheticEvent, newValue: number) => {
-    setTabIndex(newValue);
+  const sideDragRef = useRef<{ x: number; w: number } | null>(null);
+  const startSideResize = (e: React.PointerEvent) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    sideDragRef.current = { x: e.clientX, w: sideWidth };
+  };
+  const onSideResize = (e: React.PointerEvent) => {
+    const d = sideDragRef.current;
+    if (!d) return;
+    setSideWidth(Math.min(SIDE_MAX, Math.max(SIDE_MIN, d.w - (e.clientX - d.x))));
+  };
+  const endSideResize = (e: React.PointerEvent) => {
+    sideDragRef.current = null;
+    e.currentTarget.releasePointerCapture(e.pointerId);
   };
 
   return (
-    <Box
-      sx={{
-        display: "flex",
-        flexDirection: "column",
-        width: "100%",
-        height: "100%",
-        alignItems: "center",
-      }}
-    >
-      <DesktopAppBar />
-      <Container
-        component="main"
-        maxWidth="xl"
-        sx={{
-          minWidth: "320px",
-          mt: { sm: 2, md: 2, lg: 4 },
-          paddingX: { xs: 0, sm: 2, md: 6, lg: 8 },
-        }}
-      >
-        <Toolbar />
-        <FileDropContext>
-          <Grid container spacing={gap} sx={{ height: "100%" }}>
-            <Grid xs={12} sm={7} md={8} lg={8} xl={8}>
-              <Stack ref={leftPaneRef} spacing={gap}>
-                <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-                  <Box sx={{ display: "flex", flexDirection: "row" }}>
-                    <Tabs value={tabIndex} onChange={handleTabChange} sx={{ flex: 2 }}>
-                      <Tab label="Keyboard" value={0} />
-                      <Tab label={<Typography variant="inherit">Piano Roll</Typography>} value={1} />
-                    </Tabs>
-                    <Box
-                      sx={{ display: "flex", flex: 1, justifyContent: "end", alignItems: "center" }}
-                    >
-                      {tabIndex == 1 ? <PianoRollControl /> : null}
-                    </Box>
-                  </Box>
-                </Box>
-                <TabPanel value={tabIndex} index={0}>
-                  <KeyboardList spacing={gap} />
-                </TabPanel>
-                <TabPanel value={tabIndex} index={1}>
-                  <PianoRoll mode={appContext.pianoRollMode} />
-                </TabPanel>
-                {isMd ? <TimeSlider /> : null}
-              </Stack>
-            </Grid>
-            <Grid xs={12} sm={5} md={4} lg={4} xl={4}>
-              <Stack
-                sx={{
-                  gap,
-                  height: panelHeight,
-                }}
-              >
-                {!isMd ? <TimeSlider /> : null}
-                <PlayControlCard />
-                <PlayListCard />
-              </Stack>
-            </Grid>
-          </Grid>
-        </FileDropContext>
-        <Divider sx={{ mt: 4, mb: 2 }} />
-        <Box
-          component="footer"
-          sx={{ display: "flex", flexDirection: "column", alignItems: "center" }}
-        >
-          <Stack direction="row" sx={{ width: "100%", justifyContent: "space-between" }}>
-            <a href="https://github.com/digital-sound-antiques/m3disp" target="github">
-              <img src={ghlogo} width={16} height={16} />
-            </a>
-            <Box sx={{ width: "12px" }}></Box>
-            <Typography variant="caption">v{packageJson.version}</Typography>
-            <Box sx={{ flex: 1 }}></Box>
-            <Typography variant="caption">
-              Output Latency: {Math.round(context.player.outputLatency * 1000)}ms
-            </Typography>
-          </Stack>
-        </Box>
-      </Container>
-    </Box>
-  );
-}
+    <FileDropContext>
+      <div className="app">
+        <div className="layout">
+          <aside className={`channels${channelsCollapsed ? " collapsed" : ""}`}>
+            {!channelsCollapsed && <ChannelMaskPanel />}
+            <button
+              className="panel-toggle edge-right"
+              title={channelsCollapsed ? "Show channels" : "Hide channels"}
+              onClick={() => setChannelsCollapsed((c) => !c)}
+            >
+              <span className="panel-toggle-knob">{channelsCollapsed ? "›" : "‹"}</span>
+            </button>
+          </aside>
 
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
+          <div className="main">
+            <header>
+              <h1>
+                M<sup>3</sup>disp
+              </h1>
+              <div className="header-actions">
+                <VolumeControl />
+                <button
+                  className="hbtn"
+                  title="Keyboard"
+                  onClick={() => app.openDialog(keyboardDialogId)}
+                >
+                  <Piano sx={{ fontSize: 20 }} />
+                </button>
+                <button
+                  className="hbtn"
+                  ref={optionsRef}
+                  title="Options"
+                  onClick={() => app.openPopup("option-menu", optionsRef.current!)}
+                >
+                  <MoreVert sx={{ fontSize: 20 }} />
+                </button>
+              </div>
+            </header>
 
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index, ...other } = props;
+            <div className="pr-bar">
+              <PianoRollControl />
+            </div>
 
-  return (
-    <div role="tabpanel" hidden={value !== index} id={`tabpanel-${index}`} {...other}>
-      {value === index && children}
-    </div>
-  );
-}
+            <div className="viz">
+              <PianoRoll mode={app.pianoRollMode} />
+            </div>
 
-function BetaSign() {
-  return (
-    <Typography variant="caption" sx={{ textTransform: "none" }}>
-      (Beta)
-    </Typography>
+            <section className="transport">
+              <TimeSlider />
+              <PlayControl />
+            </section>
+
+            <div className="app-footer">
+              <a href="https://github.com/digital-sound-antiques/m3disp" target="github">
+                <img src={ghlogo} width={14} height={14} alt="github" />
+              </a>
+              <span>v{packageJson.version}</span>
+              <span className="spacer" />
+              <span>Output Latency: {Math.round(context.player.outputLatency * 1000)}ms</span>
+            </div>
+          </div>
+
+          <aside
+            className={`side${sideCollapsed ? " collapsed" : ""}`}
+            style={sideCollapsed ? undefined : { width: sideWidth }}
+          >
+            {!sideCollapsed && (
+              <div
+                className="side-resize"
+                onPointerDown={startSideResize}
+                onPointerMove={onSideResize}
+                onPointerUp={endSideResize}
+              />
+            )}
+            <button
+              className="panel-toggle edge-left"
+              title={sideCollapsed ? "Show playlist" : "Hide playlist"}
+              onClick={() => setSideCollapsed((c) => !c)}
+            >
+              <span className="panel-toggle-knob">{sideCollapsed ? "‹" : "›"}</span>
+            </button>
+            {!sideCollapsed && <PlayListView />}
+          </aside>
+        </div>
+      </div>
+    </FileDropContext>
   );
 }

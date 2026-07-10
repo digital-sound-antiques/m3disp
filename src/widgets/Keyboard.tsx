@@ -1,4 +1,3 @@
-import { Box, useTheme } from "@mui/material";
 import { useContext, useEffect, useRef, useState } from "react";
 import { PlayerContext } from "../contexts/PlayerContext";
 import { ChannelId, getChannelStatus } from "../kss/channel-status";
@@ -133,9 +132,9 @@ function WhiteKeys(props: {
   width?: number | null;
   height?: number | null;
   painter: KeyboardPainter;
+  color: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const theme = useTheme();
 
   useEffect(() => {
     const canvas = canvasRef.current!;
@@ -143,8 +142,8 @@ function WhiteKeys(props: {
     canvas.height = props.painter.height;
     canvas.style.width = `${props.width}px`;
     canvas.style.height = `${props.height}px`;
-    props.painter.paintWhiteKeys(canvas.getContext("2d")!, theme.palette.text.primary);
-  }, [props.width, props.height, theme.palette.text.primary]);
+    props.painter.paintWhiteKeys(canvas.getContext("2d")!, props.color);
+  }, [props.width, props.height, props.color]);
 
   return <canvas ref={canvasRef} style={{ position: "absolute", top: 0, left: 0 }}></canvas>;
 }
@@ -270,7 +269,7 @@ type KeyboardProps = {
 const defaultPainter = new KeyboardPainter();
 
 export function Keyboard(props: KeyboardProps) {
-  const boxRef = useRef<HTMLElement>(null);
+  const boxRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
 
   const painter = props.painter ?? defaultPainter;
@@ -294,15 +293,13 @@ export function Keyboard(props: KeyboardProps) {
     props.targets instanceof Array ? (props.targets as ChannelId[]) : [props.targets];
 
   return (
-    <Box
-      ref={boxRef}
-      sx={{
-        position: "relative",
-        width: "100%",
-        height: "100%",
-      }}
-    >
-      <WhiteKeys painter={painter} width={size.width} height={size.height} />
+    <div ref={boxRef} style={{ position: "relative", width: "100%", height: "100%" }}>
+      <WhiteKeys
+        painter={painter}
+        width={size.width}
+        height={size.height}
+        color={props.whiteKeyColor}
+      />
       {props.disabled != true ? (
         <WhiteKeysOverlay
           painter={painter}
@@ -323,6 +320,6 @@ export function Keyboard(props: KeyboardProps) {
           whiteKeyColor={props.whiteKeyColor}
         />
       ) : undefined}
-    </Box>
+    </div>
   );
 }

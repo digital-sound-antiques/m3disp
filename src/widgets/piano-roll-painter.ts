@@ -318,8 +318,12 @@ export function paintPianoRoll(
   // Reset the status cache if the song changed (snapshot array replaced).
   resetCacheIfSongChanged(playerContext.player);
 
-  // Compute latency-corrected current NTSC frame once, shared across channels
-  const audioFrame = playerContext.player.progress?.renderer?.currentFrame ?? 0;
+  // Compute latency-corrected current NTSC frame once, shared across channels.
+  // The renderer reports frames relative to the current stream start; snapshots
+  // are keyed by ABSOLUTE song frame, so add the stream's base (nonzero after a
+  // seek) — otherwise the roll always paints from the song head.
+  const audioFrame =
+    playerContext.player.seekBaseFrame + (playerContext.player.progress?.renderer?.currentFrame ?? 0);
   const latencySamples = (playerContext.player.outputLatency ?? 0)
     * (playerContext.player.audioContext?.sampleRate ?? 44100);
   let currentNtsc = Math.floor(Math.max(0, audioFrame - latencySamples) / 735);

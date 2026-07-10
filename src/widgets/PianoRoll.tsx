@@ -1,4 +1,3 @@
-import { Box, Card } from "@mui/material";
 import { useContext, useEffect, useRef, useState } from "react";
 import { PlayerContext } from "../contexts/PlayerContext";
 import { AppContext } from "../contexts/AppContext";
@@ -147,13 +146,13 @@ export function PianoRoll(props: { mode: string }) {
     : "none";
 
   return (
-    <Card sx={{ position: "relative", backgroundColor: "#121212", backgroundImage: "none" }}>
-      <Box
+    <div className="pianoroll-wrap">
+      <div
         ref={boxRef}
-        sx={{
+        style={{
           position: "relative",
-          aspectRatio: "4/3",
           width: "100%",
+          height: "100%",
           transformOrigin: "center",
           transformStyle: "preserve-3d",
           transform,
@@ -177,7 +176,7 @@ export function PianoRoll(props: { mode: string }) {
         </> : (
           <AutoSizeCanvas painter={paintKeyboardEdgeLine} width={size.width} height={size.height} />
         )}
-      </Box>
-    </Card>
+      </div>
+    </div>
   );
 }

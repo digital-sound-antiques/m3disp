@@ -1,5 +1,5 @@
-import { Card, Stack, useMediaQuery, useTheme } from "@mui/material";
 import { useContext } from "react";
+import { useTheme } from "@mui/material/styles";
 import { PlayerContext } from "../contexts/PlayerContext";
 import { ChannelId } from "../kss/channel-status";
 import { KSSDeviceName } from "../kss/kss-device";
@@ -33,15 +33,16 @@ function DeviceCard(props: DeviceCardProps) {
     const channels: ChannelId[] = target.map((e) => ({ device: props.device, index: e }));
 
     res.push(
-      <Stack
-        direction="row"
+      <div
         key={`${i}`}
-        sx={{
+        style={{
+          display: "flex",
+          flexDirection: "row",
           position: "relative",
           aspectRatio: props.keyboardAspectRatio ?? "640 / 22",
           width: "100%",
           overflow: "hidden",
-          mb: "1px",
+          marginBottom: "1px",
           opacity: mask ? 0.5 : 1.0,
         }}
       >
@@ -66,32 +67,20 @@ function DeviceCard(props: DeviceCardProps) {
           }
           whiteKeyColor={theme.palette.text.primary}
         />
-      </Stack>
+      </div>
     );
   }
 
-  if (props.small) {
-    return <Stack spacing="1px">{res}</Stack>;
-  }
-
-  return (
-    <Card>
-      <Stack>{res}</Stack>
-    </Card>
-  );
+  return <div className="kbd-device">{res}</div>;
 }
 
-export function KeyboardList(props: {
-  isSmall?: boolean | null;
-  spacing?: any;
-  aspect?: string | null;
-}) {
-  const theme = useTheme();
-  const isSmall = props.isSmall ?? useMediaQuery(theme.breakpoints.down("sm"));
+export function KeyboardList(props: { isSmall?: boolean | null; aspect?: string | null }) {
+  const isSmall =
+    props.isSmall ?? (typeof window !== "undefined" && window.innerWidth < 600);
   const aspect = props.aspect ?? (isSmall ? "640/22" : "640/28");
 
   return (
-    <Stack spacing={props.spacing}>
+    <div className="kbd-list">
       <DeviceCard
         keyboardAspectRatio={aspect}
         small={isSmall}
@@ -117,6 +106,6 @@ export function KeyboardList(props: {
         device="scc"
         targets={[0, 1, 2, 3, 4]}
       />
-    </Stack>
+    </div>
   );
 }

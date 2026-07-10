@@ -114,6 +114,12 @@ export class PlayerContextReducer {
     });
   }
 
+  /** Update the channel mask in state only, WITHOUT restarting playback. The
+   *  caller pushes the mask to the running decoder via player.setChannelMask(). */
+  setChannelMaskLive(channelMask: KSSChannelMask) {
+    this.setState((state) => ({ ...state, channelMask: { ...channelMask } }));
+  }
+
   _playReducer(
     state: PlayerContextState,
     target?: PlayListEntry | number | null
