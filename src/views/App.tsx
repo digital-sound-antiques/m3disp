@@ -23,7 +23,6 @@ import { FileDropContext } from "../contexts/FileDropContext";
 import { PlayerContext } from "../contexts/PlayerContext";
 import { KeyboardList } from "../widgets/KeyboardList";
 import { VolumeControl } from "../widgets/VolumeControl";
-import { WaveSliderCard } from "../widgets/WavePreview";
 import "./App.css";
 import { AppProgressDialog } from "./AppProgressDialog";
 import { OptionMenu } from "./OptionMenu";
@@ -226,7 +225,7 @@ function AppRootDesktop() {
                 <TabPanel value={tabIndex} index={1}>
                   <PianoRoll mode={appContext.pianoRollMode} />
                 </TabPanel>
-                {isMd ? <WaveSliderCard /> : null}
+                {isMd ? <TimeSlider /> : null}
               </Stack>
             </Grid>
             <Grid xs={12} sm={5} md={4} lg={4} xl={4}>
@@ -236,7 +235,7 @@ function AppRootDesktop() {
                   height: panelHeight,
                 }}
               >
-                {!isMd ? <WaveSliderCard /> : null}
+                {!isMd ? <TimeSlider /> : null}
                 <PlayControlCard />
                 <PlayListCard />
               </Stack>

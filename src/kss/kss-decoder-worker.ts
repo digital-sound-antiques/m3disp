@@ -20,6 +20,12 @@ export type KSSDecoderStartOptions = {
   opllMask?: number | null;
   psgMask?: number | null;
   sccMask?: number | null;
+  /** Absolute output frame to (re)start decoding at. Used for seek. */
+  startFrame?: number | null;
+  /** In-song seek: reuse the loaded engines (keyframe restore) instead of reloading. */
+  seek?: boolean | null;
+  /** Identifies the loaded track; a seek with a matching token reuses the engines. */
+  songToken?: number | null;
 };
 
 export type KSSDecoderDeviceSnapshot = {
@@ -30,81 +36,259 @@ export type KSSDecoderDeviceSnapshot = {
   sccKeyKeepFrames?: ArrayLike<number> | null;
   opll?: Uint8Array | null;
   opllKeyKeepFrames?: ArrayLike<number> | null;
-  wave: number;
 };
 
 const defaultDuration = 60 * 1000 * 5;
 const defaultFadeDuration = 5 * 1000;
 const defaultLoop = 2;
 
+/** Keyframe (state snapshot) spacing. Snapshots are ~57KB each, so 2s keeps the
+ *  memory for a full track modest while giving fine enough seek granularity. */
+const KEYFRAME_SECONDS = 2;
+/** How far ahead of the play head the keyframer keeps its device-register
+ *  snapshots so the piano-roll / score look-ahead stays populated (the piano
+ *  roll can show up to ~12s ahead at its widest range). */
+const SCAN_AHEAD_SECONDS = 13;
+
+type Keyframe = { frame: number; data: Uint8Array };
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
 class KSSDecoderWorker extends AudioDecoderWorker {
   constructor(worker: Worker) {
     super(worker);
+    // The base class owns worker.onmessage for its request protocol. Wrap it to
+    // intercept our own control messages (play-head for decode-ahead throttling,
+    // and config) before delegating.
+    const baseOnMessage = worker.onmessage!.bind(worker);
+    worker.onmessage = (e: MessageEvent) => {
+      const d = e.data;
+      switch (d?.type) {
+        case "playhead":
+          this._playhead = d.frame | 0;
+          return;
+        case "config":
+          if (d.lookaheadMs != null) this._lookaheadMs = d.lookaheadMs;
+          return;
+        default:
+          // The base abort awaits the in-flight process(); set our flag here so
+          // the throttle/fast-forward loops break immediately.
+          if (d?.type === "abort") this._aborted = true;
+          baseOnMessage(e);
+      }
+    };
   }
 
   private _kss: KSS | null = null;
-  private _kssplay: KSSPlay | null = null;
+  // Audible engine, kept ~lookaheadMs ahead of the play head.
+  private _player: KSSPlay | null = null;
+  // State-save engine: runs ahead (calcSilent), captures keyframes every
+  // KEYFRAME_SECONDS and posts device-register snapshots for the piano roll.
+  private _keyframer: KSSPlay | null = null;
 
-  private _duration = 60 * 1000 * 5;
-  private _fadeDuration = 5 * 1000;
-  private _decodeFrames = 0;
-  private _maxLoop = 2;
+  private _playerFrames = 0; // absolute output frame the player has rendered to
+  private _keyframerFrames = 0; // absolute output frame the keyframer has reached
+  // keyframes in ascending frame order; each holds the exact VM state at .frame
+  private _keyframes: Keyframe[] = [];
+  private _originFrame = 0; // frame the keyframe schedule starts from (0, or post-debug-skip)
+  private _nextKeyframeFrame = 0; // next scheduled capture frame
+  private _bufferedHWM = 0; // furthest keyframer position (drives the seek buffer bar)
+
+  private _duration = defaultDuration;
+  private _fadeDuration = defaultFadeDuration;
+  private _maxLoop = defaultLoop;
   private _hasDebugMarker = false;
+  private _song = 0;
+  private _cpu = 0;
+  private _loadedToken = -1;
+  private _playhead = 0;
+  private _lookaheadMs = 500;
+  private _aborted = false;
 
-  async init(args: any): Promise<void> {
+  private get _keyframeFrames() {
+    return KEYFRAME_SECONDS * this.sampleRate;
+  }
+
+  async init(_args: any): Promise<void> {
     await KSSPlay.initialize();
+    this._player = new KSSPlay(this.sampleRate);
+    this._keyframer = new KSSPlay(this.sampleRate);
+    // Only the keyframer needs the write handlers: it runs ahead and owns the
+    // device-register snapshots fed to the piano roll.
+    this._keyframer.setIOWriteHandler(this._ioWriteHandler);
+    this._keyframer.setMemWriteHandler(this._memWriteHandler);
+  }
+
+  /** Apply per-track config to both engines so their emulated state stays
+   *  identical (a keyframe captured by one is restorable into the other). */
+  private _configureEngine(kssplay: KSSPlay, args: KSSDecoderStartOptions) {
+    kssplay.setData(this._kss!);
+    kssplay.setDeviceQuality({ psg: 1, opll: 1, scc: 0, opl: 1 });
+    kssplay.reset(args.song ?? 0, args.cpu ?? 0);
+    if (args.rcf != null) {
+      kssplay.setRCF(args.rcf.resistor, args.rcf.capacitor);
+    } else {
+      kssplay.setRCF(0, 0);
+    }
+    kssplay.setChannelMask("psg", args.channelMask?.psg ?? 0);
+    kssplay.setChannelMask("scc", args.channelMask?.scc ?? 0);
+    kssplay.setChannelMask("opll", args.channelMask?.opll ?? 0);
+    kssplay.setChannelMask("opl", args.channelMask?.opl ?? 0);
+    kssplay.setSilentLimit(15 * 1000);
   }
 
   async start(args: KSSDecoderStartOptions): Promise<void> {
-    if (args.data instanceof Uint8Array) {
-      this._kss = new KSS(args.data, args.label ?? "");
-    } else if (args.data instanceof ArrayBuffer) {
-      const u8a = new Uint8Array(args.data);
-      this._kss = new KSS(u8a, args.label ?? "");
-    } else {
-      throw new Error(`Invalid data type=${typeof args.data}`);
-    }
-
-    if (this._kssplay != null) {
-      this._kssplay.release();
-    }
-    this._kssplay = new KSSPlay(this.sampleRate);
-
-    this._kssplay.setData(this._kss);
-    this._kssplay.setDeviceQuality({ psg: 1, opll: 1, scc: 0, opl: 1 });
-    this._kssplay.reset(args.song ?? 0, args.cpu ?? 0);
-    if (args.rcf != null) {
-      this._kssplay.setRCF(args.rcf.resistor, args.rcf.capacitor);
-    } else {
-      this._kssplay.setRCF(0, 0);
-    }
-
-    this._kssplay.setChannelMask("psg", args.channelMask?.psg ?? 0);
-    this._kssplay.setChannelMask("scc", args.channelMask?.scc ?? 0);
-    this._kssplay.setChannelMask("opll", args.channelMask?.opll ?? 0);
-    this._kssplay.setChannelMask("opl", args.channelMask?.opl ?? 0);
-    this._kssplay.setSilentLimit(15 * 1000);
+    this._aborted = false;
 
     this._fadeDuration = args.fadeDuration ?? defaultFadeDuration;
     this._duration =
       args.duration ?? (args.defaultDuration ?? defaultDuration) - this._fadeDuration;
-    this._hasDebugMarker = args.debug ?? false;
     this._maxLoop = args.loop ?? defaultLoop;
-    this._decodeFrames = 0;
+    this._hasDebugMarker = args.debug ?? false;
 
-    this._kssplay.setIOWriteHandler(this._ioWriteHandler);
-    this._kssplay.setMemWriteHandler(this._memWriteHandler);
+    const startFrame = Math.max(0, args.startFrame ?? 0);
+    this._playhead = startFrame;
+
+    const inSong =
+      args.seek === true &&
+      args.songToken != null &&
+      args.songToken === this._loadedToken &&
+      this._player != null;
+
+    if (inSong) {
+      // In-song seek: restore the player to the target from the nearest keyframe,
+      // and make sure the keyframer stays ahead of the new play head.
+      await this._seekPlayerTo(startFrame);
+      if (this._keyframerFrames < startFrame) this._seekKeyframerTo(startFrame);
+    } else {
+      // Fresh track (or backward seek past all keyframes): reload both engines.
+      let u8: Uint8Array;
+      if (args.data instanceof Uint8Array) {
+        u8 = args.data;
+      } else if (args.data instanceof ArrayBuffer) {
+        u8 = new Uint8Array(args.data);
+      } else {
+        throw new Error(`Invalid data type=${typeof args.data}`);
+      }
+      this._kss?.release();
+      this._kss = new KSS(u8, args.label ?? "");
+      this._song = args.song ?? 0;
+      this._cpu = args.cpu ?? 0;
+
+      this._configureEngine(this._player!, args);
+      this._configureEngine(this._keyframer!, args);
+      this._loadedToken = args.songToken ?? -1;
+      this._keyframes = [];
+      this._playerFrames = 0;
+      this._keyframerFrames = 0;
+      this._bufferedHWM = 0;
+      this._resetKeyState();
+
+      if (this._hasDebugMarker) {
+        const skipped = this._skipToDebugMarker(this._player!);
+        this._playerFrames = skipped;
+        this._keyframer!.calcSilent(skipped);
+        this._keyframerFrames = skipped;
+      }
+      // seed the keyframe schedule at the (post-skip) origin so a rewind there is instant
+      this._originFrame = this._keyframerFrames;
+      this._nextKeyframeFrame = this._originFrame;
+      this._captureKeyframe();
+
+      if (startFrame > this._playerFrames) {
+        await this._seekPlayerTo(startFrame);
+      }
+      if (this._keyframerFrames < startFrame) this._seekKeyframerTo(startFrame);
+    }
+
+    this._postBuffered();
+  }
+
+  /** Restore the player to `target` (absolute frame) from the nearest keyframe
+   *  at/below it, then fast-forward the remainder. */
+  private async _seekPlayerTo(target: number): Promise<void> {
+    const player = this._player!;
+    const kf = this._nearestKeyframe(target);
+    if (kf != null) {
+      player.loadState(kf.data);
+      this._playerFrames = kf.frame;
+    } else {
+      player.reset(this._song, this._cpu);
+      this._playerFrames = 0;
+    }
+    await this._fastForward(
+      player,
+      () => this._playerFrames,
+      (f) => (this._playerFrames = f),
+      target
+    );
+  }
+
+  /** Move the keyframer to `target` (used when a forward seek jumps past the
+   *  scanned region) so its look-ahead snapshots resume from the new position.
+   *  Remaining catch-up runs incrementally in _advanceKeyframer(). */
+  private _seekKeyframerTo(target: number) {
+    const kf = this._nearestKeyframe(target);
+    if (kf != null && kf.frame > this._keyframerFrames) {
+      this._keyframer!.loadState(kf.data);
+      this._keyframerFrames = kf.frame;
+      this._nextKeyframeFrame = kf.frame + this._keyframeFrames;
+    } else if (kf == null) {
+      this._keyframer!.reset(this._song, this._cpu);
+      this._keyframerFrames = 0;
+      this._originFrame = 0;
+      this._nextKeyframeFrame = 0;
+      this._resetKeyState();
+    }
+  }
+
+  /** Silently clock `kssplay` up to `target`, yielding between 1s chunks so a
+   *  newer seek can interrupt, and posting progress for long (unbuffered) skips. */
+  private async _fastForward(
+    kssplay: KSSPlay,
+    getFrame: () => number,
+    setFrame: (f: number) => void,
+    target: number
+  ): Promise<void> {
+    const from = getFrame();
+    const span = Math.max(1, target - from);
+    const t0 = performance.now();
+    let reporting = false;
+    const chunk = this.sampleRate;
+    while (!this._aborted && getFrame() < target) {
+      const before = getFrame();
+      const n = Math.min(chunk, target - before);
+      kssplay.calcSilent(n);
+      setFrame(before + n);
+      if (!reporting && performance.now() - t0 > 120) reporting = true;
+      if (reporting) {
+        this.worker.postMessage({
+          type: "seeking",
+          ratio: Math.min(1, (getFrame() - from) / span),
+        });
+      }
+      await sleep(0);
+    }
+    if (reporting) this.worker.postMessage({ type: "seeking", done: true });
+  }
+
+  /** Nearest keyframe with frame <= target (keyframes are in ascending order). */
+  private _nearestKeyframe(target: number): Keyframe | null {
+    for (let i = this._keyframes.length - 1; i >= 0; i--) {
+      if (this._keyframes[i].frame <= target) return this._keyframes[i];
+    }
+    return null;
+  }
+
+  /** Capture a keyframe at the keyframer's current (exact) position. Called only
+   *  when _keyframerFrames === _nextKeyframeFrame. */
+  private _captureKeyframe() {
+    this._keyframes.push({ frame: this._keyframerFrames, data: this._keyframer!.saveState() });
   }
 
   _opllAdr = 0xff;
   _psgAdr = 0xff;
 
-  // Hints[i] == true if key-off is detected;
-  // Hints[9]: BD
-  // Hints[10]: SD
-  // Hints[11]: TOM
-  // Hints[12]: CYM
-  // Hints[13]: HH
   _opllKeyStatus: boolean[] = [];
   _opllKeyEdgeHints: boolean[] = [];
   _opllKeyKeepFrames: number[] = [];
@@ -119,6 +303,23 @@ class KSSDecoderWorker extends AudioDecoderWorker {
   _sccKeyEdgeHints: boolean[] = [];
   _sccKeyKeepFrames: number[] = [];
   _sccEnhancedMode = false;
+
+  private _resetKeyState() {
+    this._opllAdr = 0xff;
+    this._psgAdr = 0xff;
+    this._opllKeyStatus = [];
+    this._opllKeyEdgeHints = [];
+    this._opllKeyKeepFrames = [];
+    this._psgKeyStatus = [];
+    this._psgVolume = [0, 0, 0];
+    this._psgKeyEdgeHints = [];
+    this._psgKeyKeepFrames = [];
+    this._sccKeyStatus = [];
+    this._sccVolume = [0, 0, 0, 0, 0];
+    this._sccKeyEdgeHints = [];
+    this._sccKeyKeepFrames = [];
+    this._sccEnhancedMode = false;
+  }
 
   _memWriteHandler = (_: any, a: number, d: number) => {
     if (a == 0x9000) {
@@ -209,20 +410,18 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     }
   };
 
-  _skipToDebugMarker() {
-    if (this._kssplay == null) return;
-
+  private _skipToDebugMarker(kssplay: KSSPlay): number {
     const interval = Math.floor(this.sampleRate / 60);
     const maxTick = (this.sampleRate * this._duration) / 1000;
     let tick = 0;
     while (tick <= maxTick) {
-      this._kssplay!.calcSilent(interval);
-      const jumpct = this._kssplay!.getMGSJumpCount();
-      if (jumpct != 0) {
+      kssplay.calcSilent(interval);
+      tick += interval;
+      if (kssplay.getMGSJumpCount() != 0) {
         break;
       }
-      tick += interval;
     }
+    return tick;
   }
 
   _updateKeyOnFrames(step: number) {
@@ -254,73 +453,118 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     this._opllKeyEdgeHints = [];
   }
 
-  async process(): Promise<Array<Int16Array> | null> {
-    if (this._kssplay == null) return null;
-
-    if (this._hasDebugMarker) {
-      this._skipToDebugMarker();
-    }
-
-    if (this._kssplay.getFadeFlag() == 2 || this._kssplay.getStopFlag() != 0) {
-      return null;
-    }
-
-    const currentTimeInMs = (this._decodeFrames / this.sampleRate) * 1000;
-
-    if (this._kssplay.getLoopCount() >= this._maxLoop || this._duration <= currentTimeInMs) {
-      if (this._kssplay.getFadeFlag() == 0) {
-        this._kssplay.fadeStart(this._fadeDuration);
+  /** Advance the keyframer up to `target`, capturing keyframes at
+   *  KEYFRAME_SECONDS boundaries and posting device-register snapshots (one per
+   *  NTSC frame). Bounded per call so it never starves the audio render. The
+   *  NTSC step (sampleRate/60) evenly divides the 2s interval, so scheduled
+   *  keyframe frames are always reached exactly. */
+  private _advanceKeyframer(target: number): void {
+    const kf = this._keyframer;
+    if (kf == null) return;
+    const step = Math.floor(this.sampleRate / 60);
+    const endLimit = (this.sampleRate * (this._duration + this._fadeDuration)) / 1000;
+    const hardTarget = Math.min(target, endLimit);
+    const snapshots: KSSDecoderDeviceSnapshot[] = [];
+    let guard = 0;
+    while (
+      !this._aborted &&
+      this._keyframerFrames < hardTarget &&
+      kf.getStopFlag() == 0 &&
+      guard++ < 4096
+    ) {
+      kf.calcSilent(step);
+      this._updateKeyOnFrames(step);
+      this._keyframerFrames += step;
+      snapshots.push({
+        frame: this._keyframerFrames - step,
+        psg: kf.readDeviceRegs("psg"),
+        psgKeyKeepFrames: [...this._psgKeyKeepFrames],
+        scc: kf.readDeviceRegs("scc"),
+        sccKeyKeepFrames: [...this._sccKeyKeepFrames],
+        opll: kf.readDeviceRegs("opll"),
+        opllKeyKeepFrames: [...this._opllKeyKeepFrames],
+      });
+      if (this._keyframerFrames >= this._nextKeyframeFrame) {
+        this._captureKeyframe();
+        this._nextKeyframeFrame += this._keyframeFrames;
       }
     }
+    if (snapshots.length > 0) {
+      this.worker.postMessage({ type: "snapshots", data: snapshots, token: this._loadedToken });
+    }
+    if (this._keyframerFrames > this._bufferedHWM) {
+      this._bufferedHWM = this._keyframerFrames;
+      this._postBuffered();
+    }
+  }
 
+  private _postBuffered(): void {
+    this.worker.postMessage({ type: "buffered", frame: this._bufferedHWM });
+  }
+
+  async process(): Promise<Array<Int16Array> | null> {
+    const player = this._player;
+    if (player == null) return null;
+
+    // keep the piano-roll / score look-ahead fed ahead of the (small) audio buffer
+    this._advanceKeyframer(this._playhead + SCAN_AHEAD_SECONDS * this.sampleRate);
+
+    // end-of-track handling (mirrors the previous single-engine policy)
+    if (player.getFadeFlag() == 2 || player.getStopFlag() != 0) {
+      return null;
+    }
+    const currentTimeInMs = (this._playerFrames / this.sampleRate) * 1000;
+    if (player.getLoopCount() >= this._maxLoop || this._duration <= currentTimeInMs) {
+      if (player.getFadeFlag() == 0) {
+        player.fadeStart(this._fadeDuration);
+      }
+    }
     if (this._duration + this._fadeDuration <= currentTimeInMs) {
       return null;
     }
 
-    const step = Math.floor(this.sampleRate / 60);
-    const res = new Int16Array(this.sampleRate);
-    const snapshots: KSSDecoderDeviceSnapshot[] = [];
-
-    for (let t = 0; t < res.length; t += step) {
-      const buf = this._kssplay.calc(step);
-      res.set(buf, t);
-      const sum = buf.reduce((prev, curr) => prev + curr, 0);
-      const wave = Math.round(sum / buf.length);
-      this._updateKeyOnFrames(step);
-      snapshots.push({
-        frame: this._decodeFrames,
-        psg: this._kssplay.readDeviceRegs("psg"),
-        psgKeyKeepFrames: [...this._psgKeyKeepFrames],
-        scc: this._kssplay.readDeviceRegs("scc"),
-        sccKeyKeepFrames: [...this._sccKeyKeepFrames],
-        opll: this._kssplay.readDeviceRegs("opll"),
-        opllKeyKeepFrames: [...this._opllKeyKeepFrames],
-        wave,
-      });
-      this._decodeFrames += step;
+    // Decode-ahead throttle: keep only ~lookaheadMs of audio ahead of the play
+    // head. While throttled, spend the idle time extending the keyframer toward
+    // the end of the track (so more of the timeline becomes instantly seekable)
+    // instead of just sleeping.
+    const limit = (this._lookaheadMs / 1000) * this.sampleRate;
+    let waits = 0;
+    while (
+      !this._aborted &&
+      this._playhead > 0 &&
+      this._playerFrames - this._playhead > limit &&
+      waits < 200
+    ) {
+      this._advanceKeyframer(this._keyframerFrames + this.sampleRate);
+      await sleep(15);
+      waits++;
     }
+    if (this._aborted || this._player == null) return null;
 
-    if (snapshots.length > 0) {
-      this.worker.postMessage({ type: "snapshots", data: snapshots });
-    }
-
+    // ~1/8s chunk keeps the buffer near the lookahead target
+    const step = Math.floor(this.sampleRate / 8);
+    const res = player.calc(step);
+    this._playerFrames += step;
     return [res];
   }
 
   async abort(): Promise<void> {
-    this._kss?.release();
-    this._kss = null;
+    this._aborted = true;
   }
 
   async dispose(): Promise<void> {
-    this._kssplay?.release();
-    this._kssplay = null;
+    this._player?.release();
+    this._keyframer?.release();
+    this._player = null;
+    this._keyframer = null;
     this._kss?.release();
     this._kss = null;
+    this._keyframes = [];
+    this._loadedToken = -1;
   }
 }
 
 console.log("kss-decoder-worker");
 
 /* `self as any` is workaround. See: [issue#20595](https://github.com/microsoft/TypeScript/issues/20595) */
-const decoder = new KSSDecoderWorker(self as any);
+new KSSDecoderWorker(self as any);
