@@ -25,8 +25,11 @@ const SECTIONS: Section[] = [
   {
     key: "opll-rhythm",
     dev: "opll",
+    // Mask bits run opposite to the status/colour index: BD=13, SD=12, TOM=11,
+    // CYM=10, HH=9 (from the physical ch6/7/8 rhythm allocation). Colour still
+    // follows the status index (9=BD … 13=HH), which the piano roll uses.
     label: "OPLL Rhythm",
-    rows: RHYTHM.map((label, i) => ({ label, bit: 9 + i, colorIndex: 9 + i })),
+    rows: RHYTHM.map((label, i) => ({ label, bit: 13 - i, colorIndex: 9 + i })),
     bits: 0x3e00, // bits 9-13
   },
   {
