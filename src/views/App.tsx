@@ -12,6 +12,7 @@ import { PianoRoll } from "../widgets/PianoRoll";
 import { PianoRollControl } from "../widgets/PianoRollControl";
 import { TimeSlider } from "../widgets/TimeSlider";
 import { PlayControl } from "./PlayerControl";
+import { TransportButtons } from "./TransportButtons";
 import { PlayListView } from "./PlayListView";
 import { VolumeControl } from "../widgets/VolumeControl";
 
@@ -31,6 +32,9 @@ import "./App.css";
 
 const SIDE_MIN = 220;
 const SIDE_MAX = 560;
+const CH_MIN = 160;
+const CH_MAX = 320;
+const clampCh = (w: number) => Math.min(CH_MAX, Math.max(CH_MIN, w));
 
 export function App() {
   const app = useContext(AppContext);
@@ -67,6 +71,11 @@ function Layout() {
     const v = parseInt(localStorage.getItem("m3disp.sideWidth") ?? "", 10);
     return isNaN(v) ? 300 : Math.min(SIDE_MAX, Math.max(SIDE_MIN, v));
   });
+  // channels column width (drag-resizable, persisted)
+  const [channelsWidth, setChannelsWidth] = useState(() => {
+    const v = parseInt(localStorage.getItem("m3disp.channelsWidth") ?? "", 10);
+    return isNaN(v) ? 210 : clampCh(v);
+  });
 
   useEffect(() => {
     localStorage.setItem("m3disp.channelsCollapsed", channelsCollapsed ? "1" : "0");
@@ -77,6 +86,9 @@ function Layout() {
   useEffect(() => {
     localStorage.setItem("m3disp.sideWidth", String(sideWidth));
   }, [sideWidth]);
+  useEffect(() => {
+    localStorage.setItem("m3disp.channelsWidth", String(channelsWidth));
+  }, [channelsWidth]);
 
   // Expose the MUI theme's primary + paper background as CSS variables on the
   // document root so the plain-CSS UI (and the modeless dialogs, which render
@@ -103,6 +115,21 @@ function Layout() {
     e.currentTarget.releasePointerCapture(e.pointerId);
   };
 
+  const chDragRef = useRef<{ x: number; w: number } | null>(null);
+  const startChResize = (e: React.PointerEvent) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    chDragRef.current = { x: e.clientX, w: channelsWidth };
+  };
+  const onChResize = (e: React.PointerEvent) => {
+    const d = chDragRef.current;
+    if (!d) return;
+    setChannelsWidth(clampCh(d.w + (e.clientX - d.x)));
+  };
+  const endChResize = (e: React.PointerEvent) => {
+    chDragRef.current = null;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
   return (
     <FileDropContext>
       <div className="app">
@@ -111,6 +138,7 @@ function Layout() {
             M<sup>3</sup>disp
           </div>
           <div className="header-actions">
+            <VolumeControl />
             <button
               className="hbtn"
               ref={optionsRef}
@@ -123,8 +151,19 @@ function Layout() {
         </header>
 
         <div className="layout">
-          <aside className={`channels${channelsCollapsed ? " collapsed" : ""}`}>
+          <aside
+            className={`channels${channelsCollapsed ? " collapsed" : ""}`}
+            style={channelsCollapsed ? undefined : { width: channelsWidth }}
+          >
             {!channelsCollapsed && <ChannelMaskPanel />}
+            {!channelsCollapsed && (
+              <div
+                className="channels-resize"
+                onPointerDown={startChResize}
+                onPointerMove={onChResize}
+                onPointerUp={endChResize}
+              />
+            )}
             <button
               className="panel-toggle edge-right"
               title={channelsCollapsed ? "Show channels" : "Hide channels"}
@@ -137,7 +176,8 @@ function Layout() {
           <div className="main">
             <div className="viz">
               <PianoRoll mode={app.pianoRollMode} />
-              <div className="pr-overlay">
+              <div className="pr-overlay pr-overlay-bottom">
+                <TransportButtons />
                 <PianoRollControl />
               </div>
             </div>
@@ -146,7 +186,6 @@ function Layout() {
               <TimeSlider />
               <div className="transport-row">
                 <PlayControl />
-                <VolumeControl />
               </div>
             </section>
           </div>

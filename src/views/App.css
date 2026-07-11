@@ -66,7 +66,7 @@ body {
   flex-direction: column;
   min-height: 0;
   border: 1px solid #21262d;
-  border-radius: 12px;
+  border-radius: 4px;
   background: var(--panel-bg);
 }
 .channels.collapsed {
@@ -87,6 +87,19 @@ body {
   font-weight: 700;
   color: #8b949e;
   border-bottom: 1px solid #21262d;
+}
+.ch-reset {
+  padding: 2px 7px;
+  font-size: 10px;
+  font-weight: 600;
+  background: #21262d;
+  color: #c9d1d9;
+  border: 1px solid #30363d;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.ch-reset:hover {
+  background: #2d333b;
 }
 .ch-actions {
   display: flex;
@@ -110,21 +123,31 @@ body {
   align-items: center;
   justify-content: center;
   padding: 2px 5px;
+  background: transparent;
+  border-color: transparent;
 }
-/* keyboard-dialog button at the left of the Channels header */
-.ch-kbd-btn {
+.ch-actions .ch-icon-btn:hover {
+  background: transparent;
+  color: #fff;
+}
+/* keyboard toggle button (right of the gear in the Channels header) */
+.ch-actions .ch-kbd-btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   padding: 2px 6px;
   color: #c9d1d9;
-  background: #21262d;
-  border: 1px solid #30363d;
+  background: transparent;
+  border: none;
   border-radius: 5px;
   cursor: pointer;
 }
-.ch-kbd-btn:hover {
-  background: #2d333b;
+.ch-actions .ch-kbd-btn:hover {
+  background: transparent;
+  color: #fff;
+}
+.ch-actions .ch-kbd-btn.active {
+  color: var(--primary);
 }
 
 /* generic modeless, draggable floating dialog (no backdrop) */
@@ -177,7 +200,7 @@ body {
   align-items: center;
   gap: 4px;
   padding: 5px 8px 5px 4px;
-  margin-top: 6px;
+  margin-bottom: 4px;
   background: rgba(0, 0, 0, 0.15);
   border-top: 1px solid #21262d;
   border-bottom: 1px solid #21262d;
@@ -199,8 +222,10 @@ body {
 .ch-collapse:hover {
   color: #fff;
 }
+.ch-group {
+  margin-bottom: 4px;
+}
 .ch-group:first-child .ch-sec {
-  margin-top: 0;
   border-top: none;
 }
 .ch-sec:hover {
@@ -240,17 +265,19 @@ body {
   border: 1px solid #30363d;
   border-radius: 5px;
 }
-.ch-row:hover {
-  background: #161b22;
-}
 /* keep the mute/solo buttons right-aligned (like the section heading) */
 .ch-row .ch-btn.mute {
   margin-left: auto;
 }
+/* dim the number + voice name for muted channels */
+.ch-row.muted .ch-num,
+.ch-row.muted .ch-voice {
+  opacity: 0.5;
+}
 /* voice name / waveform, fixed width, before the mute button */
 .ch-voice {
-  flex: 0 0 96px;
-  width: 96px;
+  flex: 0 0 64px;
+  width: 64px;
   min-width: 0;
   height: 15px;
   display: flex;
@@ -271,10 +298,11 @@ body {
    (a non-integer width makes the 32-sample wave look wobbly) */
 .ch-wave {
   flex: 0 0 auto;
-  width: 96px;
+  width: 64px;
   height: 13px;
 }
 .ch-btn {
+  position: relative;
   flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
@@ -288,6 +316,16 @@ body {
   border-radius: 4px;
   cursor: pointer;
 }
+/* extend the (transparent) hit area vertically to the full row height so the
+   hover highlight doesn't flicker in the padding gaps between rows */
+.ch-btn::after {
+  content: "";
+  position: absolute;
+  left: -4px;
+  right: -4px;
+  top: -4px;
+  bottom: -4px;
+}
 .ch-btn:hover {
   background: #21262d;
   border-color: #30363d;
@@ -297,9 +335,6 @@ body {
   display: block;
   width: 15px;
   height: 15px;
-}
-.ch-btn.mute.on {
-  color: #e6edf3;
 }
 .ch-btn.mute.partial {
   color: #656d78;
@@ -347,19 +382,16 @@ body {
   width: 34px;
   height: 30px;
   color: #c9d1d9;
-  background: #21262d;
-  border: 1px solid #30363d;
+  background: transparent;
+  border: none;
   border-radius: 8px;
   cursor: pointer;
 }
 .hbtn:hover {
-  background: #2d333b;
+  color: #fff;
 }
 
 .volume {
-  position: absolute;
-  right: 14px;
-  bottom: 10px;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -419,18 +451,27 @@ body {
   display: flex;
   justify-content: flex-end;
   padding: 8px 10px;
-  border-radius: 12px 12px 0 0;
+  border-radius: 4px 4px 0 0;
   background: linear-gradient(to bottom, rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.4) 55%, transparent);
   opacity: 0;
   transform: translateY(-6px);
   transition: opacity 0.16s ease, transform 0.16s ease;
   pointer-events: none;
 }
-.viz:hover .pr-overlay,
-.pr-overlay:focus-within {
+.viz:hover .pr-overlay {
   opacity: 1;
   transform: translateY(0);
   pointer-events: auto;
+}
+/* bottom hover overlay: transport buttons (left) + piano-roll controls (right) */
+.pr-overlay-bottom {
+  top: auto;
+  bottom: 0;
+  align-items: center;
+  justify-content: space-between;
+  border-radius: 0 0 4px 4px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.8), rgba(0, 0, 0, 0.4) 55%, transparent);
+  transform: translateY(6px);
 }
 .pr-control {
   display: flex;
@@ -507,7 +548,7 @@ body {
   height: 100%;
   background: #121212;
   border: 1px solid #21262d;
-  border-radius: 12px;
+  border-radius: 4px;
   overflow: hidden;
 }
 
@@ -517,37 +558,37 @@ body {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 10px 14px;
-  border: 1px solid #21262d;
-  border-radius: 12px;
-  background: var(--panel-bg);
+  padding: 8px 4px 4px;
 }
 /* transport controls (left) + volume/surround (bottom-right) share a row */
 .transport-row {
   display: flex;
   align-items: flex-end;
 }
-.transport-time {
-  position: absolute;
-  left: 14px;
-  bottom: 10px;
+.transport-seek {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.seek-time {
+  flex: 0 0 auto;
   font-variant-numeric: tabular-nums;
   font-size: 12px;
   color: #8b949e;
   white-space: nowrap;
 }
-.transport-time .measuring {
+.seek-time.measuring {
   font-style: italic;
   font-size: 11px;
   color: #6e7681;
 }
 .seek {
-  display: block;
-  width: 100%;
+  flex: 1 1 auto;
+  min-width: 0;
   -webkit-appearance: none;
   appearance: none;
-  height: 5px;
-  border-radius: 3px;
+  height: 3px;
+  border-radius: 2px;
   cursor: pointer;
 }
 .seek:disabled {
@@ -617,13 +658,6 @@ body {
   color: var(--primary);
 }
 /* play button: filled with the primary colour */
-.tbtn.play {
-  color: #fff;
-  background: var(--primary);
-}
-.tbtn.play:hover {
-  background: color-mix(in srgb, var(--primary) 85%, #fff);
-}
 
 /* app-wide footer row: version at the left, output latency at the right */
 .app-footer {
@@ -653,7 +687,7 @@ body {
   flex-direction: column;
   min-height: 0;
   border: 1px solid #21262d;
-  border-radius: 12px;
+  border-radius: 4px;
   background: var(--panel-bg);
 }
 .side.collapsed {
@@ -683,6 +717,30 @@ body {
   background: transparent;
 }
 .side-resize:hover::after {
+  background: #30363d;
+}
+/* channels column resize grip (right edge) */
+.channels-resize {
+  position: absolute;
+  right: -4px;
+  top: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  z-index: 4;
+  touch-action: none;
+}
+.channels-resize::after {
+  content: "";
+  position: absolute;
+  right: 3px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  border-radius: 1px;
+  background: transparent;
+}
+.channels-resize:hover::after {
   background: #30363d;
 }
 .panel-toggle {
@@ -878,47 +936,41 @@ body {
 }
 
 /* ---- keyboard dialog ---- */
-/* modeless floating window: no backdrop (the app stays interactive), draggable
-   by its header, and resizable via the native bottom-right grip */
+/* modeless floating window: dragged by its (compact) header, resizable from any
+   edge/corner (JS-driven) */
 .kbd-panel {
   position: fixed;
   z-index: 1000;
-  width: min(920px, 92vw);
-  height: 420px;
-  min-width: 280px;
-  min-height: 160px;
-  max-width: 96vw;
-  max-height: 92vh;
   display: flex;
   flex-direction: column;
   background: var(--panel-bg);
   border: 1px solid #30363d;
-  border-radius: 12px;
+  border-radius: 4px;
   box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
   overflow: hidden;
-  resize: both;
 }
 .kbd-panel-head {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  padding: 10px 14px;
-  font-size: 13px;
+  justify-content: flex-end;
+  padding: 4px 6px 4px 10px;
+  font-size: 11px;
   font-weight: 700;
-  color: #c9d1d9;
+  color: #8b949e;
   border-bottom: 1px solid #21262d;
   cursor: move;
   touch-action: none;
   user-select: none;
 }
 .kbd-close {
-  width: 26px;
-  height: 24px;
+  width: 20px;
+  height: 18px;
+  font-size: 11px;
   color: #8b949e;
   background: #21262d;
   border: 1px solid #30363d;
-  border-radius: 6px;
+  border-radius: 5px;
   cursor: pointer;
 }
 .kbd-close:hover {
@@ -928,10 +980,73 @@ body {
 .kbd-panel-body {
   flex: 1 1 0;
   min-height: 0;
-  padding: 12px 14px;
+  padding: 12px 8px;
   overflow-y: auto;
   overflow-x: hidden;
   scrollbar-gutter: stable;
+}
+
+/* resize handles: 4 edges + 4 corners */
+.kbd-rz {
+  position: absolute;
+  z-index: 5;
+  touch-action: none;
+}
+.kbd-rz-n {
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: n-resize;
+}
+.kbd-rz-s {
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 6px;
+  cursor: s-resize;
+}
+.kbd-rz-e {
+  top: 0;
+  bottom: 0;
+  right: 0;
+  width: 3px;
+  cursor: e-resize;
+}
+.kbd-rz-w {
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 6px;
+  cursor: w-resize;
+}
+.kbd-rz-ne,
+.kbd-rz-nw,
+.kbd-rz-se,
+.kbd-rz-sw {
+  z-index: 6;
+  width: 12px;
+  height: 12px;
+}
+.kbd-rz-ne {
+  top: 0;
+  right: 0;
+  cursor: ne-resize;
+}
+.kbd-rz-nw {
+  top: 0;
+  left: 0;
+  cursor: nw-resize;
+}
+.kbd-rz-se {
+  bottom: 0;
+  right: 0;
+  cursor: se-resize;
+}
+.kbd-rz-sw {
+  bottom: 0;
+  left: 0;
+  cursor: sw-resize;
 }
 /* fixed 800x640 keyboard canvas, scaled to the dialog width via transform */
 .kbd-scale-outer {

@@ -1,9 +1,14 @@
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { useTheme } from "@mui/material/styles";
 import { ChevronRight, ExpandMore, Piano, Settings } from "@mui/icons-material";
 import { DragDropContext, Draggable, Droppable, DropResult } from "@hello-pangea/dnd";
 import { PlayerContext } from "../contexts/PlayerContext";
 import { keyboardDialogId } from "./KeyboardDialog";
+import {
+  getSectionOrder,
+  setSectionOrder,
+  subscribeSectionOrder,
+} from "./channel-section-order";
 import { AppContext } from "../contexts/AppContext";
 import { pianoRollColorDialogId } from "../widgets/PianoRollControl";
 import { KSSChannelMask } from "../kss/kss-device";
@@ -118,12 +123,11 @@ function ChannelRow(props: {
     return () => cancelAnimationFrame(raf);
   }, [context.player]);
 
+  const hiOn = () => setPianoRollHighlight(props.hi);
+  const hiOff = () => setPianoRollHighlight(null);
+
   return (
-    <div
-      className="ch-row"
-      onMouseEnter={() => setPianoRollHighlight(props.hi)}
-      onMouseLeave={() => setPianoRollHighlight(null)}
-    >
+    <div className={`ch-row${props.muted ? " muted" : ""}`}>
       <span className="ch-num">{props.num}</span>
       <div className="ch-voice">
         {voice instanceof Uint8Array ? (
@@ -139,6 +143,8 @@ function ChannelRow(props: {
       <button
         className={`ch-btn mute${props.muted ? " on" : ""}`}
         onClick={props.onMute}
+        onMouseEnter={hiOn}
+        onMouseLeave={hiOff}
         title={props.muted ? "Unmute" : "Mute"}
       >
         {props.muted ? <IconVolumeOff /> : <IconVolume />}
@@ -146,6 +152,8 @@ function ChannelRow(props: {
       <button
         className={`ch-btn solo${props.soloed ? " active" : ""}`}
         onClick={props.onSolo}
+        onMouseEnter={hiOn}
+        onMouseLeave={hiOff}
         title="Solo"
       >
         S
@@ -154,31 +162,17 @@ function ChannelRow(props: {
   );
 }
 
-const DEFAULT_ORDER = SECTIONS.map((s) => s.key);
-const ORDER_KEY = "m3disp.chSectionOrder";
 const COLLAPSED_KEY = "m3disp.chCollapsedSections";
 
 export function ChannelMaskPanel() {
   const context = useContext(PlayerContext);
   const app = useContext(AppContext);
+  const keyboardOpen = app.isOpen(keyboardDialogId);
   const mask = context.channelMask;
 
-  // section display order (drag-to-reorder) and collapse state, both persisted
-  const [order, setOrder] = useState<string[]>(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(ORDER_KEY) ?? "null");
-      if (
-        Array.isArray(saved) &&
-        saved.length === DEFAULT_ORDER.length &&
-        DEFAULT_ORDER.every((k) => saved.includes(k))
-      ) {
-        return saved;
-      }
-    } catch {
-      /* ignore malformed storage */
-    }
-    return DEFAULT_ORDER;
-  });
+  // section display order — shared with the keyboard dialog (drag-to-reorder,
+  // persisted) — and per-panel collapse state
+  const order = useSyncExternalStore(subscribeSectionOrder, getSectionOrder);
   const [collapsed, setCollapsed] = useState<Set<string>>(() => {
     try {
       const saved = JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? "[]");
@@ -189,9 +183,6 @@ export function ChannelMaskPanel() {
     return new Set<string>();
   });
 
-  useEffect(() => {
-    localStorage.setItem(ORDER_KEY, JSON.stringify(order));
-  }, [order]);
   useEffect(() => {
     localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...collapsed]));
   }, [collapsed]);
@@ -211,12 +202,10 @@ export function ChannelMaskPanel() {
   const onSecDragEnd = (result: DropResult) => {
     const { source, destination } = result;
     if (!destination || destination.index === source.index) return;
-    setOrder((prev) => {
-      const next = [...prev];
-      const [moved] = next.splice(source.index, 1);
-      next.splice(destination.index, 0, moved);
-      return next;
-    });
+    const next = [...getSectionOrder()];
+    const [moved] = next.splice(source.index, 1);
+    next.splice(destination.index, 0, moved);
+    setSectionOrder(next);
   };
 
   const apply = (next: KSSChannelMask) => {
@@ -241,16 +230,18 @@ export function ChannelMaskPanel() {
   return (
     <>
       <div className="ch-head">
-        <button
-          className="ch-kbd-btn"
-          onClick={() => app.openDialog(keyboardDialogId)}
-          title="Keyboard"
-        >
-          <Piano sx={{ fontSize: 15 }} />
+        <button className="ch-reset" onClick={reset} title="Unmute all channels">
+          Reset
         </button>
         <span className="ch-actions">
-          <button onClick={reset} title="Unmute all channels">
-            Reset
+          <button
+            className={`ch-kbd-btn${keyboardOpen ? " active" : ""}`}
+            onClick={() =>
+              keyboardOpen ? app.closeDialog(keyboardDialogId) : app.openDialog(keyboardDialogId)
+            }
+            title="Keyboard"
+          >
+            <Piano sx={{ fontSize: 15 }} />
           </button>
           <button
             className="ch-icon-btn"
@@ -275,11 +266,7 @@ export function ChannelMaskPanel() {
                   <Draggable key={s.key} draggableId={s.key} index={index}>
                     {(p) => (
                       <div className="ch-group" ref={p.innerRef} {...p.draggableProps}>
-                        <div
-                          className="ch-sec"
-                          onMouseEnter={() => setPianoRollHighlight(secHi)}
-                          onMouseLeave={() => setPianoRollHighlight(null)}
-                        >
+                        <div className="ch-sec">
                           <button
                             className="ch-collapse"
                             onClick={() => toggleCollapse(s.key)}
@@ -297,6 +284,8 @@ export function ChannelMaskPanel() {
                           <button
                             className={`ch-btn mute${on ? " on" : partial ? " partial" : ""}`}
                             onClick={() => setDevice(s.dev, on ? dmask & ~s.bits : dmask | s.bits)}
+                            onMouseEnter={() => setPianoRollHighlight(secHi)}
+                            onMouseLeave={() => setPianoRollHighlight(null)}
                             title={on ? "Unmute section" : "Mute section"}
                           >
                             {on ? <IconVolumeOff /> : <IconVolume />}
@@ -304,6 +293,8 @@ export function ChannelMaskPanel() {
                           <button
                             className={`ch-btn solo${isSoloed(s.dev, s.bits) ? " active" : ""}`}
                             onClick={() => solo(s.dev, s.bits)}
+                            onMouseEnter={() => setPianoRollHighlight(secHi)}
+                            onMouseLeave={() => setPianoRollHighlight(null)}
                             title="Solo section"
                           >
                             S

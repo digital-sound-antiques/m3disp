@@ -1,7 +1,6 @@
-import { useContext, useEffect, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { PlayerContext } from "../contexts/PlayerContext";
 import { ChannelId, getChannelStatus } from "../kss/channel-status";
-import { AppContext } from "../contexts/AppContext";
 
 export type KeyboardPainterArgs = {
   whiteKeyWidth: number;
@@ -178,14 +177,14 @@ function WhiteKeysOverlay(props: {
         requestAnimationFrame(renderFrame);
         const kcodes = [];
         const colors = [];
-        for (const target of props.targets) {
+        for (const target of propsRef.current.targets) {
           const channel = getChannelStatus(playerContext.player, target);
           if (channel != null && channel.kcode != null) {
             kcodes.push(channel.kcode);
             colors.push(propsRef.current.color);
           }
         }
-        props.painter.paintWhiteKeysOverlay(canvas, kcodes, colors);
+        propsRef.current.painter.paintWhiteKeysOverlay(canvas, kcodes, colors);
       }
     };
     renderFrame();
@@ -243,14 +242,19 @@ function BlackKeysOverlay(props: {
         requestAnimationFrame(renderFrame);
         const kcodes = [];
         const colors = [];
-        for (const target of props.targets) {
+        for (const target of propsRef.current.targets) {
           const channel = playerContext.player.getChannelStatus(target);
           if (channel != null && channel.kcode != null) {
             kcodes.push(channel.kcode);
             colors.push(propsRef.current.color);
           }
         }
-        props.painter.paintBlackKeysOverlay(canvas, kcodes, colors, propsRef.current.whiteKeyColor);
+        propsRef.current.painter.paintBlackKeysOverlay(
+          canvas,
+          kcodes,
+          colors,
+          propsRef.current.whiteKeyColor
+        );
       }
     };
     renderFrame();
@@ -272,7 +276,31 @@ export function Keyboard(props: KeyboardProps) {
   const boxRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
 
-  const painter = props.painter ?? defaultPainter;
+  // Build a painter sized to the actual display box (in device pixels) so the
+  // canvas renders ~1:1 instead of being CSS-downscaled from a fixed 728px
+  // canvas — that downscaling is what crushed the 1px key separators at narrow
+  // widths. Key separators are kept at >=1 device pixel.
+  const dpr = typeof window !== "undefined" ? window.devicePixelRatio || 1 : 1;
+  const painter = useMemo(() => {
+    if (props.painter != null) return props.painter;
+    if (size.width <= 0 || size.height <= 0) return defaultPainter;
+    const N = 56;
+    const w = Math.round(size.width * dpr);
+    const h = Math.round(size.height * dpr);
+    const margin = Math.max(1, Math.round(dpr));
+    const wkw = Math.max(1, Math.floor((w - margin * (N - 1)) / N));
+    return new KeyboardPainter({
+      whiteKeyWidth: wkw,
+      whiteKeyHeight: h,
+      whiteKeyRadii: [0, 0, 0.5, 0.5],
+      blackKeyWidth: Math.max(1, Math.round(wkw * 0.72)),
+      blackKeyHeight: Math.max(1, Math.round(h * 0.6)),
+      blackKeyRadii: [0, 0, 0.5, 0.5],
+      keyMargin: margin,
+      numberOfWhiteKeys: N,
+      blackKeyColor: "#222",
+    });
+  }, [props.painter, size.width, size.height, dpr]);
 
   const onResize = () => {
     setSize({
