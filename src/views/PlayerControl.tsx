@@ -12,6 +12,7 @@ import { useContext, useEffect, useState } from "react";
 import { AudioPlayerState } from "webaudio-stream-player";
 import { PlayerContext, RepeatMode } from "../contexts/PlayerContext";
 import { Marquee } from "../widgets/Marquee";
+import { toTimeString, usePlaybackTime } from "../widgets/usePlaybackTime";
 
 const PREV_RESTART_SEC = 2;
 
@@ -51,6 +52,7 @@ export function PlayControl() {
   }[context.repeatMode];
 
   const playing = playState == "playing";
+  const { currentSec, totalSec, measuring } = usePlaybackTime();
 
   return (
     <div className="transport-controls">
@@ -92,6 +94,12 @@ export function PlayControl() {
         <button className="tbtn" onClick={() => context.reducer.next()} title="Next">
           <SkipNext />
         </button>
+      </div>
+      <div className="transport-time">
+        {toTimeString(currentSec)} /{" "}
+        <span className={measuring ? "measuring" : undefined}>
+          {measuring ? "Measuring…" : toTimeString(totalSec)}
+        </span>
       </div>
     </div>
   );

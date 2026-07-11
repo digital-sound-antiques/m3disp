@@ -1,6 +1,6 @@
 import { ThemeProvider } from "@mui/material/styles";
 import { CssBaseline } from "@mui/material";
-import { MoreVert, Piano } from "@mui/icons-material";
+import { MoreVert } from "@mui/icons-material";
 import { useContext, useEffect, useRef, useState } from "react";
 
 import { AppContext } from "../contexts/AppContext";
@@ -15,7 +15,7 @@ import { PlayControl } from "./PlayerControl";
 import { PlayListView } from "./PlayListView";
 import { VolumeControl } from "../widgets/VolumeControl";
 
-import { KeyboardDialog, keyboardDialogId } from "./KeyboardDialog";
+import { KeyboardDialog } from "./KeyboardDialog";
 import { SettingsDialog } from "./SettingsDialog";
 import { PianoRollColorDialog } from "./PianoRollColorDialog";
 import { OptionMenu } from "./OptionMenu";
@@ -84,6 +84,7 @@ function Layout() {
   useEffect(() => {
     const root = document.documentElement.style;
     root.setProperty("--primary", app.theme.palette.primary.main);
+    root.setProperty("--secondary", app.theme.palette.secondary.main);
     root.setProperty("--panel-bg", app.theme.palette.background.paper);
   }, [app.theme]);
 
@@ -110,14 +111,6 @@ function Layout() {
             M<sup>3</sup>disp
           </div>
           <div className="header-actions">
-            <VolumeControl />
-            <button
-              className="hbtn"
-              title="Keyboard"
-              onClick={() => app.openDialog(keyboardDialogId)}
-            >
-              <Piano sx={{ fontSize: 20 }} />
-            </button>
             <button
               className="hbtn"
               ref={optionsRef}
@@ -142,17 +135,19 @@ function Layout() {
           </aside>
 
           <div className="main">
-            <div className="pr-bar">
-              <PianoRollControl />
-            </div>
-
             <div className="viz">
               <PianoRoll mode={app.pianoRollMode} />
+              <div className="pr-overlay">
+                <PianoRollControl />
+              </div>
             </div>
 
             <section className="transport">
               <TimeSlider />
-              <PlayControl />
+              <div className="transport-row">
+                <PlayControl />
+                <VolumeControl />
+              </div>
             </section>
           </div>
 

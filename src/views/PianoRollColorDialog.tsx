@@ -1,10 +1,8 @@
 import {
   Box,
   Button,
-  Dialog,
   DialogActions,
   DialogContent,
-  Divider,
   FormControlLabel,
   ListSubheader,
   Radio,
@@ -14,7 +12,7 @@ import {
   Typography,
 } from "@mui/material";
 import Grid2 from "@mui/material/Unstable_Grid2/Grid2";
-import React, { Fragment, useContext, useState } from "react";
+import React, { Fragment, useContext, useEffect, useRef, useState } from "react";
 import { AppContext, PianoRollColorModeMap } from "../contexts/AppContext";
 import { ColorBall } from "../widgets/ColorSelector";
 import { pianoRollColorDialogId } from "../widgets/PianoRollControl";
@@ -221,5 +219,51 @@ function DialogBody(props: { id: string }) {
 export function PianoRollColorDialog() {
   const app = useContext(AppContext);
   const open = app.isOpen(pianoRollColorDialogId);
-  return <Dialog open={open}>{open && <DialogBody id={pianoRollColorDialogId} />}</Dialog>;
+  const [pos, setPos] = useState<{ x: number; y: number }>({ x: 160, y: 110 });
+  const dragRef = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") app.closeDialog(pianoRollColorDialogId);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, app]);
+
+  if (!open) return null;
+
+  const onHeadDown = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest(".fdlg-close")) return;
+    e.currentTarget.setPointerCapture(e.pointerId);
+    dragRef.current = { px: e.clientX, py: e.clientY, x: pos.x, y: pos.y };
+  };
+  const onHeadMove = (e: React.PointerEvent) => {
+    const d = dragRef.current;
+    if (!d) return;
+    setPos({
+      x: Math.max(0, Math.min(window.innerWidth - 60, d.x + (e.clientX - d.px))),
+      y: Math.max(0, Math.min(window.innerHeight - 40, d.y + (e.clientY - d.py))),
+    });
+  };
+  const onHeadUp = (e: React.PointerEvent) => {
+    dragRef.current = null;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
+  return (
+    <div className="fdlg" style={{ left: pos.x, top: pos.y }}>
+      <div className="fdlg-head" onPointerDown={onHeadDown} onPointerMove={onHeadMove} onPointerUp={onHeadUp}>
+        <span>Channel Colors</span>
+        <button
+          className="fdlg-close"
+          onClick={() => app.closeDialog(pianoRollColorDialogId)}
+          title="Close"
+        >
+          ✕
+        </button>
+      </div>
+      <DialogBody id={pianoRollColorDialogId} />
+    </div>
+  );
 }

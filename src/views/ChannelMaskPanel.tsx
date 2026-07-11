@@ -1,11 +1,16 @@
 import { useContext, useEffect, useRef, useState } from "react";
 import { useTheme } from "@mui/material/styles";
+import { ChevronRight, ExpandMore, Piano, Settings } from "@mui/icons-material";
+import { DragDropContext, Draggable, Droppable, DropResult } from "@hello-pangea/dnd";
 import { PlayerContext } from "../contexts/PlayerContext";
+import { keyboardDialogId } from "./KeyboardDialog";
+import { AppContext } from "../contexts/AppContext";
+import { pianoRollColorDialogId } from "../widgets/PianoRollControl";
 import { KSSChannelMask } from "../kss/kss-device";
 import { ChannelId } from "../kss/channel-status";
 import { IconVolume, IconVolumeOff } from "../widgets/icons";
 import { setPianoRollHighlight } from "../widgets/piano-roll-highlight";
-import { VolumeIndicator, WaveIndicator } from "../widgets/TrackInfo";
+import { WaveIndicator } from "../widgets/TrackInfo";
 
 type Dev = "opll" | "psg" | "scc";
 // A row may cover several channels (OPLL 7/8/9 double as rhythm). `maskBits` are
@@ -71,10 +76,12 @@ const maskEq = (a: KSSChannelMask, b: KSSChannelMask) =>
 const soloMask = (dev: Dev, bits: number): KSSChannelMask => ({ ...ALL, [dev]: ALL[dev] & ~bits });
 const bitsOf = (arr: number[]) => arr.reduce((m, b) => m | (1 << b), 0);
 
-/** A channel row: number + voice name (or SCC waveform) + mute/solo on the main
- *  line, and a 2px level meter along the bottom edge. Reads status each frame. */
+/** A channel row: voice name (or SCC waveform) + mute/solo. When no voice is
+ *  active (stopped/silent) it falls back to the device+channel name (e.g.
+ *  "OPLL1"). Muted channels still show their voice. Reads status each frame. */
 function ChannelRow(props: {
-  label: string;
+  num: string;
+  name: string;
   targets: ChannelId[];
   hi: number[];
   muted: boolean;
@@ -84,14 +91,7 @@ function ChannelRow(props: {
 }) {
   const theme = useTheme();
   const context = useContext(PlayerContext);
-  const [info, setInfo] = useState<{
-    vol: number;
-    kcode: number | null;
-    kkf: number;
-    voice: string | Uint8Array | null;
-  }>({ vol: 0, kcode: null, kkf: 0, voice: null });
-  const mutedRef = useRef(props.muted);
-  mutedRef.current = props.muted;
+  const [voice, setVoice] = useState<string | Uint8Array | null>(null);
   const targetsRef = useRef(props.targets);
   targetsRef.current = props.targets;
 
@@ -100,22 +100,18 @@ function ChannelRow(props: {
     const loop = () => {
       raf = requestAnimationFrame(loop);
       const p = context.player;
-      if (!mutedRef.current && (p.state === "playing" || p.state === "paused")) {
-        let vol = 0;
-        let kcode: number | null = null;
-        let kkf = Infinity;
-        let voice: string | Uint8Array | null = null;
+      if (p.state === "playing" || p.state === "paused") {
+        let v: string | Uint8Array | null = null;
         for (const t of targetsRef.current) {
           const s = p.getChannelStatus(t);
-          if (s == null) continue;
-          if (s.vol > vol) vol = s.vol;
-          if (s.kcode != null) kcode = s.kcode;
-          if ((s.keyKeepFrames ?? 0) < kkf) kkf = s.keyKeepFrames ?? 0;
-          if (voice == null && s.voice != null) voice = s.voice as string | Uint8Array;
+          if (s != null && s.voice != null) {
+            v = s.voice as string | Uint8Array;
+            break;
+          }
         }
-        setInfo({ vol, kcode, kkf: isFinite(kkf) ? kkf : 0, voice });
+        setVoice(v);
       } else {
-        setInfo({ vol: 0, kcode: null, kkf: 0, voice: null });
+        setVoice(null);
       }
     };
     raf = requestAnimationFrame(loop);
@@ -128,29 +124,17 @@ function ChannelRow(props: {
       onMouseEnter={() => setPianoRollHighlight(props.hi)}
       onMouseLeave={() => setPianoRollHighlight(null)}
     >
-      <span className="ch-label">{props.label}</span>
-      <div className="ch-voice-col">
-        <div className="ch-voice">
-          {info.voice instanceof Uint8Array ? (
-            <div className="ch-wave">
-              <WaveIndicator wave={info.voice} color={theme.palette.primary.main} />
-            </div>
-          ) : (
-            <span className="ch-voice-name">
-              {typeof info.voice === "string" ? info.voice : ""}
-            </span>
-          )}
-        </div>
-        <div className="ch-meter">
-          <VolumeIndicator
-            volume={info.vol}
-            kcode={info.kcode}
-            keyKeepFrames={info.kkf}
-            primaryColor={theme.palette.primary.main}
-            secondaryColor={theme.palette.secondary.main}
-            variant="horizontal"
-          />
-        </div>
+      <span className="ch-num">{props.num}</span>
+      <div className="ch-voice">
+        {voice instanceof Uint8Array ? (
+          <div className="ch-wave">
+            <WaveIndicator wave={voice} color={theme.palette.primary.main} />
+          </div>
+        ) : typeof voice === "string" ? (
+          <span className="ch-voice-name">{voice}</span>
+        ) : (
+          <span className="ch-voice-name placeholder">{props.name}</span>
+        )}
       </div>
       <button
         className={`ch-btn mute${props.muted ? " on" : ""}`}
@@ -170,9 +154,70 @@ function ChannelRow(props: {
   );
 }
 
+const DEFAULT_ORDER = SECTIONS.map((s) => s.key);
+const ORDER_KEY = "m3disp.chSectionOrder";
+const COLLAPSED_KEY = "m3disp.chCollapsedSections";
+
 export function ChannelMaskPanel() {
   const context = useContext(PlayerContext);
+  const app = useContext(AppContext);
   const mask = context.channelMask;
+
+  // section display order (drag-to-reorder) and collapse state, both persisted
+  const [order, setOrder] = useState<string[]>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(ORDER_KEY) ?? "null");
+      if (
+        Array.isArray(saved) &&
+        saved.length === DEFAULT_ORDER.length &&
+        DEFAULT_ORDER.every((k) => saved.includes(k))
+      ) {
+        return saved;
+      }
+    } catch {
+      /* ignore malformed storage */
+    }
+    return DEFAULT_ORDER;
+  });
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? "[]");
+      if (Array.isArray(saved)) return new Set<string>(saved);
+    } catch {
+      /* ignore malformed storage */
+    }
+    return new Set<string>();
+  });
+
+  useEffect(() => {
+    localStorage.setItem(ORDER_KEY, JSON.stringify(order));
+  }, [order]);
+  useEffect(() => {
+    localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...collapsed]));
+  }, [collapsed]);
+
+  const orderedSections = order
+    .map((k) => SECTIONS.find((s) => s.key === k))
+    .filter((s): s is Section => s != null);
+
+  const toggleCollapse = (key: string) =>
+    setCollapsed((prev) => {
+      const next = new Set(prev);
+      if (next.has(key)) next.delete(key);
+      else next.add(key);
+      return next;
+    });
+
+  const onSecDragEnd = (result: DropResult) => {
+    const { source, destination } = result;
+    if (!destination || destination.index === source.index) return;
+    setOrder((prev) => {
+      const next = [...prev];
+      const [moved] = next.splice(source.index, 1);
+      next.splice(destination.index, 0, moved);
+      return next;
+    });
+  };
 
   const apply = (next: KSSChannelMask) => {
     context.player.setChannelMask(next);
@@ -196,62 +241,102 @@ export function ChannelMaskPanel() {
   return (
     <>
       <div className="ch-head">
-        <span>Channels</span>
+        <button
+          className="ch-kbd-btn"
+          onClick={() => app.openDialog(keyboardDialogId)}
+          title="Keyboard"
+        >
+          <Piano sx={{ fontSize: 15 }} />
+        </button>
         <span className="ch-actions">
           <button onClick={reset} title="Unmute all channels">
             Reset
           </button>
+          <button
+            className="ch-icon-btn"
+            onClick={() => app.openDialog(pianoRollColorDialogId)}
+            title="Channel color settings"
+          >
+            <Settings sx={{ fontSize: 15 }} />
+          </button>
         </span>
       </div>
-      <div className="ch-list">
-        {SECTIONS.map((s) => {
-          const dmask = mask[s.dev];
-          const on = (dmask & s.bits) === s.bits;
-          const partial = !on && (dmask & s.bits) !== 0;
-          const secHi = s.rows.flatMap((r) => r.hi);
-          return (
-            <div className="ch-group" key={s.key}>
-              <div
-                className="ch-sec"
-                onMouseEnter={() => setPianoRollHighlight(secHi)}
-                onMouseLeave={() => setPianoRollHighlight(null)}
-              >
-                <span className="ch-sec-label">{s.label}</span>
-                <button
-                  className={`ch-btn mute${on ? " on" : partial ? " partial" : ""}`}
-                  onClick={() => setDevice(s.dev, on ? dmask & ~s.bits : dmask | s.bits)}
-                  title={on ? "Unmute section" : "Mute section"}
-                >
-                  {on ? <IconVolumeOff /> : <IconVolume />}
-                </button>
-                <button
-                  className={`ch-btn solo${isSoloed(s.dev, s.bits) ? " active" : ""}`}
-                  onClick={() => solo(s.dev, s.bits)}
-                  title="Solo section"
-                >
-                  S
-                </button>
-              </div>
-              {s.rows.map((r) => {
-                const rowBits = bitsOf(r.maskBits);
-                const muted = (dmask & (1 << r.maskBits[0])) !== 0;
+      <DragDropContext onDragEnd={onSecDragEnd}>
+        <Droppable droppableId="ch-sections">
+          {(dp) => (
+            <div className="ch-list" ref={dp.innerRef} {...dp.droppableProps}>
+              {orderedSections.map((s, index) => {
+                const dmask = mask[s.dev];
+                const on = (dmask & s.bits) === s.bits;
+                const partial = !on && (dmask & s.bits) !== 0;
+                const secHi = s.rows.flatMap((r) => r.hi);
+                const isCollapsed = collapsed.has(s.key);
                 return (
-                  <ChannelRow
-                    key={r.label}
-                    label={r.label}
-                    targets={r.targets}
-                    hi={r.hi}
-                    muted={muted}
-                    soloed={isSoloed(s.dev, rowBits)}
-                    onMute={() => toggleRow(s.dev, r.maskBits)}
-                    onSolo={() => solo(s.dev, rowBits)}
-                  />
+                  <Draggable key={s.key} draggableId={s.key} index={index}>
+                    {(p) => (
+                      <div className="ch-group" ref={p.innerRef} {...p.draggableProps}>
+                        <div
+                          className="ch-sec"
+                          onMouseEnter={() => setPianoRollHighlight(secHi)}
+                          onMouseLeave={() => setPianoRollHighlight(null)}
+                        >
+                          <button
+                            className="ch-collapse"
+                            onClick={() => toggleCollapse(s.key)}
+                            title={isCollapsed ? "Expand" : "Collapse"}
+                          >
+                            {isCollapsed ? (
+                              <ChevronRight sx={{ fontSize: 16 }} />
+                            ) : (
+                              <ExpandMore sx={{ fontSize: 16 }} />
+                            )}
+                          </button>
+                          <span className="ch-sec-label" {...p.dragHandleProps}>
+                            {s.label}
+                          </span>
+                          <button
+                            className={`ch-btn mute${on ? " on" : partial ? " partial" : ""}`}
+                            onClick={() => setDevice(s.dev, on ? dmask & ~s.bits : dmask | s.bits)}
+                            title={on ? "Unmute section" : "Mute section"}
+                          >
+                            {on ? <IconVolumeOff /> : <IconVolume />}
+                          </button>
+                          <button
+                            className={`ch-btn solo${isSoloed(s.dev, s.bits) ? " active" : ""}`}
+                            onClick={() => solo(s.dev, s.bits)}
+                            title="Solo section"
+                          >
+                            S
+                          </button>
+                        </div>
+                        {!isCollapsed &&
+                          s.rows.map((r) => {
+                            const rowBits = bitsOf(r.maskBits);
+                            const muted = (dmask & (1 << r.maskBits[0])) !== 0;
+                            return (
+                              <ChannelRow
+                                key={r.label}
+                                num={r.label}
+                                name={`${s.label}${r.label}`}
+                                targets={r.targets}
+                                hi={r.hi}
+                                muted={muted}
+                                soloed={isSoloed(s.dev, rowBits)}
+                                onMute={() => toggleRow(s.dev, r.maskBits)}
+                                onSolo={() => solo(s.dev, rowBits)}
+                              />
+                            );
+                          })}
+                      </div>
+                    )}
+                  </Draggable>
                 );
               })}
+              {dp.placeholder}
             </div>
-          );
-        })}
-      </div>
+          )}
+        </Droppable>
+      </DragDropContext>
     </>
   );
 }

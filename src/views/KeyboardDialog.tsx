@@ -12,6 +12,28 @@ export function KeyboardDialog() {
   const [pos, setPos] = useState<{ x: number; y: number }>({ x: 120, y: 96 });
   const dragRef = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
 
+  // The keyboard content renders at a fixed 800x640 canvas and is scaled to fit
+  // the dialog's (content-box) width; vertical overflow scrolls in the body.
+  const KBD_W = 800;
+  const KBD_H = 640;
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const [scale, setScale] = useState(1);
+
+  useEffect(() => {
+    if (!open) return;
+    const el = bodyRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      // clientWidth excludes the (gutter-stable) scrollbar; subtract padding.
+      const cs = getComputedStyle(el);
+      const pad = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight);
+      const w = el.clientWidth - pad;
+      if (w > 0) setScale(w / KBD_W);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => {
@@ -58,8 +80,15 @@ export function KeyboardDialog() {
           ✕
         </button>
       </div>
-      <div className="kbd-panel-body">
-        <KeyboardList />
+      <div className="kbd-panel-body" ref={bodyRef}>
+        <div className="kbd-scale-outer" style={{ height: KBD_H * scale }}>
+          <div
+            className="kbd-scale-inner"
+            style={{ width: KBD_W, height: KBD_H, transform: `scale(${scale})` }}
+          >
+            <KeyboardList isSmall={false} />
+          </div>
+        </div>
       </div>
     </div>
   );

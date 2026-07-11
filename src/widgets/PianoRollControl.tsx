@@ -1,4 +1,4 @@
-import { AutoAwesome, Layers, MoreVert, Piano, ThreeDRotation, ZoomIn } from "@mui/icons-material";
+import { AutoAwesome, Layers, Piano, ThreeDRotation, ZoomIn } from "@mui/icons-material";
 import { useContext } from "react";
 import { AppContext } from "../contexts/AppContext";
 
@@ -49,13 +49,6 @@ export function PianoRollControl() {
         title="3D"
       >
         <ThreeDRotation sx={{ fontSize: 16 }} />
-      </button>
-      <button
-        className="pr-toggle"
-        onClick={() => context.openDialog(pianoRollColorDialogId)}
-        title="Color settings"
-      >
-        <MoreVert sx={{ fontSize: 18 }} />
       </button>
     </div>
   );

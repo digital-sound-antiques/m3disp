@@ -23,18 +23,10 @@ export function VolumeControl() {
   const modeColor: Record<SurroundMode, string> = {
     off: "rgba(255,255,255,0.4)",
     wide: "#e0e0e0",
-    "wide-reverb": "#4f9cff",
+    "wide-reverb": "var(--primary)",
   };
   return (
     <div className="volume">
-      <button
-        className="surround-btn"
-        style={{ color: modeColor[mode] }}
-        title={MODE_LABEL[mode]}
-        onClick={() => context.reducer.setSurroundMode(NEXT_MODE[mode])}
-      >
-        <SurroundSound sx={{ fontSize: "20px" }} />
-      </button>
       <VolumeDown sx={{ fontSize: "18px" }} />
       <input
         type="range"
@@ -44,6 +36,14 @@ export function VolumeControl() {
         value={context.masterGain}
         onChange={(e) => context.reducer.setMasterGain(Number(e.target.value))}
       />
+      <button
+        className="surround-btn"
+        style={{ color: modeColor[mode] }}
+        title={MODE_LABEL[mode]}
+        onClick={() => context.reducer.setSurroundMode(NEXT_MODE[mode])}
+      >
+        <SurroundSound sx={{ fontSize: "20px" }} />
+      </button>
     </div>
   );
 }

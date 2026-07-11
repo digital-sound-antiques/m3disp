@@ -1,4 +1,5 @@
-import { useContext, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
+import { EditNote, PlaylistAdd, SaveAlt } from "@mui/icons-material";
 
 import { DragDropContext, Draggable, Droppable, DropResult } from "@hello-pangea/dnd";
 import { PlayListEntry, PlayerContext } from "../contexts/PlayerContext";
@@ -13,12 +14,24 @@ export function PlayListView() {
   const { fileDropRef, fileDropProps, isDraggingOver, onFileInputChange } = useFileDrop(false);
   const [editMode, setEditMode] = useState(false);
   const [dragging, setDragging] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const addWrapRef = useRef<HTMLDivElement>(null);
 
   const onAddClick = () => {
     fileInputRef.current!.value = "";
     fileInputRef.current!.click();
   };
+
+  // close the add menu on an outside click
+  useEffect(() => {
+    if (!addOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (!addWrapRef.current?.contains(e.target as Node)) setAddOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [addOpen]);
 
   const onDragEnd = (result: DropResult) => {
     setDragging(false);
@@ -40,18 +53,77 @@ export function PlayListView() {
   return (
     <div className="pl">
       <div className="pl-toolbar">
-        <button className="pl-open" onClick={onAddClick}>
-          Open…
-        </button>
-        <button onClick={() => app.openDialog("sample-dialog")}>Samples</button>
-        <span className="pl-spacer" />
-        {entries.length > 0 && (
+        {editMode ? (
           <>
-            <button onClick={() => app.openDialog("save-as-zip-dialog")}>Save</button>
-            <button className={editMode ? "active" : ""} onClick={() => setEditMode(!editMode)}>
-              {editMode ? "Done" : "Edit"}
+            <button
+              className="pl-text-btn danger"
+              onClick={() => context.reducer.clearEntries()}
+            >
+              All Clear
             </button>
-            {editMode && <button onClick={() => context.reducer.clearEntries()}>Clear</button>}
+            <span className="pl-spacer" />
+            <button className="pl-text-btn ok" onClick={() => setEditMode(false)}>
+              Done
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="pl-menu-wrap" ref={addWrapRef}>
+              <button
+                className={`pl-icon-btn${addOpen ? " active" : ""}`}
+                title="Add tracks"
+                onClick={() => setAddOpen((o) => !o)}
+              >
+                <PlaylistAdd sx={{ fontSize: 20 }} />
+              </button>
+              {addOpen && (
+                <div className="pl-menu">
+                  <button
+                    onClick={() => {
+                      setAddOpen(false);
+                      onAddClick();
+                    }}
+                  >
+                    Open file…
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAddOpen(false);
+                      app.openDialog("open-url-dialog");
+                    }}
+                  >
+                    Open URL…
+                  </button>
+                  <button
+                    onClick={() => {
+                      setAddOpen(false);
+                      app.openDialog("sample-dialog");
+                    }}
+                  >
+                    Open samples…
+                  </button>
+                </div>
+              )}
+            </div>
+            <span className="pl-spacer" />
+            {entries.length > 0 && (
+              <>
+                <button
+                  className="pl-icon-btn"
+                  title="Save as ZIP"
+                  onClick={() => app.openDialog("save-as-zip-dialog")}
+                >
+                  <SaveAlt sx={{ fontSize: 18 }} />
+                </button>
+                <button
+                  className="pl-icon-btn"
+                  title="Edit"
+                  onClick={() => setEditMode(true)}
+                >
+                  <EditNote sx={{ fontSize: 20 }} />
+                </button>
+              </>
+            )}
           </>
         )}
       </div>
@@ -86,7 +158,6 @@ export function PlayListView() {
                             onClick={() => onItemClick(e)}
                             title={e.title ?? e.filename}
                           >
-                            <span className="num">{index + 1}</span>
                             <span className="pl-title">{e.title || e.filename}</span>
                             {editMode ? (
                               <button
@@ -99,9 +170,9 @@ export function PlayListView() {
                               >
                                 ✕
                               </button>
-                            ) : (
+                            ) : selected ? (
                               <span className="pl-act">{playing ? "⏸" : "▶"}</span>
-                            )}
+                            ) : null}
                           </li>
                         )}
                       </Draggable>

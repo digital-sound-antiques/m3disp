@@ -158,6 +158,17 @@ export function WaveIndicator(props: WaveIndicatorProps) {
     const context = canvasRef.current!.getContext("2d")!;
     const canvas = context.canvas;
     context.clearRect(0, 0, canvas.width, canvas.height);
+
+    // origin (Y=0) baseline at y=127, so a flat/zero wave is still visible.
+    // The canvas (256px tall) is scaled down to `size.height`, so make the
+    // line thick enough in canvas space to render as ~1px on screen.
+    const originY = 127;
+    const lineH = size.height > 0 ? Math.max(1, Math.round(canvas.height / size.height)) : 1;
+    context.fillStyle = props.color;
+    context.globalAlpha = 0.5;
+    context.fillRect(0, originY - Math.floor(lineH / 2), canvas.width, lineH);
+    context.globalAlpha = 1.0;
+
     if (props.wave != null) {
       const step = canvas.width / props.wave.length;
       context.fillStyle = props.color;
@@ -165,14 +176,14 @@ export function WaveIndicator(props: WaveIndicatorProps) {
       for (let i = 0; i < props.wave.length; i++) {
         const a = props.wave[i];
         if (a < 128) {
-          context.rect(i * step, 127 - a, step - 1, a);
+          context.rect(i * step, originY - a, step - 1, a);
         } else {
-          context.rect(i * step, 127, step - 1, 255 - a + 1);
+          context.rect(i * step, originY, step - 1, 255 - a + 1);
         }
       }
       context.fill();
     }
-  }, [props.wave, props.color]);
+  }, [props.wave, props.color, size.height]);
 
   return (
     <Box
