@@ -13,10 +13,27 @@ import { AudioPlayerState } from "webaudio-stream-player";
 import { PlayerContext, RepeatMode } from "../contexts/PlayerContext";
 import { Marquee } from "../widgets/Marquee";
 
+const PREV_RESTART_SEC = 2;
+
 export function PlayControl() {
   const context = useContext(PlayerContext);
   const [playState, setPlayState] = useState(context.player.state);
   const onStateChange = (ev: CustomEvent<AudioPlayerState>) => setPlayState(ev.detail);
+
+  // Prev: if we're more than PREV_RESTART_SEC into the track (or on the first
+  // track), restart from the top; otherwise go to the previous playlist entry.
+  const onPrev = () => {
+    const rate = context.audioContext?.sampleRate ?? 44100;
+    const posSec =
+      (context.player.seekBaseFrame + (context.player.progress?.renderer?.currentFrame ?? 0)) / rate;
+    const idx = context.currentEntry ? context.entries.indexOf(context.currentEntry) : -1;
+    if (idx < 0) return;
+    if (posSec >= PREV_RESTART_SEC || idx <= 0) {
+      context.player.seek(0);
+    } else {
+      context.reducer.prev();
+    }
+  };
   useEffect(() => {
     context.player.addEventListener("statechange", onStateChange);
     return () => context.player.removeEventListener("statechange", onStateChange);
@@ -43,7 +60,7 @@ export function PlayControl() {
         </Marquee>
       </div>
       <div className="transport-buttons">
-        <button className="tbtn" onClick={() => context.reducer.prev()} title="Previous">
+        <button className="tbtn" onClick={onPrev} title="Previous">
           <SkipPrevious />
         </button>
         <button

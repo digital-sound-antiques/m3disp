@@ -299,12 +299,10 @@ function SettingsDialogBody(props: { id: string }) {
           <Tabs value={value} onChange={handleChange} variant="fullWidth">
             <Tab label="Player" />
             <Tab label="Theme" />
-            <Tab label="Channels" />
           </Tabs>
         </Box>
         <PlayerPanel value={value} index={0} />
         <ColorPanel value={value} index={1} />
-        <MaskPanel value={value} index={2} />
       </DialogContent>
       <DialogActions sx={{ backgroundColor: "background.paper" }}>
         <Button onClick={onCancel}>Cancel</Button>
