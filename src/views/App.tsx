@@ -184,6 +184,9 @@ function Layout() {
 
             <section className="transport">
               <TimeSlider />
+              <div className="transport-buttons-bar">
+                <TransportButtons />
+              </div>
               <div className="transport-row">
                 <PlayControl />
               </div>

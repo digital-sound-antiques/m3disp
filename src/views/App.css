@@ -3,7 +3,7 @@
 }
 
 #root {
-  width: 100vw;
+  width: 100%;
   height: 100vh;
   margin: 0;
   padding: 0;
@@ -401,7 +401,7 @@ body {
   -webkit-appearance: none;
   appearance: none;
   flex: 0 0 auto;
-  width: 68px;
+  width: 100px;
   background: transparent;
   cursor: pointer;
 }
@@ -560,6 +560,10 @@ body {
   gap: 8px;
   padding: 8px 4px 4px;
 }
+/* transport buttons below the seek bar — only used on the mobile layout */
+.transport-buttons-bar {
+  display: none;
+}
 /* transport controls (left) + volume/surround (bottom-right) share a row */
 .transport-row {
   display: flex;
@@ -637,7 +641,7 @@ body {
   margin-top: auto;
   display: flex;
   align-items: center;
-  gap: 2px;
+  gap: 8px;
 }
 .tbtn {
   display: inline-flex;
@@ -882,12 +886,32 @@ body {
 .pl-empty {
   height: 100%;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 16px;
   text-align: center;
   padding: 24px;
   color: #6e7681;
   font-size: 13px;
+}
+.pl-empty-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.pl-empty-actions button {
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #c9d1d9;
+  background: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  cursor: pointer;
+}
+.pl-empty-actions button:hover {
+  background: #2d333b;
 }
 .playlist {
   list-style: none;
@@ -1101,5 +1125,94 @@ body {
   }
   .pl-drop {
     max-height: 50vh;
+  }
+}
+
+/* ---- mobile (phones): channel list hidden; piano roll (16:9) on top, seek
+   below, playlist filling the bottom ---- */
+@media (max-width: 640px) {
+  .app {
+    height: 100vh;
+    height: 100dvh;
+    min-height: 0;
+    padding: 4px 8px 8px;
+  }
+  .layout {
+    flex-direction: column;
+    flex: 1 1 0;
+    height: auto;
+    min-height: 0;
+    gap: 8px;
+  }
+  .app-title {
+    font-size: 16px;
+  }
+  /* channel list is not shown on phones */
+  .channels {
+    display: none;
+  }
+  .main {
+    flex: 0 0 auto;
+    gap: 6px;
+    overflow: visible;
+  }
+  .viz {
+    flex: 0 0 auto;
+    width: auto;
+    margin: 0 -8px;
+    aspect-ratio: 16 / 10;
+    min-height: 0;
+  }
+  /* only the title lived in the transport row; hide it on phones */
+  .transport-row {
+    display: none;
+  }
+  .transport {
+    padding: 4px 8px 0;
+  }
+  /* transport buttons move below the seek bar (out of the piano-roll overlay),
+     spread evenly across the width */
+  .transport-buttons-bar {
+    display: flex;
+  }
+  .transport-buttons-bar .transport-buttons {
+    flex: 1 1 auto;
+    gap: 0;
+    justify-content: space-evenly;
+  }
+  .pr-overlay-bottom .transport-buttons {
+    display: none;
+  }
+  /* remaining overlay controls (view settings) sit at the right */
+  .pr-overlay-bottom {
+    justify-content: flex-end;
+  }
+  .side {
+    width: auto !important;
+    flex: 1 1 auto;
+    min-height: 0;
+    /* full-bleed playlist: no rounded corners, no side margins/borders */
+    margin: 0 -8px;
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
+  }
+  .pl-drop {
+    max-height: none;
+  }
+  /* taller playlist rows for easier tapping */
+  .playlist li {
+    padding-top: 12px;
+    padding-bottom: 12px;
+  }
+  /* footer is not shown on phones */
+  .app-footer {
+    display: none;
+  }
+  /* no collapse toggles or resize grips in the mobile stack */
+  .panel-toggle,
+  .channels-resize,
+  .side-resize {
+    display: none;
   }
 }

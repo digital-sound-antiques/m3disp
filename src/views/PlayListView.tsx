@@ -1,5 +1,5 @@
 import { useContext, useEffect, useRef, useState } from "react";
-import { EditNote, PlaylistAdd, SaveAlt } from "@mui/icons-material";
+import { EditNote, Pause, PlayArrow, PlaylistAdd, SaveAlt } from "@mui/icons-material";
 
 import { DragDropContext, Draggable, Droppable, DropResult } from "@hello-pangea/dnd";
 import { PlayListEntry, PlayerContext } from "../contexts/PlayerContext";
@@ -133,7 +133,13 @@ export function PlayListView() {
         className={`pl-drop${isDraggingOver ? " over" : ""}`}
       >
         {entries.length == 0 ? (
-          <div className="pl-empty">Drag &amp; drop MGS / KSS files here, or use Open…</div>
+          <div className="pl-empty">
+            <span className="pl-empty-hint">Drag &amp; drop MGS / KSS files here, or</span>
+            <div className="pl-empty-actions">
+              <button onClick={onAddClick}>Open File…</button>
+              <button onClick={() => app.openDialog("sample-dialog")}>Open Samples</button>
+            </div>
+          </div>
         ) : (
           <DragDropContext onDragStart={() => setDragging(true)} onDragEnd={onDragEnd}>
             <Droppable droppableId="pl-list">
@@ -171,7 +177,13 @@ export function PlayListView() {
                                 ✕
                               </button>
                             ) : selected ? (
-                              <span className="pl-act">{playing ? "⏸" : "▶"}</span>
+                              <span className="pl-act">
+                                {playing ? (
+                                  <Pause sx={{ fontSize: 16 }} />
+                                ) : (
+                                  <PlayArrow sx={{ fontSize: 16 }} />
+                                )}
+                              </span>
                             ) : null}
                           </li>
                         )}
