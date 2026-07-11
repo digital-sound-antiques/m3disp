@@ -560,6 +560,23 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     if (player.getFadeFlag() == 2 || player.getStopFlag() != 0) {
       return null;
     }
+
+    // Prefer the keyframer's detected end. It scans at a fine granularity and
+    // reliably catches the exact loop point, even when the driver's loop counter
+    // is only transiently >= maxLoop. The audible player samples that counter
+    // coarsely (once per ~1/8s chunk) and can miss such a spike, which would let
+    // it overrun the reported duration and never fade out; anchoring to
+    // `_endFrame` keeps audio and the seek bar in sync.
+    if (this._endFrame > 0) {
+      const fadeFrames = (this.sampleRate * this._fadeDuration) / 1000;
+      if (this._playerFrames >= this._endFrame - fadeFrames && player.getFadeFlag() == 0) {
+        player.fadeStart(this._fadeDuration);
+      }
+      if (this._playerFrames >= this._endFrame) {
+        return null;
+      }
+    }
+
     const currentTimeInMs = (this._playerFrames / this.sampleRate) * 1000;
     if (player.getLoopCount() >= this._maxLoop || this._duration <= currentTimeInMs) {
       if (player.getFadeFlag() == 0) {
