@@ -1,6 +1,7 @@
 import * as Colors from "@mui/material/colors";
 import type { PlayerContextState } from "../contexts/PlayerContext";
 import { type ChannelId, type ChannelStatus, getStatusFromSnapshot } from "../kss/channel-status";
+import { pianoRollHighlight } from "./piano-roll-highlight";
 import type { KSSDecoderDeviceSnapshot } from "../kss/kss-decoder-worker";
 
 // ---- Channel definitions ----
@@ -315,6 +316,11 @@ export function paintPianoRoll(
   const ctx = canvas.getContext("2d")!;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+  // When playback has ended or stopped, leave the roll empty rather than frozen
+  // on the last frame. Keep the freeze-frame only while paused.
+  const state = playerContext.player.state;
+  if (state !== "playing" && state !== "paused") return;
+
   // Reset the status cache if the song changed (snapshot array replaced).
   resetCacheIfSongChanged(playerContext.player);
 
@@ -342,11 +348,17 @@ export function paintPianoRoll(
 
   // Deferred draws for currently-playing segments so they always sit on top,
   // giving a stable z-order regardless of channel index.
-  type Draw = { x: number; y: number; w: number; color: string; nowX: number; noteAge: number; vol: number };
+  type Draw = { x: number; y: number; w: number; color: string; nowX: number; noteAge: number; vol: number; dim: boolean };
   const playingDraws: Draw[] = [];
+
+  // Channel spotlight (set on channel-panel row hover): dim every channel not in
+  // the highlight set so only the hovered one stands out.
+  const hi = pianoRollHighlight.channels;
+  const hiActive = hi != null && hi.size > 0;
 
   // Pass 1: build segments per channel, draw non-playing ones immediately
   for (let ch = 0; ch < channelIds.length; ch++) {
+    const dim = hiActive && !hi!.has(ch);
     const frames = Math.round(60 * rangeInSec) + (layered ? ch * 8 : 0);
     const step = canvas.width / frames;
     const nowIdx = Math.floor(frames * lpos);
@@ -399,9 +411,9 @@ export function paintPianoRoll(
       if (isPlaying) {
         // Volume at the play head (0-15); windowStart + nowIdx === currentNtsc.
         const vol = getStatusCached(playerContext.player, ch, windowStart + nowIdx)?.vol ?? 15;
-        playingDraws.push({ x, y, w, color: seg.color, nowX, noteAge: nowIdx - seg.start, vol });
+        playingDraws.push({ x, y, w, color: seg.color, nowX, noteAge: nowIdx - seg.start, vol, dim });
       } else {
-        ctx.fillStyle = seg.color + "99"; // dimmer when not sounding
+        ctx.fillStyle = seg.color + (dim ? "14" : "99"); // dimmer when not sounding / not spotlit
         ctx.fillRect(x, y, w, h);
       }
     }
@@ -409,6 +421,14 @@ export function paintPianoRoll(
 
   // Pass 2: draw playing segments on top, with a glow + particles
   for (const d of playingDraws) {
+    if (d.dim) {
+      // spotlight active and this channel isn't it: flat, dim, no glow/particles
+      ctx.save();
+      ctx.fillStyle = d.color + "3a";
+      ctx.fillRect(d.x, d.y, d.w, h);
+      ctx.restore();
+      continue;
+    }
     ctx.save();
     // Outer halo: a wide, additive bloom around the note.
     ctx.globalCompositeOperation = "lighter";
