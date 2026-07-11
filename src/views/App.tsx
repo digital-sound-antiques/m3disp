@@ -78,6 +78,15 @@ function Layout() {
     localStorage.setItem("m3disp.sideWidth", String(sideWidth));
   }, [sideWidth]);
 
+  // Expose the MUI theme's primary + paper background as CSS variables on the
+  // document root so the plain-CSS UI (and the modeless dialogs, which render
+  // outside .app) can tint/colour to match the theme.
+  useEffect(() => {
+    const root = document.documentElement.style;
+    root.setProperty("--primary", app.theme.palette.primary.main);
+    root.setProperty("--panel-bg", app.theme.palette.background.paper);
+  }, [app.theme]);
+
   const sideDragRef = useRef<{ x: number; w: number } | null>(null);
   const startSideResize = (e: React.PointerEvent) => {
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -96,6 +105,30 @@ function Layout() {
   return (
     <FileDropContext>
       <div className="app">
+        <header className="app-header">
+          <div className="app-title">
+            M<sup>3</sup>disp
+          </div>
+          <div className="header-actions">
+            <VolumeControl />
+            <button
+              className="hbtn"
+              title="Keyboard"
+              onClick={() => app.openDialog(keyboardDialogId)}
+            >
+              <Piano sx={{ fontSize: 20 }} />
+            </button>
+            <button
+              className="hbtn"
+              ref={optionsRef}
+              title="Options"
+              onClick={() => app.openPopup("option-menu", optionsRef.current!)}
+            >
+              <MoreVert sx={{ fontSize: 20 }} />
+            </button>
+          </div>
+        </header>
+
         <div className="layout">
           <aside className={`channels${channelsCollapsed ? " collapsed" : ""}`}>
             {!channelsCollapsed && <ChannelMaskPanel />}
@@ -109,30 +142,6 @@ function Layout() {
           </aside>
 
           <div className="main">
-            <header>
-              <h1>
-                M<sup>3</sup>disp
-              </h1>
-              <div className="header-actions">
-                <VolumeControl />
-                <button
-                  className="hbtn"
-                  title="Keyboard"
-                  onClick={() => app.openDialog(keyboardDialogId)}
-                >
-                  <Piano sx={{ fontSize: 20 }} />
-                </button>
-                <button
-                  className="hbtn"
-                  ref={optionsRef}
-                  title="Options"
-                  onClick={() => app.openPopup("option-menu", optionsRef.current!)}
-                >
-                  <MoreVert sx={{ fontSize: 20 }} />
-                </button>
-              </div>
-            </header>
-
             <div className="pr-bar">
               <PianoRollControl />
             </div>
@@ -145,15 +154,6 @@ function Layout() {
               <TimeSlider />
               <PlayControl />
             </section>
-
-            <div className="app-footer">
-              <a href="https://github.com/digital-sound-antiques/m3disp" target="github">
-                <img src={ghlogo} width={14} height={14} alt="github" />
-              </a>
-              <span>v{packageJson.version}</span>
-              <span className="spacer" />
-              <span>Output Latency: {Math.round(context.player.outputLatency * 1000)}ms</span>
-            </div>
           </div>
 
           <aside
@@ -178,6 +178,18 @@ function Layout() {
             {!sideCollapsed && <PlayListView />}
           </aside>
         </div>
+
+        <footer className="app-footer">
+          <span className="af-left">
+            <a href="https://github.com/digital-sound-antiques/m3disp" target="github">
+              <img src={ghlogo} width={14} height={14} alt="github" />
+            </a>
+            <span>v{packageJson.version}</span>
+          </span>
+          <span className="af-right">
+            Output Latency: {Math.round(context.player.outputLatency * 1000)}ms
+          </span>
+        </footer>
       </div>
     </FileDropContext>
   );

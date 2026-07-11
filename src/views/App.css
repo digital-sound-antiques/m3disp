@@ -20,14 +20,40 @@ body {
 }
 
 .app {
-  padding: 12px 16px;
+  padding: 8px 16px 10px;
   height: 100vh;
+  display: flex;
+  flex-direction: column;
+  /* label font sizes for the channel list and playlist; stepped down under
+     1280px (UI control fonts stay fixed) */
+  --ch-font-size: 10.5px;
+  --pl-font-size: 13px;
+}
+
+/* app-wide header row (modest height): title left, controls right */
+.app-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  height: 44px;
+}
+.app-title {
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: #e6edf3;
+}
+.app-title sup {
+  font-size: 0.6em;
 }
 
 .layout {
+  flex: 1 1 0;
+  min-height: 0;
   display: flex;
   gap: 14px;
-  height: 100%;
 }
 
 /* ---- left column: channel mask ---- */
@@ -40,7 +66,7 @@ body {
   min-height: 0;
   border: 1px solid #21262d;
   border-radius: 12px;
-  background: #0d1117;
+  background: var(--panel-bg);
 }
 .channels.collapsed {
   width: 0;
@@ -100,7 +126,7 @@ body {
 }
 .ch-sec-label {
   flex: 1 1 auto;
-  font-size: 10.5px;
+  font-size: var(--ch-font-size);
   font-family: ui-monospace, monospace;
   font-weight: 700;
   color: #fff;
@@ -110,25 +136,64 @@ body {
 .ch-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  padding: 3px 8px 3px 10px;
-  font-size: 12px;
+  gap: 5px;
+  padding: 3px 8px 4px 10px;
 }
 .ch-row:hover {
   background: #161b22;
 }
-.ch-swatch {
-  width: 11px;
-  height: 11px;
-  border-radius: 3px;
-  flex: 0 0 auto;
-}
+/* channel number, flush (device name is in the section heading) */
 .ch-label {
-  flex: 1 1 auto;
-  font-size: 11px;
+  flex: 0 0 auto;
+  text-align: left;
+  font-family: ui-monospace, monospace;
+  font-size: var(--ch-font-size);
+  color: #8b949e;
+}
+/* voice name / waveform stacked over the level meter; occupies the space
+   between the number and the mute button */
+.ch-voice-col {
+  flex: 0 0 96px;
+  width: 96px;
+  margin-left: 4px; /* extra gap after the channel number */
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 1px;
+}
+/* keep the mute/solo buttons right-aligned (like the section heading) */
+.ch-row .ch-btn.mute {
+  margin-left: auto;
+}
+.ch-voice {
+  min-width: 0;
+  height: 13px;
+  display: flex;
+  align-items: center;
+}
+.ch-voice-name {
+  font-family: ui-monospace, monospace;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.84);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+/* SCC waveform: fixed to a multiple of 32px so it renders at integer scale
+   (a non-integer width makes the 32-sample wave look wobbly) */
+.ch-wave {
+  flex: 0 0 auto;
+  width: 96px;
+  height: 13px;
+}
+/* subdued level meter, spanning the voice column (from the name to just before
+   the mute button); faint so an idle channel's resting volume doesn't read as
+   actively sounding */
+.ch-meter {
+  width: 100%;
+  height: 2px;
+  opacity: 0.5;
 }
 .ch-btn {
   flex: 0 0 auto;
@@ -160,6 +225,21 @@ body {
 .ch-btn.mute.partial {
   color: #656d78;
 }
+/* solo: a lettered box, lit blue when this channel/section is isolated or hovered */
+.ch-btn.solo {
+  width: 18px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #8b949e;
+  background: #21262d;
+  border: 1px solid #30363d;
+}
+.ch-btn.solo:hover,
+.ch-btn.solo.active {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
 
 /* ---- centre column ---- */
 .main {
@@ -173,21 +253,8 @@ body {
 }
 .main > header,
 .main > .pr-bar,
-.main > .transport,
-.main > .app-footer {
+.main > .transport {
   flex: 0 0 auto;
-}
-
-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-}
-header h1 {
-  margin: 0;
-  font-size: 24px;
-  letter-spacing: 0.5px;
 }
 .header-actions {
   display: flex;
@@ -249,7 +316,7 @@ header h1 {
 .pr-range {
   width: 72px;
   height: 4px;
-  accent-color: #1f6feb;
+  accent-color: var(--primary);
 }
 .pr-toggle {
   display: inline-flex;
@@ -270,8 +337,8 @@ header h1 {
 }
 .pr-toggle.active {
   color: #fff;
-  background: #1f6feb;
-  border-color: #1f6feb;
+  background: var(--primary);
+  border-color: var(--primary);
 }
 
 .viz {
@@ -374,26 +441,31 @@ header h1 {
   background: #21262d;
 }
 .tbtn.active {
-  color: #4f9cff;
+  color: var(--primary);
 }
 .tbtn.play {
   color: #fff;
-  background: #1f6feb;
+  background: var(--primary);
 }
 .tbtn.play:hover {
-  background: #388bfd;
+  background: color-mix(in srgb, var(--primary) 80%, #fff);
 }
 
+/* app-wide footer row: version at the left, output latency at the right */
 .app-footer {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 10px;
-  padding-top: 4px;
+  padding-top: 6px;
   font-size: 11px;
   color: #6e7681;
 }
-.app-footer .spacer {
-  flex: 1;
+.app-footer .af-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
 }
 .app-footer a {
   display: inline-flex;
@@ -408,7 +480,7 @@ header h1 {
   min-height: 0;
   border: 1px solid #21262d;
   border-radius: 12px;
-  background: #0d1117;
+  background: var(--panel-bg);
 }
 .side.collapsed {
   width: 0 !important;
@@ -501,16 +573,16 @@ header h1 {
   background: #2d333b;
 }
 .pl-toolbar button.pl-open {
-  background: #1f6feb;
-  border-color: #1f6feb;
+  background: var(--primary);
+  border-color: var(--primary);
   color: #fff;
 }
 .pl-toolbar button.pl-open:hover {
-  background: #388bfd;
+  background: color-mix(in srgb, var(--primary) 80%, #fff);
 }
 .pl-toolbar button.active {
-  background: #15263f;
-  color: #6cb6ff;
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
+  color: var(--primary);
   border-color: #1f4a7a;
 }
 .pl-drop {
@@ -538,7 +610,7 @@ header h1 {
   align-items: center;
   gap: 10px;
   padding: 8px 12px;
-  font-size: 13px;
+  font-size: var(--pl-font-size);
   cursor: pointer;
   border-top: 1px solid #1b2027;
 }
@@ -549,8 +621,8 @@ header h1 {
   background: #161b22;
 }
 .playlist li.active {
-  background: #15263f;
-  color: #6cb6ff;
+  background: color-mix(in srgb, var(--primary) 22%, transparent);
+  color: var(--primary);
 }
 .playlist .num {
   width: 22px;
@@ -584,27 +656,28 @@ header h1 {
 }
 
 /* ---- keyboard dialog ---- */
-.kbd-overlay {
-  position: fixed;
-  inset: 0;
-  z-index: 1000;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(13, 17, 23, 0.72);
-  backdrop-filter: blur(2px);
-}
+/* modeless floating window: no backdrop (the app stays interactive), draggable
+   by its header, and resizable via the native bottom-right grip */
 .kbd-panel {
+  position: fixed;
+  z-index: 1000;
   width: min(920px, 92vw);
-  max-height: 88vh;
+  height: 420px;
+  min-width: 280px;
+  min-height: 160px;
+  max-width: 96vw;
+  max-height: 92vh;
   display: flex;
   flex-direction: column;
-  background: #0d1117;
+  background: var(--panel-bg);
   border: 1px solid #30363d;
   border-radius: 12px;
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.5);
   overflow: hidden;
+  resize: both;
 }
 .kbd-panel-head {
+  flex: 0 0 auto;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -613,6 +686,9 @@ header h1 {
   font-weight: 700;
   color: #c9d1d9;
   border-bottom: 1px solid #21262d;
+  cursor: move;
+  touch-action: none;
+  user-select: none;
 }
 .kbd-close {
   width: 26px;
@@ -628,6 +704,8 @@ header h1 {
   color: #fff;
 }
 .kbd-panel-body {
+  flex: 1 1 0;
+  min-height: 0;
   padding: 12px 14px;
   overflow: auto;
 }
@@ -645,6 +723,15 @@ header h1 {
 .pl-drop.file-drop,
 .pl-drop .file-drop-target {
   height: 100%;
+}
+
+/* under 1280px, shrink the channel-list and playlist label fonts one step
+   (UI control fonts are unaffected) */
+@media (max-width: 1279px) {
+  .app {
+    --ch-font-size: 9.5px;
+    --pl-font-size: 12px;
+  }
 }
 
 /* ---- responsive: stack columns ---- */
