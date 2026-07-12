@@ -6,8 +6,9 @@ import { toTimeString, usePlaybackTime } from "./usePlaybackTime";
 /** Red played region up to the head, light-gray keyframe-buffered region, dark
  *  unbuffered — as an inline linear-gradient behind the native range track. */
 function seekBackground(current: number, buffered: number, max: number): string {
-  const played = (Math.min(current, max) / Math.max(max, 1)) * 100;
-  const buf = Math.max(played, (Math.min(buffered, max) / Math.max(max, 1)) * 100);
+  const denom = Math.max(max, 1e-6);
+  const played = (Math.min(current, max) / denom) * 100;
+  const buf = Math.max(played, (Math.min(buffered, max) / denom) * 100);
   return `linear-gradient(to right, var(--secondary) ${played}%, #6b7480 ${played}%, #6b7480 ${buf}%, #30363d ${buf}%)`;
 }
 
@@ -41,7 +42,10 @@ export function TimeSlider() {
   };
 
   const displaySec = seekingTo ?? currentSec;
-  const maxSec = Math.max(totalSec, displaySec, 1);
+  // Axis extent = the real total (or the seek preview if it runs past it).
+  // Don't floor it to 1s: a sub-second track would then leave the buffered
+  // region stuck partway across a 1s axis after it stops.
+  const maxSec = Math.max(totalSec, displaySec, 1e-6);
 
   return (
     <div className="transport-seek">
