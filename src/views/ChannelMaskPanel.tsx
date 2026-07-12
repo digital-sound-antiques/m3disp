@@ -187,12 +187,12 @@ export function ChannelMaskPanel() {
                   <Draggable key={s.key} draggableId={s.key} index={index}>
                     {(p) => (
                       <div className="ch-group" ref={p.innerRef} {...p.draggableProps}>
-                        <div className="ch-sec">
-                          <button
-                            className="ch-collapse"
-                            onClick={() => toggleCollapse(s.key)}
-                            title={isCollapsed ? "Expand" : "Collapse"}
-                          >
+                        <div
+                          className="ch-sec"
+                          onClick={() => toggleCollapse(s.key)}
+                          title={isCollapsed ? "Expand" : "Collapse"}
+                        >
+                          <button className="ch-collapse" title={isCollapsed ? "Expand" : "Collapse"}>
                             {isCollapsed ? (
                               <ChevronRight sx={{ fontSize: 16 }} />
                             ) : (
@@ -204,14 +204,20 @@ export function ChannelMaskPanel() {
                           </span>
                           <button
                             className={`ch-btn mute${on ? " on" : partial ? " partial" : ""}`}
-                            onClick={() => setDevice(s.dev, on ? dmask & ~s.bits : dmask | s.bits)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setDevice(s.dev, on ? dmask & ~s.bits : dmask | s.bits);
+                            }}
                             title={on ? "Unmute section" : "Mute section"}
                           >
                             {on ? <IconVolumeOff /> : <IconVolume />}
                           </button>
                           <button
                             className={`ch-btn solo${isSoloed(s.dev, s.bits) ? " active" : ""}`}
-                            onClick={() => solo(s.dev, s.bits)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              solo(s.dev, s.bits);
+                            }}
                             onMouseEnter={() =>
                               setPianoRollHighlight(s.rows.flatMap((r) => r.hi))
                             }

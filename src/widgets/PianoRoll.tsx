@@ -161,24 +161,6 @@ export function PianoRoll(props: { mode: string }) {
     return () => observer.disconnect();
   }, []);
 
-  // Animate the transform only when the 2D/3D mode toggles; size-driven changes
-  // (the transform depends on the measured box) should snap instantly.
-  const prevMode = useRef(props.mode);
-  const modeChanged = prevMode.current !== props.mode;
-  prevMode.current = props.mode;
-  const [modeAnim, setModeAnim] = useState(false);
-  const didMount = useRef(false);
-  useEffect(() => {
-    if (!didMount.current) {
-      didMount.current = true;
-      return;
-    }
-    setModeAnim(true);
-    const t = setTimeout(() => setModeAnim(false), 1000);
-    return () => clearTimeout(t);
-  }, [props.mode]);
-  const transition = modeChanged || modeAnim ? "transform 1s ease" : "none";
-
   // In 3D the now-line (keyboard) is placed exactly 25% up from the bottom of
   // the drawing area. Its projected vertical position depends on the box size,
   // so translateY is computed from the measured width/height rather than being a
@@ -228,7 +210,6 @@ export function PianoRoll(props: { mode: string }) {
           transformOrigin: "center",
           transformStyle: "preserve-3d",
           transform,
-          transition,
         }}
       >
         <AutoSizeCanvas painter={paintPianoRollBg} width={size.width} height={size.height} resX={resX} resY={resY} />

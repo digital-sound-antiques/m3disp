@@ -68,7 +68,7 @@ export class SurroundEffect {
     const ramp = (param: AudioParam, value: number) => param.setTargetAtTime(value, t, 0.02);
     ramp(this.directGain.gain, mode === "off" ? 1 : 0);
     ramp(this.wideGain.gain, mode === "off" ? 0 : 0.8);
-    ramp(this.reverbGain.gain, mode === "wide-reverb" ? 0.42 : 0);
+    ramp(this.reverbGain.gain, mode === "wide-reverb" ? 0.35 : 0);
   }
 
   getMode(): SurroundMode {
