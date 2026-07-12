@@ -402,7 +402,10 @@ textarea {
   background: rgba(0, 0, 0, 0.15);
   border-top: 1px solid #21262d;
   border-bottom: 1px solid #21262d;
-  cursor: pointer;
+  cursor: grab;
+}
+.ch-sec:active {
+  cursor: grabbing;
 }
 /* left-edge collapse chevron */
 .ch-collapse {
@@ -437,10 +440,6 @@ textarea {
   color: #8b949e;
   text-transform: uppercase;
   letter-spacing: 0.6px;
-  cursor: grab;
-}
-.ch-sec-label:active {
-  cursor: grabbing;
 }
 .ch-row {
   display: flex;

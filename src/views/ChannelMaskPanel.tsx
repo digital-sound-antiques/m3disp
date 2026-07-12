@@ -191,6 +191,7 @@ export function ChannelMaskPanel() {
                           className="ch-sec"
                           onClick={() => toggleCollapse(s.key)}
                           title={isCollapsed ? "Expand" : "Collapse"}
+                          {...p.dragHandleProps}
                         >
                           <button className="ch-collapse" title={isCollapsed ? "Expand" : "Collapse"}>
                             {isCollapsed ? (
@@ -199,9 +200,7 @@ export function ChannelMaskPanel() {
                               <ExpandMore sx={{ fontSize: 16 }} />
                             )}
                           </button>
-                          <span className="ch-sec-label" {...p.dragHandleProps}>
-                            {s.label}
-                          </span>
+                          <span className="ch-sec-label">{s.label}</span>
                           <button
                             className={`ch-btn mute${on ? " on" : partial ? " partial" : ""}`}
                             onClick={(e) => {
