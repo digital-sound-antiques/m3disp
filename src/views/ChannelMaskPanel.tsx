@@ -1,21 +1,18 @@
-import { useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { useTheme } from "@mui/material/styles";
-import { ChevronRight, ExpandMore, Piano, Settings } from "@mui/icons-material";
+import { useContext, useSyncExternalStore } from "react";
+import { ChevronRight, ExpandMore } from "@mui/icons-material";
 import { DragDropContext, Draggable, Droppable, DropResult } from "@hello-pangea/dnd";
 import { PlayerContext } from "../contexts/PlayerContext";
-import { keyboardDialogId } from "./KeyboardDialog";
 import {
+  getCollapsedSections,
   getSectionOrder,
   setSectionOrder,
   subscribeSectionOrder,
+  toggleSectionCollapsed,
 } from "./channel-section-order";
-import { AppContext } from "../contexts/AppContext";
-import { pianoRollColorDialogId } from "../widgets/PianoRollControl";
 import { KSSChannelMask } from "../kss/kss-device";
 import { ChannelId } from "../kss/channel-status";
 import { IconVolume, IconVolumeOff } from "../widgets/icons";
 import { setPianoRollHighlight } from "../widgets/piano-roll-highlight";
-import { WaveIndicator } from "../widgets/TrackInfo";
 
 type Dev = "opll" | "psg" | "scc";
 // A row may cover several channels (OPLL 7/8/9 double as rhythm). `maskBits` are
@@ -81,79 +78,40 @@ const maskEq = (a: KSSChannelMask, b: KSSChannelMask) =>
 const soloMask = (dev: Dev, bits: number): KSSChannelMask => ({ ...ALL, [dev]: ALL[dev] & ~bits });
 const bitsOf = (arr: number[]) => arr.reduce((m, b) => m | (1 << b), 0);
 
-/** A channel row: voice name (or SCC waveform) + mute/solo. When no voice is
- *  active (stopped/silent) it falls back to the device+channel name (e.g.
- *  "OPLL1"). Muted channels still show their voice. Reads status each frame. */
+/** A channel row: track name (e.g. "OPLL1") + mute/solo. */
 function ChannelRow(props: {
-  num: string;
   name: string;
-  targets: ChannelId[];
   hi: number[];
   muted: boolean;
   soloed: boolean;
   onMute: () => void;
   onSolo: () => void;
 }) {
-  const theme = useTheme();
-  const context = useContext(PlayerContext);
-  const [voice, setVoice] = useState<string | Uint8Array | null>(null);
-  const targetsRef = useRef(props.targets);
-  targetsRef.current = props.targets;
-
-  useEffect(() => {
-    let raf = 0;
-    const loop = () => {
-      raf = requestAnimationFrame(loop);
-      const p = context.player;
-      if (p.state === "playing" || p.state === "paused") {
-        let v: string | Uint8Array | null = null;
-        for (const t of targetsRef.current) {
-          const s = p.getChannelStatus(t);
-          if (s != null && s.voice != null) {
-            v = s.voice as string | Uint8Array;
-            break;
-          }
-        }
-        setVoice(v);
-      } else {
-        setVoice(null);
-      }
-    };
-    raf = requestAnimationFrame(loop);
-    return () => cancelAnimationFrame(raf);
-  }, [context.player]);
-
-  const hiOn = () => setPianoRollHighlight(props.hi);
-  const hiOff = () => setPianoRollHighlight(null);
-
   return (
-    <div className={`ch-row${props.muted ? " muted" : ""}`}>
-      <span className="ch-num">{props.num}</span>
+    <div
+      className={`ch-row${props.muted ? " muted" : ""}`}
+      onMouseEnter={() => setPianoRollHighlight(props.hi)}
+      onMouseLeave={() => setPianoRollHighlight(null)}
+    >
       <div className="ch-voice">
-        {voice instanceof Uint8Array ? (
-          <div className="ch-wave">
-            <WaveIndicator wave={voice} color={theme.palette.primary.main} />
-          </div>
-        ) : typeof voice === "string" ? (
-          <span className="ch-voice-name">{voice}</span>
-        ) : (
-          <span className="ch-voice-name placeholder">{props.name}</span>
-        )}
+        <span className="ch-voice-name">{props.name}</span>
       </div>
       <button
         className={`ch-btn mute${props.muted ? " on" : ""}`}
-        onClick={props.onMute}
-        onMouseEnter={hiOn}
-        onMouseLeave={hiOff}
+        onClick={(e) => {
+          e.stopPropagation();
+          props.onMute();
+        }}
         title={props.muted ? "Unmute" : "Mute"}
       >
         {props.muted ? <IconVolumeOff /> : <IconVolume />}
       </button>
       <button
         className={`ch-btn solo${props.soloed ? " active" : ""}`}
-        onClick={props.onSolo}
-        onMouseEnter={hiOn}
-        onMouseLeave={hiOff}
+        onClick={(e) => {
+          e.stopPropagation();
+          props.onSolo();
+        }}
         title="Solo"
       >
         S
@@ -162,42 +120,20 @@ function ChannelRow(props: {
   );
 }
 
-const COLLAPSED_KEY = "m3disp.chCollapsedSections";
-
 export function ChannelMaskPanel() {
   const context = useContext(PlayerContext);
-  const app = useContext(AppContext);
-  const keyboardOpen = app.isOpen(keyboardDialogId);
   const mask = context.channelMask;
 
-  // section display order — shared with the keyboard dialog (drag-to-reorder,
-  // persisted) — and per-panel collapse state
+  // section display order + collapse — shared with the keyboard tab/dialog
+  // (drag-to-reorder, collapse, persisted)
   const order = useSyncExternalStore(subscribeSectionOrder, getSectionOrder);
-  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? "[]");
-      if (Array.isArray(saved)) return new Set<string>(saved);
-    } catch {
-      /* ignore malformed storage */
-    }
-    return new Set<string>();
-  });
-
-  useEffect(() => {
-    localStorage.setItem(COLLAPSED_KEY, JSON.stringify([...collapsed]));
-  }, [collapsed]);
+  const collapsed = useSyncExternalStore(subscribeSectionOrder, getCollapsedSections);
 
   const orderedSections = order
     .map((k) => SECTIONS.find((s) => s.key === k))
     .filter((s): s is Section => s != null);
 
-  const toggleCollapse = (key: string) =>
-    setCollapsed((prev) => {
-      const next = new Set(prev);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+  const toggleCollapse = (key: string) => toggleSectionCollapsed(key);
 
   const onSecDragEnd = (result: DropResult) => {
     const { source, destination } = result;
@@ -230,27 +166,15 @@ export function ChannelMaskPanel() {
   return (
     <>
       <div className="ch-head">
-        <button className="ch-reset" onClick={reset} title="Unmute all channels">
+        <span className="ch-title">Channels</span>
+        <button
+          className="ch-reset"
+          onClick={reset}
+          disabled={maskEq(mask, NONE)}
+          title="Unmute all channels"
+        >
           Reset
         </button>
-        <span className="ch-actions">
-          <button
-            className={`ch-kbd-btn${keyboardOpen ? " active" : ""}`}
-            onClick={() =>
-              keyboardOpen ? app.closeDialog(keyboardDialogId) : app.openDialog(keyboardDialogId)
-            }
-            title="Keyboard"
-          >
-            <Piano sx={{ fontSize: 15 }} />
-          </button>
-          <button
-            className="ch-icon-btn"
-            onClick={() => app.openDialog(pianoRollColorDialogId)}
-            title="Channel color settings"
-          >
-            <Settings sx={{ fontSize: 15 }} />
-          </button>
-        </span>
       </div>
       <DragDropContext onDragEnd={onSecDragEnd}>
         <Droppable droppableId="ch-sections">
@@ -260,8 +184,7 @@ export function ChannelMaskPanel() {
                 const dmask = mask[s.dev];
                 const on = (dmask & s.bits) === s.bits;
                 const partial = !on && (dmask & s.bits) !== 0;
-                const secHi = s.rows.flatMap((r) => r.hi);
-                const isCollapsed = collapsed.has(s.key);
+                const isCollapsed = collapsed.includes(s.key);
                 return (
                   <Draggable key={s.key} draggableId={s.key} index={index}>
                     {(p) => (
@@ -284,8 +207,6 @@ export function ChannelMaskPanel() {
                           <button
                             className={`ch-btn mute${on ? " on" : partial ? " partial" : ""}`}
                             onClick={() => setDevice(s.dev, on ? dmask & ~s.bits : dmask | s.bits)}
-                            onMouseEnter={() => setPianoRollHighlight(secHi)}
-                            onMouseLeave={() => setPianoRollHighlight(null)}
                             title={on ? "Unmute section" : "Mute section"}
                           >
                             {on ? <IconVolumeOff /> : <IconVolume />}
@@ -293,8 +214,6 @@ export function ChannelMaskPanel() {
                           <button
                             className={`ch-btn solo${isSoloed(s.dev, s.bits) ? " active" : ""}`}
                             onClick={() => solo(s.dev, s.bits)}
-                            onMouseEnter={() => setPianoRollHighlight(secHi)}
-                            onMouseLeave={() => setPianoRollHighlight(null)}
                             title="Solo section"
                           >
                             S
@@ -307,9 +226,7 @@ export function ChannelMaskPanel() {
                             return (
                               <ChannelRow
                                 key={r.label}
-                                num={r.label}
                                 name={`${s.label}${r.label}`}
-                                targets={r.targets}
                                 hi={r.hi}
                                 muted={muted}
                                 soloed={isSoloed(s.dev, rowBits)}

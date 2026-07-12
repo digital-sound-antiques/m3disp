@@ -1,11 +1,13 @@
-// Shared device-section order (OPLL / PSG / SCC), reorderable by drag in the
-// channel list and mirrored live in the keyboard dialog. Persisted so it
-// survives reloads. Both views subscribe via useSyncExternalStore.
+// Shared device-section state (OPLL / PSG / SCC): display order and per-section
+// collapse. Reorderable/collapsible from both the channel list and the keyboard
+// tab, mirrored live and persisted across reloads. Views subscribe via
+// useSyncExternalStore.
 
 export const SECTION_KEYS = ["opll", "psg", "scc"] as const;
 const ORDER_KEY = "m3disp.chSectionOrder";
+const COLLAPSED_KEY = "m3disp.chCollapsedSections";
 
-function load(): string[] {
+function loadOrder(): string[] {
   try {
     const saved = JSON.parse(localStorage.getItem(ORDER_KEY) ?? "null");
     if (
@@ -21,8 +23,23 @@ function load(): string[] {
   return [...SECTION_KEYS];
 }
 
-let order: string[] = load();
+function loadCollapsed(): string[] {
+  try {
+    const saved = JSON.parse(localStorage.getItem(COLLAPSED_KEY) ?? "[]");
+    if (Array.isArray(saved)) return saved.filter((k) => typeof k === "string");
+  } catch {
+    /* ignore malformed storage */
+  }
+  return [];
+}
+
+let order: string[] = loadOrder();
+let collapsed: string[] = loadCollapsed();
 const listeners = new Set<() => void>();
+
+function emit() {
+  listeners.forEach((l) => l());
+}
 
 export function getSectionOrder(): string[] {
   return order;
@@ -31,7 +48,32 @@ export function getSectionOrder(): string[] {
 export function setSectionOrder(next: string[]) {
   order = next;
   localStorage.setItem(ORDER_KEY, JSON.stringify(next));
-  listeners.forEach((l) => l());
+  emit();
+}
+
+export function getCollapsedSections(): string[] {
+  return collapsed;
+}
+
+export function isSectionCollapsed(key: string): boolean {
+  return collapsed.includes(key);
+}
+
+export function toggleSectionCollapsed(key: string) {
+  collapsed = collapsed.includes(key)
+    ? collapsed.filter((k) => k !== key)
+    : [...collapsed, key];
+  localStorage.setItem(COLLAPSED_KEY, JSON.stringify(collapsed));
+  emit();
+}
+
+/** Restore section order/collapse to defaults (all sections shown, expanded). */
+export function resetSections() {
+  order = [...SECTION_KEYS];
+  collapsed = [];
+  localStorage.removeItem(ORDER_KEY);
+  localStorage.removeItem(COLLAPSED_KEY);
+  emit();
 }
 
 export function subscribeSectionOrder(listener: () => void) {

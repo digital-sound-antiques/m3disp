@@ -3,6 +3,7 @@ import { PlayerContext } from "../contexts/PlayerContext";
 import { AppContext } from "../contexts/AppContext";
 import {
   channelIds,
+  isChannelMuted,
   lpos,
   paintPianoRoll,
   paintPianoRollBg,
@@ -43,10 +44,12 @@ function HighlightCanvas(props: {
   height: number;
   painter: (canvas: HTMLCanvasElement, keys: number[]) => void;
 }) {
-  const { player } = useContext(PlayerContext);
+  const { player, channelMask } = useContext(PlayerContext);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const painterRef = useRef(props.painter);
   painterRef.current = props.painter;
+  const maskRef = useRef(channelMask);
+  maskRef.current = channelMask;
 
   useEffect(() => {
     const canvas = canvasRef.current!;
@@ -63,6 +66,7 @@ function HighlightCanvas(props: {
         requestAnimationFrame(renderFrame);
         const keys: number[] = [];
         for (const id of channelIds) {
+          if (isChannelMuted(maskRef.current, id)) continue;
           const status = player.getChannelStatus(id);
           if (status?.kcode != null) keys.push(status.kcode);
         }
@@ -84,6 +88,10 @@ function PianoRollCanvas(props: { width: number; height: number }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const appContextRef = useRef(appContext);
   appContextRef.current = appContext;
+  // keep a live reference so the rAF loop sees the current channel mask (and
+  // other state), not the value captured when the effect mounted
+  const playerContextRef = useRef(playerContext);
+  playerContextRef.current = playerContext;
 
   // Note: the status cache is synced inside paintPianoRoll (rAF). It detects
   // song changes via player._snapshots array identity, so no event listeners
@@ -107,7 +115,7 @@ function PianoRollCanvas(props: { width: number; height: number }) {
         const ac = appContextRef.current;
         paintPianoRoll(
           canvas,
-          playerContext,
+          playerContextRef.current,
           ac.pianoRollRangeInSec,
           ac.pianoRollLayered,
           ac.pianoRollShowParticles,

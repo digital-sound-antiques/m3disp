@@ -1,15 +1,4 @@
-import {
-  Box,
-  ListSubheader,
-  MenuItem,
-  Select,
-  SelectChangeEvent,
-  Stack,
-  Typography,
-} from "@mui/material";
-
-import { Fragment, useState } from "react";
-
+import { useState } from "react";
 import * as Colors from "@mui/material/colors";
 
 type PaletteName =
@@ -74,29 +63,12 @@ const palettes: PaletteMap = {
   blueGrey: Colors.blueGrey,
 };
 
-const variants: ColorVariantName[] = [
-  "50",
-  "100",
-  "200",
-  "300",
-  "400",
-  "500",
-  "600",
-  "700",
-  "800",
-  "900",
-  "A100",
-  "A200",
-  "A400",
-  "A700",
-];
-
 type ColorDef = {
   palette: PaletteName;
   variant: ColorVariantName;
 };
 
-const paletteNameToLabel = {
+const paletteNameToLabel: { [key in PaletteName]: string } = {
   red: "Red",
   pink: "Pink",
   purple: "Purple",
@@ -128,45 +100,11 @@ function stringToColorDef(value: string): ColorDef {
     for (const variant in palette) {
       const color = palette[variant as ColorVariantName];
       if (color == value) {
-        return {
-          palette: name as PaletteName,
-          variant: variant as ColorVariantName,
-        };
+        return { palette: name as PaletteName, variant: variant as ColorVariantName };
       }
     }
   }
   return { palette: "grey", variant: "500" };
-}
-
-function VariantSelector(props: {
-  palette: PaletteName;
-  value: ColorVariantName;
-  variants: ColorVariantName[];
-  onChange: (value: ColorVariantName) => void;
-}) {
-  const { palette, value, variants, onChange } = props;
-
-  return (
-    <Box sx={{ flexDirection: "row", gap: 1 }}>
-      {variants.map((e) => {
-        const variant = e as ColorVariantName;
-        const color = colorDefToString({ palette, variant });
-        const iconProps = {
-          sx: {
-            color: color,
-          },
-        };
-        return (
-          <ColorBall
-            key={color}
-            color={color}
-            selected={value == e}
-            onClick={() => onChange(variant)}
-          />
-        );
-      })}
-    </Box>
-  );
 }
 
 export function ColorBall(props: {
@@ -178,20 +116,20 @@ export function ColorBall(props: {
   const inner = props.size ?? 16;
   const outer = inner + 6;
   return (
-    <Box
+    <span
       style={{
-        border: props.selected ? `2px solid ${props.color}` : undefined,
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
         width: `${outer}px`,
         height: `${outer}px`,
-        marginRight: "8px",
         borderRadius: `${outer / 2}px`,
-        justifyContent: "center",
-        alignItems: "center",
-        display: "inline-flex",
+        border: props.selected ? `2px solid ${props.color}` : "2px solid transparent",
+        cursor: props.onClick ? "pointer" : undefined,
       }}
+      onClick={props.onClick}
     >
-      <Box
-        onClick={props.onClick}
+      <span
         style={{
           width: `${inner}px`,
           height: `${inner}px`,
@@ -199,18 +137,7 @@ export function ColorBall(props: {
           backgroundColor: props.color,
         }}
       />
-    </Box>
-  );
-}
-
-function ColorLabel(props: { paletteId: PaletteName; variantId: ColorVariantName }) {
-  const { paletteId, variantId } = props;
-  const palette = palettes[paletteId];
-  return (
-    <Fragment>
-      <ColorBall color={palette[variantId]} />
-      <Typography>{paletteNameToLabel[paletteId]}</Typography>
-    </Fragment>
+    </span>
   );
 }
 
@@ -220,12 +147,11 @@ export function ColorSelector(props: {
   value: string;
   onChange: (value: string) => void;
 }) {
-  const { value, variants, onChange } = props;
+  const { label, value, variants, onChange } = props;
 
   const [colorDef, setColorDef] = useState(stringToColorDef(value));
 
-  const onPaletteChange = (evt: SelectChangeEvent) => {
-    const palette = evt.target.value as PaletteName;
+  const onPaletteChange = (palette: PaletteName) => {
     const def = { ...colorDef, palette };
     setColorDef(def);
     onChange(colorDefToString(def));
@@ -238,42 +164,32 @@ export function ColorSelector(props: {
   };
 
   return (
-    <Stack>
-      <ListSubheader>{props.label}</ListSubheader>
-      <Box sx={{ mx: 2 }}>
-        <Select
-          fullWidth
-          size="small"
+    <div className="crd-field">
+      <div className="crd-field-label">{label}</div>
+      <div className="crd-field-row">
+        <ColorBall color={colorDefToString(colorDef)} />
+        <select
+          className="crd-select"
           value={colorDef.palette}
-          onChange={onPaletteChange}
-          renderValue={(paletteId) => {
-            return (
-              <MenuItem sx={{ p: 0 }}>
-                <ColorLabel paletteId={paletteId} variantId={colorDef.variant} />
-              </MenuItem>
-            );
-          }}
+          onChange={(e) => onPaletteChange(e.target.value as PaletteName)}
         >
-          {Object.keys(palettes).map((e) => {
-            const paletteId = e as PaletteName;
-            const color = palettes[paletteId][colorDef.variant];
-            return (
-              <MenuItem key={paletteId} value={paletteId}>
-                <ColorBall color={color} />
-                <Typography>{paletteNameToLabel[paletteId]}</Typography>
-              </MenuItem>
-            );
-          })}
-        </Select>
-      </Box>
-      <Box sx={{ display: "flex", mx: 4, my: 2 }}>
-        <VariantSelector
-          palette={colorDef.palette}
-          value={colorDef.variant}
-          variants={variants}
-          onChange={onVariantChange}
-        />
-      </Box>
-    </Stack>
+          {Object.keys(palettes).map((e) => (
+            <option key={e} value={e}>
+              {paletteNameToLabel[e as PaletteName]}
+            </option>
+          ))}
+        </select>
+      </div>
+      <div className="crd-balls">
+        {variants.map((v) => (
+          <ColorBall
+            key={v}
+            color={colorDefToString({ palette: colorDef.palette, variant: v })}
+            selected={colorDef.variant == v}
+            onClick={() => onVariantChange(v)}
+          />
+        ))}
+      </div>
+    </div>
   );
 }

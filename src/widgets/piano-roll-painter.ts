@@ -3,6 +3,23 @@ import type { PlayerContextState } from "../contexts/PlayerContext";
 import { type ChannelId, type ChannelStatus, getStatusFromSnapshot } from "../kss/channel-status";
 import { pianoRollHighlight } from "./piano-roll-highlight";
 import type { KSSDecoderDeviceSnapshot } from "../kss/kss-decoder-worker";
+import type { KSSChannelMask } from "../kss/kss-device";
+
+// OPLL rhythm channels (index 9-13) use reversed mute bits (BD=13 … HH=9); PSG
+// tone channels 3-5 share bits 0-2 with 0-2; SCC and OPLL melody map 1:1.
+const opllBit = (i: number) => (i < 9 ? i : 22 - i);
+export function isChannelMuted(mask: KSSChannelMask, id: ChannelId): boolean {
+  switch (id.device) {
+    case "opll":
+      return (mask.opll & (1 << opllBit(id.index))) !== 0;
+    case "psg":
+      return (mask.psg & (1 << (id.index % 3))) !== 0;
+    case "scc":
+      return (mask.scc & (1 << id.index)) !== 0;
+    default:
+      return false;
+  }
+}
 
 // ---- Channel definitions ----
 
@@ -237,60 +254,82 @@ export function paintPianoRollBg(canvas: HTMLCanvasElement) {
   }
 }
 
+// The on-roll keyboard sits just left of the "now" line. Its key widths and
+// offset scale with the canvas height (matching the key height = height/56) so
+// the keyboard keeps its proportions as the roll is enlarged, instead of the
+// widths staying a fixed pixel size (which looked pinched on a large canvas).
+// Ratios (28/22/32/6) reproduce the previous look at ~840px canvas height.
+function kbGeom(canvas: HTMLCanvasElement) {
+  const kw = Math.max(2, Math.round(canvas.height / 24)); // white key length (longer)
+  const bw = Math.max(2, Math.round(canvas.height / 38)); // black key length (shorter)
+  const gap = 4; // gap between the white keys' right edge and the now line
+  const off = kw + gap; // left edge offset from the now line
+  const flip = Math.round((kw * 6) / 28); // 3D black-key nudge
+  const dx = Math.floor(canvas.width * lpos - off);
+  return { kw, bw, off, flip, dx };
+}
+
 export function paintWhiteKeyboard(canvas: HTMLCanvasElement) {
   const ctx = canvas.getContext("2d")!;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const dx = Math.floor(canvas.width * lpos - 32);
-  const kh = Math.ceil(canvas.height / 56);
+  const { kw, dx } = kbGeom(canvas);
+  // gap between white keys, scaled with the key slot so it keeps its proportion
+  // as the keyboard grows (instead of a fixed 1px that looks thin when enlarged)
+  const slot = canvas.height / 56;
+  const gap = Math.max(1, Math.round(slot * 0.12));
+  const kh = Math.max(1, Math.ceil(slot) - gap);
   ctx.fillStyle = "#f0f0f060";
   for (let i = 0; i < 56; i++) {
-    ctx.fillRect(dx, canvas.height * (1.0 - (i + 1) / 56), 28, kh);
+    ctx.fillRect(dx, canvas.height * (1.0 - (i + 1) / 56), kw, kh);
   }
 }
 
 export function paintBlackKeyboard(canvas: HTMLCanvasElement, flip: boolean) {
   const ctx = canvas.getContext("2d")!;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const dx = Math.floor(canvas.width * lpos - 32) + (flip ? 6 : 0);
+  const g = kbGeom(canvas);
+  const dx = g.dx + (flip ? g.flip : 0);
   const kh = Math.ceil(canvas.height / 96);
   ctx.fillStyle = "#121212";
   for (let i = 0; i < 96; i++) {
     const k = i % 12;
     if (k === 1 || k === 3 || k === 6 || k === 8 || k === 10)
-      ctx.fillRect(dx, canvas.height * (1.0 - (i + 1) / 96), 22, kh);
+      ctx.fillRect(dx, canvas.height * (1.0 - (i + 1) / 96), g.bw, kh);
   }
 }
 
 export function paintWhiteHighlight(canvas: HTMLCanvasElement, keys: number[]) {
   const ctx = canvas.getContext("2d")!;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const dx = Math.floor(canvas.width * lpos - 32);
+  const { kw, dx } = kbGeom(canvas);
   const kh = Math.ceil(canvas.height / 96);
   ctx.fillStyle = "#f0f0f0f0";
   for (const i of keys) {
     const k = i % 12;
     if (k !== 1 && k !== 3 && k !== 6 && k !== 8 && k !== 10)
-      ctx.fillRect(dx, canvas.height * (1.0 - (i + 1) / 96), 28, kh);
+      ctx.fillRect(dx, canvas.height * (1.0 - (i + 1) / 96), kw, kh);
   }
 }
 
 export function paintBlackHighlight(canvas: HTMLCanvasElement, keys: number[], flip: boolean) {
   const ctx = canvas.getContext("2d")!;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const dx = Math.floor(canvas.width * lpos - 32) + (flip ? 6 : 0);
+  const g = kbGeom(canvas);
+  const dx = g.dx + (flip ? g.flip : 0);
   const kh = Math.ceil(canvas.height / 96);
   ctx.fillStyle = "#f0f0f0f0";
   for (const i of keys) {
     const k = i % 12;
     if (k === 1 || k === 3 || k === 6 || k === 8 || k === 10)
-      ctx.fillRect(dx, canvas.height * (1.0 - (i + 1) / 96), 22, kh);
+      ctx.fillRect(dx, canvas.height * (1.0 - (i + 1) / 96), g.bw, kh);
   }
 }
 
 export function paintKeyboardEdgeLine(canvas: HTMLCanvasElement) {
   const ctx = canvas.getContext("2d")!;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const x = Math.floor(canvas.width * lpos - 32) + 28;
+  const { kw, dx } = kbGeom(canvas);
+  const x = dx + kw;
   ctx.strokeStyle = "rgba(200,200,200,0.6)";
   ctx.lineWidth = 2;
   ctx.beginPath();
@@ -348,17 +387,22 @@ export function paintPianoRoll(
 
   // Deferred draws for currently-playing segments so they always sit on top,
   // giving a stable z-order regardless of channel index.
-  type Draw = { x: number; y: number; w: number; color: string; nowX: number; noteAge: number; vol: number; dim: boolean };
+  type Draw = { x: number; y: number; w: number; color: string; nowX: number; noteAge: number; vol: number; hilite: boolean };
   const playingDraws: Draw[] = [];
 
-  // Channel spotlight (set on channel-panel row hover): dim every channel not in
-  // the highlight set so only the hovered one stands out.
+  // Channel spotlight (set on channel-panel row hover): outline the hovered
+  // channel's notes with a bright frame. Other channels are drawn normally.
   const hi = pianoRollHighlight.channels;
   const hiActive = hi != null && hi.size > 0;
+  const hiStroke = "#ffffff";
+  const hiLineWidth = Math.max(1, Math.round(1.5 * devicePixelRatio));
 
   // Pass 1: build segments per channel, draw non-playing ones immediately
+  const mask = playerContext.channelMask;
   for (let ch = 0; ch < channelIds.length; ch++) {
-    const dim = hiActive && !hi!.has(ch);
+    // muted channels are hidden from the roll entirely
+    if (isChannelMuted(mask, channelIds[ch])) continue;
+    const hilite = hiActive && hi!.has(ch);
     const frames = Math.round(60 * rangeInSec) + (layered ? ch * 8 : 0);
     const step = canvas.width / frames;
     const nowIdx = Math.floor(frames * lpos);
@@ -411,24 +455,21 @@ export function paintPianoRoll(
       if (isPlaying) {
         // Volume at the play head (0-15); windowStart + nowIdx === currentNtsc.
         const vol = getStatusCached(playerContext.player, ch, windowStart + nowIdx)?.vol ?? 15;
-        playingDraws.push({ x, y, w, color: seg.color, nowX, noteAge: nowIdx - seg.start, vol, dim });
+        playingDraws.push({ x, y, w, color: seg.color, nowX, noteAge: nowIdx - seg.start, vol, hilite });
       } else {
-        ctx.fillStyle = seg.color + (dim ? "14" : "99"); // dimmer when not sounding / not spotlit
+        ctx.fillStyle = seg.color + "99"; // dimmer when not sounding
         ctx.fillRect(x, y, w, h);
+        if (hilite) {
+          ctx.strokeStyle = hiStroke;
+          ctx.lineWidth = hiLineWidth;
+          ctx.strokeRect(x + 0.5, y + 0.5, Math.max(1, w - 1), Math.max(1, h - 1));
+        }
       }
     }
   }
 
   // Pass 2: draw playing segments on top, with a glow + particles
   for (const d of playingDraws) {
-    if (d.dim) {
-      // spotlight active and this channel isn't it: flat, dim, no glow/particles
-      ctx.save();
-      ctx.fillStyle = d.color + "3a";
-      ctx.fillRect(d.x, d.y, d.w, h);
-      ctx.restore();
-      continue;
-    }
     ctx.save();
     // Outer halo: a wide, additive bloom around the note.
     ctx.globalCompositeOperation = "lighter";
@@ -454,6 +495,14 @@ export function paintPianoRoll(
       // Scale particle size by channel volume: vol 0 → 50%, vol 15 → 100%.
       const sizeScale = 0.5 + 0.5 * (Math.max(0, Math.min(15, d.vol)) / 15);
       if (count > 0) spawnParticles(d.nowX, d.y + h / 2, d.color, count, sizeScale);
+    }
+
+    if (d.hilite) {
+      ctx.save();
+      ctx.strokeStyle = hiStroke;
+      ctx.lineWidth = hiLineWidth;
+      ctx.strokeRect(d.x + 0.5, d.y + 0.5, Math.max(1, d.w - 1), Math.max(1, h - 1));
+      ctx.restore();
     }
   }
 

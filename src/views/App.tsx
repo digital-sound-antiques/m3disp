@@ -1,6 +1,6 @@
 import { ThemeProvider } from "@mui/material/styles";
 import { CssBaseline } from "@mui/material";
-import { MoreVert } from "@mui/icons-material";
+import { MoreVert, ViewAgenda } from "@mui/icons-material";
 import { useContext, useEffect, useRef, useState } from "react";
 
 import { AppContext } from "../contexts/AppContext";
@@ -9,14 +9,15 @@ import { PlayerContext } from "../contexts/PlayerContext";
 
 import { ChannelMaskPanel } from "./ChannelMaskPanel";
 import { PianoRoll } from "../widgets/PianoRoll";
-import { PianoRollControl } from "../widgets/PianoRollControl";
+import { PianoRollMenu } from "./PianoRollMenu";
+import { KeyboardList } from "../widgets/KeyboardList";
 import { TimeSlider } from "../widgets/TimeSlider";
 import { PlayControl } from "./PlayerControl";
 import { TransportButtons } from "./TransportButtons";
 import { PlayListView } from "./PlayListView";
 import { VolumeControl } from "../widgets/VolumeControl";
+import { resetSections } from "./channel-section-order";
 
-import { KeyboardDialog } from "./KeyboardDialog";
 import { SettingsDialog } from "./SettingsDialog";
 import { PianoRollColorDialog } from "./PianoRollColorDialog";
 import { OptionMenu } from "./OptionMenu";
@@ -44,13 +45,11 @@ export function App() {
       {/* secondary dialogs (still MUI) — render unconditionally, self-gated */}
       <SettingsDialog id="settings-dialog" />
       <PianoRollColorDialog />
-      <OptionMenu id="option-menu" />
       <AboutDialog />
       <AppProgressDialog />
       <OpenUrlDialog />
       <SaveAsZipDialog />
       <SampleDialog />
-      <KeyboardDialog />
       <Layout />
     </ThemeProvider>
   );
@@ -59,7 +58,6 @@ export function App() {
 function Layout() {
   const app = useContext(AppContext);
   const context = useContext(PlayerContext);
-  const optionsRef = useRef<HTMLButtonElement>(null);
 
   const [channelsCollapsed, setChannelsCollapsed] = useState(
     () => localStorage.getItem("m3disp.channelsCollapsed") === "1"
@@ -76,6 +74,31 @@ function Layout() {
     const v = parseInt(localStorage.getItem("m3disp.channelsWidth") ?? "", 10);
     return isNaN(v) ? 210 : clampCh(v);
   });
+  // center view tab: "pianoroll" (default) or "keyboard"
+  const [vizTab, setVizTab] = useState<"pianoroll" | "keyboard">(() =>
+    localStorage.getItem("m3disp.vizTab") === "keyboard" ? "keyboard" : "pianoroll"
+  );
+  useEffect(() => {
+    localStorage.setItem("m3disp.vizTab", vizTab);
+  }, [vizTab]);
+  // keyboard view: 1 or 2 channels per row
+  const [keyboardCols, setKeyboardCols] = useState<number>(() =>
+    localStorage.getItem("m3disp.keyboardCols") === "2" ? 2 : 1
+  );
+  useEffect(() => {
+    localStorage.setItem("m3disp.keyboardCols", String(keyboardCols));
+  }, [keyboardCols]);
+  // piano-roll settings dropdown (gear in the tab row)
+  const [prMenuOpen, setPrMenuOpen] = useState(false);
+  const prMenuRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!prMenuOpen) return;
+    const onDown = (e: MouseEvent) => {
+      if (!prMenuRef.current?.contains(e.target as Node)) setPrMenuOpen(false);
+    };
+    document.addEventListener("mousedown", onDown);
+    return () => document.removeEventListener("mousedown", onDown);
+  }, [prMenuOpen]);
 
   useEffect(() => {
     localStorage.setItem("m3disp.channelsCollapsed", channelsCollapsed ? "1" : "0");
@@ -89,6 +112,21 @@ function Layout() {
   useEffect(() => {
     localStorage.setItem("m3disp.channelsWidth", String(channelsWidth));
   }, [channelsWidth]);
+
+  // "Reset all settings" also restores the layout to its defaults (live).
+  useEffect(() => {
+    const onReset = () => {
+      setChannelsCollapsed(false);
+      setSideCollapsed(false);
+      setSideWidth(300);
+      setChannelsWidth(210);
+      setVizTab("pianoroll");
+      setKeyboardCols(1);
+      resetSections();
+    };
+    window.addEventListener("m3disp:reset-layout", onReset);
+    return () => window.removeEventListener("m3disp:reset-layout", onReset);
+  }, []);
 
   // Expose the MUI theme's primary + paper background as CSS variables on the
   // document root so the plain-CSS UI (and the modeless dialogs, which render
@@ -139,14 +177,7 @@ function Layout() {
           </div>
           <div className="header-actions">
             <VolumeControl />
-            <button
-              className="hbtn"
-              ref={optionsRef}
-              title="Options"
-              onClick={() => app.openPopup("option-menu", optionsRef.current!)}
-            >
-              <MoreVert sx={{ fontSize: 20 }} />
-            </button>
+            <OptionMenu />
           </div>
         </header>
 
@@ -175,10 +206,65 @@ function Layout() {
 
           <div className="main">
             <div className="viz">
-              <PianoRoll mode={app.pianoRollMode} />
+              <div className="viz-tabs">
+                <button
+                  className={`viz-tab${vizTab === "keyboard" ? " active" : ""}`}
+                  onClick={() => setVizTab("keyboard")}
+                >
+                  Keyboard
+                </button>
+                <button
+                  className={`viz-tab${vizTab === "pianoroll" ? " active" : ""}`}
+                  onClick={() => setVizTab("pianoroll")}
+                >
+                  Piano Roll
+                </button>
+                {vizTab === "keyboard" && (
+                  <div className="viz-seg">
+                    <button
+                      className={`viz-seg-btn${keyboardCols === 1 ? " active" : ""}`}
+                      onClick={() => setKeyboardCols(1)}
+                      title="1 column"
+                    >
+                      <ViewAgenda sx={{ fontSize: 15 }} />
+                    </button>
+                    <button
+                      className={`viz-seg-btn${keyboardCols === 2 ? " active" : ""}`}
+                      onClick={() => setKeyboardCols(2)}
+                      title="2 columns"
+                    >
+                      <ViewAgenda sx={{ fontSize: 15, transform: "rotate(90deg)" }} />
+                    </button>
+                  </div>
+                )}
+                {vizTab === "pianoroll" && (
+                  <div className="pr-menu-wrap" ref={prMenuRef}>
+                    <button
+                      className={`viz-gear${prMenuOpen ? " active" : ""}`}
+                      onClick={() => setPrMenuOpen((o) => !o)}
+                      title="Piano roll settings"
+                    >
+                      <MoreVert sx={{ fontSize: 18 }} />
+                    </button>
+                    {prMenuOpen && (
+                      <div className="pr-menu">
+                        <PianoRollMenu />
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              <div className="viz-body">
+                {vizTab === "pianoroll" ? (
+                  <PianoRoll mode={app.pianoRollMode} />
+                ) : (
+                  <div className="viz-keyboard">
+                    <KeyboardList isSmall={false} columns={keyboardCols} />
+                  </div>
+                )}
+              </div>
               <div className="pr-overlay pr-overlay-bottom">
                 <TransportButtons />
-                <PianoRollControl />
               </div>
             </div>
 

@@ -54,6 +54,9 @@ export function TransportButtons() {
 
   return (
     <div className="transport-buttons">
+      <button className="tbtn" onClick={onPrev} title="Previous">
+        <SkipPrevious />
+      </button>
       <button
         className="tbtn play"
         onClick={async () => {
@@ -72,9 +75,6 @@ export function TransportButtons() {
       </button>
       <button className="tbtn" onClick={() => context.reducer.stop()} title="Stop">
         <Stop />
-      </button>
-      <button className="tbtn" onClick={onPrev} title="Previous">
-        <SkipPrevious />
       </button>
       <button className="tbtn" onClick={() => context.reducer.next()} title="Next">
         <SkipNext />

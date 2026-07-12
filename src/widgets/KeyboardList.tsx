@@ -1,18 +1,27 @@
 import { useContext, useSyncExternalStore } from "react";
 import { useTheme } from "@mui/material/styles";
+import { ChevronRight, ExpandMore } from "@mui/icons-material";
+import { DragDropContext, Draggable, Droppable, DropResult } from "@hello-pangea/dnd";
 import { PlayerContext } from "../contexts/PlayerContext";
 import { ChannelId } from "../kss/channel-status";
 import { KSSDeviceName } from "../kss/kss-device";
 import { Keyboard } from "./Keyboard";
 import { TrackInfoPanel, VolumeInfoPanel } from "./TrackInfo";
 import { AppContext } from "../contexts/AppContext";
-import { getSectionOrder, subscribeSectionOrder } from "../views/channel-section-order";
+import {
+  getCollapsedSections,
+  getSectionOrder,
+  setSectionOrder,
+  subscribeSectionOrder,
+  toggleSectionCollapsed,
+} from "../views/channel-section-order";
 
 type DeviceCardProps = {
   name: string;
   device: KSSDeviceName;
   targets: Array<number[] | number>;
   small?: boolean;
+  columns?: number;
   keyboardAspectRatio?: string;
 };
 
@@ -41,6 +50,7 @@ function DeviceCard(props: DeviceCardProps) {
     context.reducer.setChannelMaskLive(mask);
   };
 
+  const cols2 = props.columns === 2;
   const res = [];
   for (let i = 0; i < props.targets.length; i++) {
     const mask = (masks & (1 << i)) != 0;
@@ -58,13 +68,21 @@ function DeviceCard(props: DeviceCardProps) {
         onClick={() => toggleMute(i)}
         title={mask ? "Unmute" : "Mute"}
         style={{
+          // 2-column: stack info row on top of the keyboard; 1-column: side by side
           display: "flex",
-          flexDirection: "row",
+          flexDirection: cols2 ? "column" : "row",
           position: "relative",
-          aspectRatio: props.keyboardAspectRatio ?? "640 / 22",
-          width: "100%",
+          // 1-column: aspect on the whole row. 2-column: no cell aspect (height is
+          // auto = info row + keyboard), the aspect goes on the keyboard box below.
+          aspectRatio: cols2 ? undefined : props.keyboardAspectRatio ?? "640 / 22",
+          width: cols2 ? "calc(50% - 1cqw)" : "100%",
           overflow: "hidden",
-          marginBottom: "1px",
+          // channel spacing scales with the keyboard width (% vertical margin is
+          // relative to the containing block's width); tighter in 1-column
+          marginBottom: cols2 ? "0.5%" : "0.3%",
+          // size container so the track info can scale via cqw/cqh (1-column needs
+          // a definite height → size; 2-column height is content-driven → inline-size)
+          containerType: cols2 ? "inline-size" : "size",
           cursor: "pointer",
           // muted rows dim, but their voice/meter/keyboard stay live
           opacity: mask ? 0.5 : 1.0,
@@ -78,23 +96,38 @@ function DeviceCard(props: DeviceCardProps) {
             sx={{ width: "72px" }}
           />
         ) : (
-          <TrackInfoPanel title={props.name} targets={channels} disabled={false} />
+          <TrackInfoPanel title={String(i + 1)} targets={channels} disabled={false} top={cols2} />
         )}
 
-        <Keyboard
-          targets={channels}
-          highlightColor={
-            app.keyHighlightColorType == "primary"
-              ? theme.palette.primary.main
-              : theme.palette.secondary.main
+        <div
+          style={
+            cols2
+              ? { width: "100%", aspectRatio: props.keyboardAspectRatio ?? "640 / 48", position: "relative" }
+              : { flex: 1, minWidth: 0, minHeight: 0, position: "relative" }
           }
-          whiteKeyColor={theme.palette.text.primary}
-        />
+        >
+          <Keyboard
+            targets={channels}
+            highlightColor={
+              app.keyHighlightColorType == "primary"
+                ? theme.palette.primary.main
+                : theme.palette.secondary.main
+            }
+            whiteKeyColor={theme.palette.text.primary}
+          />
+        </div>
       </div>
     );
   }
 
-  return <div className="kbd-device">{res}</div>;
+  return (
+    <div
+      className="kbd-device"
+      style={cols2 ? { flexDirection: "row", flexWrap: "wrap", columnGap: "2cqw" } : undefined}
+    >
+      {res}
+    </div>
+  );
 }
 
 // device-section cards keyed to match the channel list's section keys, so both
@@ -108,28 +141,83 @@ const DEVICE_CARDS: Record<
   scc: { name: "SCC", device: "scc", targets: [0, 1, 2, 3, 4] },
 };
 
-export function KeyboardList(props: { isSmall?: boolean | null; aspect?: string | null }) {
+export function KeyboardList(props: {
+  isSmall?: boolean | null;
+  aspect?: string | null;
+  columns?: number;
+}) {
   const isSmall =
     props.isSmall ?? (typeof window !== "undefined" && window.innerWidth < 600);
-  const aspect = props.aspect ?? (isSmall ? "640/22" : "640/28");
+  // per-row aspect ratio: shorter keyboards in 1-column, taller in 2-column
+  // 1-column: applied to the whole row; 2-column: applied to the keyboard box
+  // (the cell height is then auto = info row + keyboard, so it can't stretch)
+  const aspect =
+    props.aspect ?? (isSmall ? "640/22" : props.columns === 2 ? "640/36" : "640/24");
   const order = useSyncExternalStore(subscribeSectionOrder, getSectionOrder);
+  const collapsed = useSyncExternalStore(subscribeSectionOrder, getCollapsedSections);
+
+  const onDragEnd = (result: DropResult) => {
+    const { source, destination } = result;
+    if (!destination || destination.index === source.index) return;
+    const next = [...getSectionOrder()];
+    const [moved] = next.splice(source.index, 1);
+    next.splice(destination.index, 0, moved);
+    setSectionOrder(next);
+  };
 
   return (
-    <div className="kbd-list">
-      {order.map((key) => {
-        const c = DEVICE_CARDS[key];
-        if (c == null) return null;
-        return (
-          <DeviceCard
-            key={key}
-            keyboardAspectRatio={aspect}
-            small={isSmall}
-            name={c.name}
-            device={c.device}
-            targets={c.targets}
-          />
-        );
-      })}
-    </div>
+    <DragDropContext onDragEnd={onDragEnd}>
+      <Droppable droppableId="kbd-sections">
+        {(dp) => (
+          <div
+            className="kbd-list"
+            ref={dp.innerRef}
+            {...dp.droppableProps}
+            style={{ gap: "6px" }}
+          >
+            {order.map((key, index) => {
+              const c = DEVICE_CARDS[key];
+              if (c == null) return null;
+              const isCollapsed = collapsed.includes(key);
+              return (
+                <Draggable key={key} draggableId={key} index={index}>
+                  {(p) => (
+                    <div className="kbd-section" ref={p.innerRef} {...p.draggableProps}>
+                      <div
+                        className="kbd-section-head"
+                        onClick={() => toggleSectionCollapsed(key)}
+                        title={isCollapsed ? "Expand" : "Collapse"}
+                      >
+                        <span className="kbd-section-collapse">
+                          {isCollapsed ? (
+                            <ChevronRight sx={{ fontSize: "1.2em" }} />
+                          ) : (
+                            <ExpandMore sx={{ fontSize: "1.2em" }} />
+                          )}
+                        </span>
+                        <span className="kbd-section-name" {...p.dragHandleProps}>
+                          {c.name}
+                        </span>
+                      </div>
+                      {!isCollapsed && (
+                        <DeviceCard
+                          keyboardAspectRatio={aspect}
+                          small={isSmall}
+                          columns={props.columns}
+                          name={c.name}
+                          device={c.device}
+                          targets={c.targets}
+                        />
+                      )}
+                    </div>
+                  )}
+                </Draggable>
+              );
+            })}
+            {dp.placeholder}
+          </div>
+        )}
+      </Droppable>
+    </DragDropContext>
   );
 }

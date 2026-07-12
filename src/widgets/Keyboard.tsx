@@ -287,7 +287,10 @@ export function Keyboard(props: KeyboardProps) {
     const N = 56;
     const w = Math.round(size.width * dpr);
     const h = Math.round(size.height * dpr);
-    const margin = Math.max(1, Math.round(dpr));
+    // gap between white keys scales with the key slot so it keeps its
+    // proportion as the keyboard grows (min 1 device px)
+    const slot = w / N;
+    const margin = Math.max(1, Math.round(slot * 0.08));
     const wkw = Math.max(1, Math.floor((w - margin * (N - 1)) / N));
     return new KeyboardPainter({
       whiteKeyWidth: wkw,

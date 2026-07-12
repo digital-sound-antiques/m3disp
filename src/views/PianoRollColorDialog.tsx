@@ -1,18 +1,4 @@
-import {
-  Box,
-  Button,
-  DialogActions,
-  DialogContent,
-  FormControlLabel,
-  ListSubheader,
-  Radio,
-  RadioGroup,
-  Tab,
-  Tabs,
-  Typography,
-} from "@mui/material";
-import Grid2 from "@mui/material/Unstable_Grid2/Grid2";
-import React, { Fragment, useContext, useEffect, useRef, useState } from "react";
+import React, { useContext, useEffect, useRef, useState } from "react";
 import { AppContext, PianoRollColorModeMap } from "../contexts/AppContext";
 import { ColorBall } from "../widgets/ColorSelector";
 import { pianoRollColorDialogId } from "../widgets/PianoRollControl";
@@ -38,11 +24,11 @@ function toHex6(color: string): string {
   return color.slice(0, 7).toLowerCase();
 }
 
-const BALL_SIZE = 26; // inner circle diameter; outer wrapper is +6.
+const BALL_SIZE = 22; // inner circle diameter; the hit area is +6.
 
 function ColorPickerBall(props: { color: string; disabled?: boolean; onChange: (c: string) => void }) {
   return (
-    <Box sx={{ position: "relative", display: "inline-flex" }}>
+    <span style={{ position: "relative", display: "inline-flex" }}>
       <ColorBall color={props.color} size={BALL_SIZE} />
       {!props.disabled && (
         <input
@@ -60,77 +46,7 @@ function ColorPickerBall(props: { color: string; disabled?: boolean; onChange: (
           }}
         />
       )}
-    </Box>
-  );
-}
-
-interface TabPanelProps {
-  children?: React.ReactNode;
-  index: number;
-  value: number;
-}
-
-function TabPanel(props: TabPanelProps) {
-  const { children, value, index } = props;
-  return (
-    <div role="tabpanel" hidden={value !== index}>
-      {value === index && <Box sx={{ py: 2 }}>{children}</Box>}
-    </div>
-  );
-}
-
-function ChipPanel(props: {
-  value: number;
-  index: number;
-  group: ChannelGroup;
-  mode: PianoRollColorMode;
-  colors: string[];
-  onModeChange: (value: PianoRollColorMode) => void;
-  onColorChange: (index: number, color: string) => void;
-  onReset: () => void;
-}) {
-  const { group } = props;
-  // Channel colors only apply in "By Channel" mode; dim + disable otherwise.
-  const disabled = props.mode === "voice";
-  return (
-    <TabPanel value={props.value} index={props.index}>
-      <ListSubheader>Coloring Mode</ListSubheader>
-      <RadioGroup
-        row
-        sx={{ px: 2 }}
-        value={props.mode}
-        onChange={(_evt, value) => props.onModeChange(value as PianoRollColorMode)}
-      >
-        <FormControlLabel value="voice" control={<Radio size="small" />} label="By Tone" />
-        <FormControlLabel value="channel" control={<Radio size="small" />} label="By Channel" />
-      </RadioGroup>
-
-      <Box sx={{ opacity: disabled ? 0.4 : 1, pointerEvents: disabled ? "none" : "auto" }}>
-        <ListSubheader>Channel Colors</ListSubheader>
-        <Grid2 container columns={3} sx={{ px: 2 }}>
-          {group.labels.map((label, i) => {
-            const index = group.base + i;
-            return (
-              <Grid2 xs={1} key={label}>
-                <Box sx={{ display: "flex", alignItems: "center", my: 0.5 }}>
-                  <ColorPickerBall
-                    color={props.colors[index]}
-                    disabled={disabled}
-                    onChange={(c) => props.onColorChange(index, c)}
-                  />
-                  <Typography variant="body2">{label}</Typography>
-                </Box>
-              </Grid2>
-            );
-          })}
-        </Grid2>
-        <Box sx={{ px: 2, mt: 1 }}>
-          <Button size="small" disabled={disabled} onClick={props.onReset}>
-            Reset to Default
-          </Button>
-        </Box>
-      </Box>
-    </TabPanel>
+    </span>
   );
 }
 
@@ -173,57 +89,94 @@ function DialogBody(props: { id: string }) {
     app.setPianoRollChannelColors(savedChannelColors);
     app.closeDialog(props.id);
   };
-
   const onOk = () => app.closeDialog(props.id);
 
+  const g = channelGroups[tab];
+  const gMode = mode[g.device];
+  const disabled = gMode === "voice"; // channel colors only apply "By Channel"
+
   return (
-    <Fragment>
-      <DialogContent
-        sx={{
-          minWidth: "300px",
-          width: { sm: "480px" },
-          height: { xs: "440px", sm: "480px" },
-          p: 1,
-          backgroundColor: "background.paper",
-        }}
-      >
-        <Box sx={{ borderBottom: 1, borderColor: "divider" }}>
-          <Tabs value={tab} onChange={(_evt, value) => setTab(value)} variant="fullWidth">
-            {channelGroups.map((g) => (
-              <Tab key={g.device} label={g.name} />
-            ))}
-          </Tabs>
-        </Box>
-        {channelGroups.map((g, i) => (
-          <ChipPanel
-            key={g.device}
-            value={tab}
-            index={i}
-            group={g}
-            mode={mode[g.device]}
-            colors={channelColors}
-            onModeChange={(value) => updateMode(g.device, value)}
-            onColorChange={updateChannelColorAt}
-            onReset={() => resetChannelColors(g)}
-          />
-        ))}
-      </DialogContent>
-      <DialogActions sx={{ backgroundColor: "background.paper" }}>
-        <Button onClick={onCancel}>Cancel</Button>
-        <Button onClick={onOk}>Ok</Button>
-      </DialogActions>
-    </Fragment>
+    <>
+      <div className="crd-body">
+        <div className="crd-tabs">
+          {channelGroups.map((grp, i) => (
+            <button
+              key={grp.device}
+              className={`crd-tab${tab === i ? " active" : ""}`}
+              onClick={() => setTab(i)}
+            >
+              {grp.name}
+            </button>
+          ))}
+        </div>
+
+        <div className="crd-section-label">Coloring Mode</div>
+        <div className="crd-radios">
+          <label className="crd-radio">
+            <input
+              type="radio"
+              name={`crd-mode-${g.device}`}
+              checked={gMode === "voice"}
+              onChange={() => updateMode(g.device, "voice")}
+            />
+            <span>By Tone</span>
+          </label>
+          <label className="crd-radio">
+            <input
+              type="radio"
+              name={`crd-mode-${g.device}`}
+              checked={gMode === "channel"}
+              onChange={() => updateMode(g.device, "channel")}
+            />
+            <span>By Channel</span>
+          </label>
+        </div>
+
+        <div className={`crd-colors${disabled ? " disabled" : ""}`}>
+          <div className="crd-section-label">Channel Colors</div>
+          <div className="crd-grid">
+            {g.labels.map((label, i) => {
+              const index = g.base + i;
+              return (
+                <div className="crd-cell" key={label}>
+                  <ColorPickerBall
+                    color={channelColors[index]}
+                    disabled={disabled}
+                    onChange={(c) => updateChannelColorAt(index, c)}
+                  />
+                  <span className="crd-cell-label">{label}</span>
+                </div>
+              );
+            })}
+          </div>
+          <button className="crd-reset" disabled={disabled} onClick={() => resetChannelColors(g)}>
+            Reset to Default
+          </button>
+        </div>
+      </div>
+
+      <div className="fdlg-foot">
+        <button className="fdlg-txtbtn" onClick={onCancel}>
+          CANCEL
+        </button>
+        <button className="fdlg-txtbtn" onClick={onOk}>
+          OK
+        </button>
+      </div>
+    </>
   );
 }
 
 export function PianoRollColorDialog() {
   const app = useContext(AppContext);
   const open = app.isOpen(pianoRollColorDialogId);
-  const [pos, setPos] = useState<{ x: number; y: number }>({ x: 160, y: 110 });
+  // null = not yet dragged → render centered; once dragged, explicit position.
+  const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
   const dragRef = useRef<{ px: number; py: number; x: number; y: number } | null>(null);
 
   useEffect(() => {
     if (!open) return;
+    setPos(null); // always re-center when the dialog opens
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") app.closeDialog(pianoRollColorDialogId);
     };
@@ -235,8 +188,11 @@ export function PianoRollColorDialog() {
 
   const onHeadDown = (e: React.PointerEvent) => {
     if ((e.target as HTMLElement).closest(".fdlg-close")) return;
+    const rect = (e.currentTarget.closest(".fdlg") as HTMLElement).getBoundingClientRect();
+    const start = pos ?? { x: rect.left, y: rect.top };
+    if (!pos) setPos(start); // switch from centered to explicit positioning
     e.currentTarget.setPointerCapture(e.pointerId);
-    dragRef.current = { px: e.clientX, py: e.clientY, x: pos.x, y: pos.y };
+    dragRef.current = { px: e.clientX, py: e.clientY, x: start.x, y: start.y };
   };
   const onHeadMove = (e: React.PointerEvent) => {
     const d = dragRef.current;
@@ -251,8 +207,12 @@ export function PianoRollColorDialog() {
     e.currentTarget.releasePointerCapture(e.pointerId);
   };
 
+  const style: React.CSSProperties = pos
+    ? { left: pos.x, top: pos.y }
+    : { left: "50%", top: "50%", transform: "translate(-50%, -50%)" };
+
   return (
-    <div className="fdlg" style={{ left: pos.x, top: pos.y }}>
+    <div className="fdlg fdlg-colors" style={style}>
       <div className="fdlg-head" onPointerDown={onHeadDown} onPointerMove={onHeadMove} onPointerUp={onHeadUp}>
         <span>Channel Colors</span>
         <button

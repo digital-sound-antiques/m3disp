@@ -1,5 +1,14 @@
 import { useContext, useEffect, useRef, useState } from "react";
-import { EditNote, Pause, PlayArrow, PlaylistAdd, SaveAlt } from "@mui/icons-material";
+import {
+  EditNote,
+  FileOpen,
+  LibraryMusic,
+  Link as LinkIcon,
+  Pause,
+  PlayArrow,
+  PlaylistAdd,
+  SaveAlt,
+} from "@mui/icons-material";
 
 import { DragDropContext, Draggable, Droppable, DropResult } from "@hello-pangea/dnd";
 import { PlayListEntry, PlayerContext } from "../contexts/PlayerContext";
@@ -78,30 +87,44 @@ export function PlayListView() {
               </button>
               {addOpen && (
                 <div className="pl-menu">
-                  <button
-                    onClick={() => {
-                      setAddOpen(false);
-                      onAddClick();
-                    }}
-                  >
-                    Open file…
-                  </button>
-                  <button
-                    onClick={() => {
-                      setAddOpen(false);
-                      app.openDialog("open-url-dialog");
-                    }}
-                  >
-                    Open URL…
-                  </button>
-                  <button
-                    onClick={() => {
-                      setAddOpen(false);
-                      app.openDialog("sample-dialog");
-                    }}
-                  >
-                    Open samples…
-                  </button>
+                  <div className="menu-list">
+                    <button
+                      className="menu-item"
+                      onClick={() => {
+                        setAddOpen(false);
+                        onAddClick();
+                      }}
+                    >
+                      <span className="menu-ico">
+                        <FileOpen sx={{ fontSize: 18 }} />
+                      </span>
+                      <span className="menu-label">Open file…</span>
+                    </button>
+                    <button
+                      className="menu-item"
+                      onClick={() => {
+                        setAddOpen(false);
+                        app.openDialog("open-url-dialog");
+                      }}
+                    >
+                      <span className="menu-ico">
+                        <LinkIcon sx={{ fontSize: 18 }} />
+                      </span>
+                      <span className="menu-label">Open URL…</span>
+                    </button>
+                    <button
+                      className="menu-item"
+                      onClick={() => {
+                        setAddOpen(false);
+                        app.openDialog("sample-dialog");
+                      }}
+                    >
+                      <span className="menu-ico">
+                        <LibraryMusic sx={{ fontSize: 18 }} />
+                      </span>
+                      <span className="menu-label">Open samples…</span>
+                    </button>
+                  </div>
                 </div>
               )}
             </div>
@@ -176,15 +199,17 @@ export function PlayListView() {
                               >
                                 ✕
                               </button>
-                            ) : selected ? (
+                            ) : (
                               <span className="pl-act">
-                                {playing ? (
-                                  <Pause sx={{ fontSize: 16 }} />
-                                ) : (
-                                  <PlayArrow sx={{ fontSize: 16 }} />
-                                )}
+                                {selected ? (
+                                  playing ? (
+                                    <Pause sx={{ fontSize: 16 }} />
+                                  ) : (
+                                    <PlayArrow sx={{ fontSize: 16 }} />
+                                  )
+                                ) : null}
                               </span>
-                            ) : null}
+                            )}
                           </li>
                         )}
                       </Draggable>

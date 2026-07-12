@@ -8,6 +8,9 @@ type TrackInfoPanelProps = {
   targets: ChannelId[];
   sx?: SxProps<Theme> | null;
   disabled: boolean;
+  /** lay out number / voice / meter in a single row (for stacking above the
+   *  keyboard in the 2-column view) instead of the default side column */
+  top?: boolean;
 };
 
 type VolumeIndicatorProps = {
@@ -264,7 +267,7 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
         >
           <Typography
             sx={{
-              fontSize: { sm: "8px", md: "9px", lg: "10px", xl: "11px" },              
+              fontSize: "inherit",
               fontWeight: "bold",
               px: 0.25,
             }}
@@ -285,7 +288,13 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
             height: "100%",
           }}
         >
-          <Box sx={{ position: "absolute", top: 6, bottom: 6, right: 4, left: 4 }}>
+          <Box
+            sx={
+              props.top
+                ? { position: "absolute", top: "10%", bottom: "28%", left: "2%", width: "84%", maxWidth: "96px" }
+                : { position: "absolute", top: "10%", bottom: "28%", left: "2%", right: "2%" }
+            }
+          >
             <WaveIndicator
               wave={status?.voice}
               color={theme.palette.primary.main}
@@ -299,7 +308,47 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
     }
   }
 
+  if (props.top) {
+    // single row: number · voice · meter — placed above the keyboard (2-column)
+    return (
+      <Box
+        ref={rootRef}
+        sx={{
+          flex: "0 0 auto",
+          display: "flex",
+          flexDirection: "row",
+          alignItems: "center",
+          gap: "1.5cqw",
+          width: "100%",
+          px: "1.5cqw",
+          py: "1cqw",
+          fontSize: "clamp(4px, 1cqh, 24px)",
+          lineHeight: 1,
+          overflow: "hidden",
+        }}
+      >
+        <Typography
+          sx={{
+            flex: "0 0 auto",
+            fontSize: "inherit",
+            fontWeight: "bold",
+            color: "#8b949e",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {props.title}
+        </Typography>
+        <Box sx={{ position: "relative", flex: 1, minWidth: 0, height: "1.3em" }}>{voiceNode}</Box>
+        <Box sx={{ position: "relative", flex: "0 0 30%", maxWidth: "80px", height: "0.5em" }}>
+          <VolumeInfoPanel variant="horizontal" targets={props.targets} disabled={props.disabled} />
+        </Box>
+      </Box>
+    );
+  }
+
   return (
+    // Sizes are expressed in container units (cqw/cqh) of the enclosing keyboard
+    // row so the name/voice/meter scale together with the row.
     <Box
       ref={rootRef}
       sx={{
@@ -308,8 +357,10 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
         flexDirection: "column",
         justifyContent: "start",
         alignItems: "stretch",
-        minWidth: { sm: "96px", lg: "128px" },
-        width: { sm: "96px", lg: "128px" },
+        flex: "0 0 auto",
+        width: "17cqw",
+        fontSize: "clamp(8px, 24cqh, 32px)",
+        lineHeight: 1,
       }}
     >
       <Box
@@ -318,48 +369,31 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
           display: "flex",
           position: "relative",
           flexDirection: "row",
-          alignItems: "stretch",
-          px: { md: 0.25, lg: 0.5 },
+          alignItems: "center",
+          minHeight: 0,
+          px: "1cqw",
+          gap: "1cqw",
         }}
       >
-        <Box
-          sx={{ flex: 0, flexShrink: 0, display: "flex", alignItems: "center", flexBasis: "2em" }}
-        >
-          <Typography
-            sx={{
-              flexBasis: "64px",
-              textAlign: "center",
-              fontSize: { sm: "8px", md: "9px", lg: "10px", xl: "11px" },
-              fontWeight: "bold",
-              color: "text.secondary",            
-            }}
-          >
-            {props.title}
-          </Typography>
-        </Box>
-        <Box
+        <Typography
           sx={{
-            position: "relative",
-            ml: 0.25,
-            flex: 0,
-            flexGrow: 1,
-            flexShrink: 0,
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "stretch",
+            flex: "0 0 auto",
+            fontSize: "inherit",
+            fontWeight: "bold",
+            color: "#8b949e",
+            whiteSpace: "nowrap",
           }}
         >
-          <Box sx={{ position: "relative", width: "100%", height: "100%" }}>{voiceNode}</Box>
-        </Box>
+          {props.title}
+        </Typography>
+        <Box sx={{ position: "relative", flex: 1, minWidth: 0, height: "100%" }}>{voiceNode}</Box>
       </Box>
-      <Box
-        sx={{ position: "relative", width: "100%", height: { sm: "1px", md: "2px", lg: "2px" } }}
-      >
-        <Box sx={{ position: "absolute", top: 0, bottom: 0, right: 8, left: 8 }}>
+      <Box sx={{ position: "relative", width: "100%", height: "10cqh" }}>
+        <Box sx={{ position: "absolute", top: 0, bottom: 0, right: "1cqw", left: "1cqw" }}>
           <VolumeInfoPanel variant="horizontal" targets={props.targets} disabled={props.disabled} />
         </Box>
       </Box>
-      <Box sx={{ height: { xs: "4px", lg: "6px" } }}></Box>
+      <Box sx={{ height: "16cqh" }}></Box>
     </Box>
   );
 }
