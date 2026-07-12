@@ -100,6 +100,9 @@ class KSSDecoderWorker extends AudioDecoderWorker {
   private _nextKeyframeFrame = 0; // next scheduled capture frame
   private _bufferedHWM = 0; // furthest keyframer position (drives the seek buffer bar)
   private _endFrame = 0; // actual total length (intro + loops + fade), 0 until the keyframer finds it
+  // whether _endFrame ends on a fade-out (loop cut-off / duration cap) rather
+  // than a natural stop (stop flag). Only fade-out ends get the anchored fade.
+  private _endIsFadeOut = false;
 
   private _duration = defaultDuration;
   private _fadeDuration = defaultFadeDuration;
@@ -205,6 +208,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
       this._keyframerFrames = 0;
       this._bufferedHWM = 0;
       this._endFrame = 0;
+      this._endIsFadeOut = false;
       this._resetKeyState();
 
       if (this._hasDebugMarker) {
@@ -509,7 +513,8 @@ class KSSDecoderWorker extends AudioDecoderWorker {
       // `maxLoop` times, ending fadeFrames later. (The audible player applies the
       // same policy; the keyframer just discovers the frame first.)
       if (this._endFrame === 0 && kf.getLoopCount() >= this._maxLoop) {
-        this._reportDuration(this._keyframerFrames + fadeFrames);
+        // Loop cut-off: fade out over the fadeFrames that follow the loop point.
+        this._reportDuration(this._keyframerFrames + fadeFrames, true);
       }
       snapshots.push({
         frame: this._keyframerFrames - step,
@@ -525,10 +530,13 @@ class KSSDecoderWorker extends AudioDecoderWorker {
         this._nextKeyframeFrame += this._keyframeFrames;
       }
     }
-    // Natural end: the song stopped on its own, or reached the duration cap
-    // (non-looping / silence). The keyframer's current frame is the total length.
+    // End of song: the driver stopped on its own (stop flag) or we hit the
+    // duration cap (non-looping / silence). A natural stop ends cleanly with no
+    // fade; only the duration cap fades out. The keyframer's current frame is
+    // the total length.
     if (this._endFrame === 0 && (kf.getStopFlag() != 0 || this._keyframerFrames >= endLimit)) {
-      this._reportDuration(this._keyframerFrames);
+      const naturalStop = kf.getStopFlag() != 0;
+      this._reportDuration(this._keyframerFrames, !naturalStop);
     }
     if (snapshots.length > 0) {
       this.worker.postMessage({ type: "snapshots", data: snapshots, token: this._loadedToken });
@@ -539,9 +547,12 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     }
   }
 
-  /** Record and announce the actual total length (once). */
-  private _reportDuration(frame: number): void {
+  /** Record and announce the actual total length (once). `isFadeOut` marks a
+   *  loop cut-off / duration-cap end (audible player fades before it); a natural
+   *  stop-flag end passes false and is played through to the exact frame. */
+  private _reportDuration(frame: number, isFadeOut: boolean): void {
     this._endFrame = frame;
+    this._endIsFadeOut = isFadeOut;
     this.worker.postMessage({ type: "duration", frame, token: this._loadedToken });
   }
 
@@ -569,7 +580,13 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     // `_endFrame` keeps audio and the seek bar in sync.
     if (this._endFrame > 0) {
       const fadeFrames = (this.sampleRate * this._fadeDuration) / 1000;
-      if (this._playerFrames >= this._endFrame - fadeFrames && player.getFadeFlag() == 0) {
+      // Only fade for loop cut-off / duration-cap ends. Songs that stop on their
+      // own (stop flag) have a definite ending and are played through unfaded.
+      if (
+        this._endIsFadeOut &&
+        this._playerFrames >= this._endFrame - fadeFrames &&
+        player.getFadeFlag() == 0
+      ) {
         player.fadeStart(this._fadeDuration);
       }
       if (this._playerFrames >= this._endFrame) {
