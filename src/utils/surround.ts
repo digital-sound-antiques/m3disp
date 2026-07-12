@@ -55,8 +55,9 @@ export class SurroundEffect {
     this.wideGain = new GainNode(ctx, { gain: 0 });
     merger.connect(this.wideGain).connect(this.output);
 
-    // Reverb layered on top of the widened signal.
-    const convolver = new ConvolverNode(ctx, { buffer: makeImpulse(ctx, 2.2, 1.8) });
+    // Reverb layered on top of the widened signal. Longer tail + gentler decay
+    // for a deeper, more spacious echo.
+    const convolver = new ConvolverNode(ctx, { buffer: makeImpulse(ctx, 2.8, 2.0) });
     this.reverbGain = new GainNode(ctx, { gain: 0 });
     merger.connect(convolver).connect(this.reverbGain).connect(this.output);
   }
@@ -67,7 +68,7 @@ export class SurroundEffect {
     const ramp = (param: AudioParam, value: number) => param.setTargetAtTime(value, t, 0.02);
     ramp(this.directGain.gain, mode === "off" ? 1 : 0);
     ramp(this.wideGain.gain, mode === "off" ? 0 : 0.8);
-    ramp(this.reverbGain.gain, mode === "wide-reverb" ? 0.33 : 0);
+    ramp(this.reverbGain.gain, mode === "wide-reverb" ? 0.42 : 0);
   }
 
   getMode(): SurroundMode {

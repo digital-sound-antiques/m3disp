@@ -21,20 +21,26 @@ function AutoSizeCanvas(props: {
   width: number;
   height: number;
   painter: (canvas: HTMLCanvasElement) => void;
+  resX?: number;
+  resY?: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const rx = props.resX ?? 1;
+  const ry = props.resY ?? 1;
 
   useEffect(() => {
     const canvas = canvasRef.current!;
-    canvas.width = props.width * devicePixelRatio;
-    canvas.height = props.height * devicePixelRatio;
+    // Backing store is boosted by the display scale so a CSS-scaled (3D) canvas
+    // keeps device-pixel sharpness instead of being upscaled/coarse.
+    canvas.width = Math.round(props.width * devicePixelRatio * rx);
+    canvas.height = Math.round(props.height * devicePixelRatio * ry);
     canvas.style.width = `${props.width}px`;
     canvas.style.height = `${props.height}px`;
-  }, [props.width, props.height]);
+  }, [props.width, props.height, rx, ry]);
 
   useEffect(() => {
     props.painter(canvasRef.current!);
-  }, [props.painter, props.width, props.height]);
+  }, [props.painter, props.width, props.height, rx, ry]);
 
   return <canvas ref={canvasRef} style={{ position: "absolute", top: 0, left: 0 }} />;
 }
@@ -43,6 +49,8 @@ function HighlightCanvas(props: {
   width: number;
   height: number;
   painter: (canvas: HTMLCanvasElement, keys: number[]) => void;
+  resX?: number;
+  resY?: number;
 }) {
   const { player, channelMask } = useContext(PlayerContext);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -50,14 +58,16 @@ function HighlightCanvas(props: {
   painterRef.current = props.painter;
   const maskRef = useRef(channelMask);
   maskRef.current = channelMask;
+  const rx = props.resX ?? 1;
+  const ry = props.resY ?? 1;
 
   useEffect(() => {
     const canvas = canvasRef.current!;
-    canvas.width = props.width * devicePixelRatio;
-    canvas.height = props.height * devicePixelRatio;
+    canvas.width = Math.round(props.width * devicePixelRatio * rx);
+    canvas.height = Math.round(props.height * devicePixelRatio * ry);
     canvas.style.width = `${props.width}px`;
     canvas.style.height = `${props.height}px`;
-  }, [props.width, props.height]);
+  }, [props.width, props.height, rx, ry]);
 
   useEffect(() => {
     const renderFrame = () => {
@@ -82,7 +92,7 @@ function HighlightCanvas(props: {
 
 // ---- Main piano roll canvas ----
 
-function PianoRollCanvas(props: { width: number; height: number }) {
+function PianoRollCanvas(props: { width: number; height: number; resX?: number; resY?: number }) {
   const appContext = useContext(AppContext);
   const playerContext = useContext(PlayerContext);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -92,6 +102,8 @@ function PianoRollCanvas(props: { width: number; height: number }) {
   // other state), not the value captured when the effect mounted
   const playerContextRef = useRef(playerContext);
   playerContextRef.current = playerContext;
+  const rx = props.resX ?? 1;
+  const ry = props.resY ?? 1;
 
   // Note: the status cache is synced inside paintPianoRoll (rAF). It detects
   // song changes via player._snapshots array identity, so no event listeners
@@ -100,11 +112,11 @@ function PianoRollCanvas(props: { width: number; height: number }) {
   // Sync canvas size
   useEffect(() => {
     const canvas = canvasRef.current!;
-    canvas.width = props.width * devicePixelRatio;
-    canvas.height = props.height * devicePixelRatio;
+    canvas.width = Math.round(props.width * devicePixelRatio * rx);
+    canvas.height = Math.round(props.height * devicePixelRatio * ry);
     canvas.style.width = `${props.width}px`;
     canvas.style.height = `${props.height}px`;
-  }, [props.width, props.height]);
+  }, [props.width, props.height, rx, ry]);
 
   // rAF render loop
   useEffect(() => {
@@ -149,9 +161,61 @@ export function PianoRoll(props: { mode: string }) {
     return () => observer.disconnect();
   }, []);
 
-  const transform = props.mode === "3d"
-    ? "scaleY(1.2) translateY(-20%) perspective(900px) rotateX(-130deg) rotateZ(90deg) rotateY(0deg)"
-    : "none";
+  // Animate the transform only when the 2D/3D mode toggles; size-driven changes
+  // (the transform depends on the measured box) should snap instantly.
+  const prevMode = useRef(props.mode);
+  const modeChanged = prevMode.current !== props.mode;
+  prevMode.current = props.mode;
+  const [modeAnim, setModeAnim] = useState(false);
+  const didMount = useRef(false);
+  useEffect(() => {
+    if (!didMount.current) {
+      didMount.current = true;
+      return;
+    }
+    setModeAnim(true);
+    const t = setTimeout(() => setModeAnim(false), 1000);
+    return () => clearTimeout(t);
+  }, [props.mode]);
+  const transition = modeChanged || modeAnim ? "transform 1s ease" : "none";
+
+  // In 3D the now-line (keyboard) is placed exactly 25% up from the bottom of
+  // the drawing area. Its projected vertical position depends on the box size,
+  // so translateY is computed from the measured width/height rather than being a
+  // fixed percentage. Transform order (applied last→first): scaleY, translateY,
+  // perspective, rotateX, rotateZ — so translateY/scaleY act in projected space.
+  const PERSP = 900;
+  const SCALE_Y = 1.2;
+  const NOW_FROM_BOTTOM = 0.25; // keyboard sits 25% up from the bottom
+  const KB_WIDTH_FRAC = 0.8; // keyboard spans ~80% of the display width
+  const RES_CAP = 2; // cap the backing-store boost so memory stays bounded
+  let transform = "none";
+  let resX = 1;
+  let resY = 1;
+  if (props.mode === "3d") {
+    const w = size.width;
+    const h = size.height;
+    const rotXDeg = -130; // fixed tilt
+    const rotX = (rotXDeg * Math.PI) / 180;
+    // After rotateZ(90deg): the now-line (keyboard) is a single horizontal line
+    // whose whole length sits at one depth. yc is its centered rotated-y; the
+    // keyboard's pitch axis (canvas height h) maps to the screen's horizontal.
+    const yc = (lpos - 0.5) * w;
+    const zKb = yc * Math.sin(rotX); // keyboard depth after rotateX
+    const kbFactor = PERSP / (PERSP - zKb); // perspective magnification at that depth
+    const yProj = yc * Math.cos(rotX) * kbFactor;
+    // translateY so the now-line lands NOW_FROM_BOTTOM up from the bottom
+    const ty = ((0.5 - NOW_FROM_BOTTOM) * h) / SCALE_Y - yProj;
+    // scaleX so the keyboard (projected width = h * kbFactor) fills ~90% of w
+    const scaleX = h > 0 ? (KB_WIDTH_FRAC * w) / (h * kbFactor) : 1;
+    transform = `scaleY(${SCALE_Y}) scaleX(${scaleX}) translateY(${ty}px) perspective(${PERSP}px) rotateX(${rotXDeg}deg) rotateZ(90deg)`;
+    // Boost canvas backing store to the actual on-screen magnification so the
+    // CSS-scaled 3D view stays sharp (no more than the displayed device pixels).
+    // rotateZ(90deg) swaps axes: canvas width → screen-y (scaleY), canvas height
+    // → screen-x (scaleX). Include the keyboard's perspective magnification.
+    resX = Math.min(RES_CAP, Math.max(1, SCALE_Y * kbFactor));
+    resY = Math.min(RES_CAP, Math.max(1, scaleX * kbFactor));
+  }
 
   return (
     <div className="pianoroll-wrap">
@@ -164,25 +228,25 @@ export function PianoRoll(props: { mode: string }) {
           transformOrigin: "center",
           transformStyle: "preserve-3d",
           transform,
-          transition: "transform 1s ease",
+          transition,
         }}
       >
-        <AutoSizeCanvas painter={paintPianoRollBg} width={size.width} height={size.height} />
-        <PianoRollCanvas width={size.width} height={size.height} />
+        <AutoSizeCanvas painter={paintPianoRollBg} width={size.width} height={size.height} resX={resX} resY={resY} />
+        <PianoRollCanvas width={size.width} height={size.height} resX={resX} resY={resY} />
 
         {appContext.pianoRollShowKeyboard ? <>
-          <AutoSizeCanvas painter={paintWhiteKeyboard} width={size.width} height={size.height} />
-          <HighlightCanvas painter={paintWhiteHighlight} width={size.width} height={size.height} />
+          <AutoSizeCanvas painter={paintWhiteKeyboard} width={size.width} height={size.height} resX={resX} resY={resY} />
+          <HighlightCanvas painter={paintWhiteHighlight} width={size.width} height={size.height} resX={resX} resY={resY} />
           <AutoSizeCanvas
             painter={(c) => paintBlackKeyboard(c, props.mode === "3d")}
-            width={size.width} height={size.height}
+            width={size.width} height={size.height} resX={resX} resY={resY}
           />
           <HighlightCanvas
             painter={(c, keys) => paintBlackHighlight(c, keys, props.mode === "3d")}
-            width={size.width} height={size.height}
+            width={size.width} height={size.height} resX={resX} resY={resY}
           />
         </> : (
-          <AutoSizeCanvas painter={paintKeyboardEdgeLine} width={size.width} height={size.height} />
+          <AutoSizeCanvas painter={paintKeyboardEdgeLine} width={size.width} height={size.height} resX={resX} resY={resY} />
         )}
       </div>
     </div>
