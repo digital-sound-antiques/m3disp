@@ -68,6 +68,8 @@ export function SettingsContextProvider(props: PropsWithChildren) {
 
   const [state, setState] = useState({
     ...defaultContextState,
+    defaultLoopCount: context.defaultLoopCount,
+    defaultDuration: context.defaultDuration,
     channelMask: { ...context.channelMask },
   });
 
