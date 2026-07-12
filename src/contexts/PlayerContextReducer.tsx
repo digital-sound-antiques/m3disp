@@ -175,7 +175,7 @@ export class PlayerContextReducer {
 
   _nextReducer(state: PlayerContextState, loop: boolean = false): PlayerContextState {
     const currentIndex = state.entries.findIndex((e) => e == state.currentEntry);
-    if (currentIndex != null) {
+    if (currentIndex >= 0) {
       if (loop || currentIndex < state.entries.length - 1) {
         const nextEntry = state.entries[(currentIndex + 1) % state.entries.length];
         return this._playReducer(state, nextEntry);
@@ -190,7 +190,7 @@ export class PlayerContextReducer {
 
   _prevReducer(state: PlayerContextState, loop: boolean = false): PlayerContextState {
     const currentIndex = state.entries.findIndex((e) => e == state.currentEntry);
-    if (currentIndex != null) {
+    if (currentIndex >= 0) {
       if (loop || currentIndex > 0) {
         const nextEntry =
           state.entries[(currentIndex + state.entries.length - 1) % state.entries.length];
@@ -214,14 +214,26 @@ export class PlayerContextReducer {
 
   onPlayerStopped() {
     this.setState((state) => {
+      let next: PlayerContextState;
       switch (state.repeatMode) {
         case "single":
-          return this._playReducer(state);
+          next = this._playReducer(state);
+          break;
         case "all":
-          return this._nextReducer(state, true);
+          next = this._nextReducer(state, true);
+          break;
         default:
-          return this._nextReducer(state, false);
+          next = this._nextReducer(state, false);
       }
+      if (next != state) {
+        return next;
+      }
+      // No track to advance to (end of playlist): leave the playing state.
+      return {
+        ...state,
+        playState: "stopped",
+        playStateChangeCount: state.playStateChangeCount + 1,
+      };
     });
   }
 }

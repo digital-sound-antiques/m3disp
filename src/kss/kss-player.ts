@@ -142,7 +142,15 @@ export class KSSPlayer extends AudioPlayer {
   async seek(sec: number): Promise<void> {
     if (this._lastArgs == null) return;
     const rate = this.audioContext?.sampleRate ?? 44100;
-    const startFrame = Math.max(0, Math.round(sec * rate));
+    let startFrame = Math.max(0, Math.round(sec * rate));
+    if (this._totalFrame > 0) {
+      startFrame = Math.min(startFrame, this._totalFrame);
+    } else if (startFrame > this._buffered) {
+      // The real length is not known yet: a target beyond the scanned region
+      // may lie past the actual end of the track, where the decoder would kill
+      // playback the moment the end is discovered. Treat such a seek as invalid.
+      return;
+    }
     await this._runPlay({
       ...this._lastArgs,
       startFrame,
@@ -152,7 +160,11 @@ export class KSSPlayer extends AudioPlayer {
   }
 
   override async abort() {
-    this._snapshots = [];
+    // Reset the seek origin BEFORE super.abort(): the final (empty) progress
+    // event it dispatches resolves the play position as baseFrame + 0, which
+    // must read 0:00 — otherwise the time display sticks at the last seek
+    // target (e.g. after seeking past the not-yet-measured end of a track).
+    this.baseFrame = 0;
     await super.abort();
   }
 

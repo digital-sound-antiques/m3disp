@@ -21,6 +21,25 @@ export function TimeSlider() {
     if (seekingTo != null && Math.abs(currentSec - seekingTo) < 1) setSeekingTo(null);
   }, [currentSec, seekingTo]);
 
+  // a stale preview must not survive a track change
+  useEffect(() => {
+    setSeekingTo(null);
+  }, [entry]);
+
+  // While the real length is still being measured, a target beyond the scanned
+  // (buffered) region may lie past the actual end of the track; such a seek is
+  // rejected (mirroring KSSPlayer.seek), so snap the thumb back instead of
+  // pinning the preview on a position playback will never reach.
+  const commitSeek = (sec: number) => {
+    if (measuring && sec > bufferedSec) {
+      setSeekingTo(null);
+      return;
+    }
+    const target = Math.min(sec, totalSec);
+    setSeekingTo(target);
+    context.player.seek(target);
+  };
+
   const displaySec = seekingTo ?? currentSec;
   const maxSec = Math.max(totalSec, displaySec, 1);
 
@@ -37,10 +56,10 @@ export function TimeSlider() {
         disabled={entry == null}
         style={{ background: seekBackground(displaySec, bufferedSec, maxSec) }}
         onChange={(e) => setSeekingTo(Number(e.target.value))}
-        onPointerUp={(e) => context.player.seek(Number((e.target as HTMLInputElement).value))}
+        onPointerUp={(e) => commitSeek(Number((e.target as HTMLInputElement).value))}
         onKeyUp={(e) => {
           if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
-            context.player.seek(Number((e.target as HTMLInputElement).value));
+            commitSeek(Number((e.target as HTMLInputElement).value));
           }
         }}
       />
