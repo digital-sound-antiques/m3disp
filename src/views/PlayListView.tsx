@@ -16,6 +16,8 @@ import { PlayListEntry, PlayerContext } from "../contexts/PlayerContext";
 import { FileDrop } from "react-file-drop";
 import { useFileDrop } from "../contexts/FileDropContext";
 import { AppContext } from "../contexts/AppContext";
+import { PlaylistImage } from "./PlaylistImage";
+import { setDisplayImage } from "./display-image";
 
 export function PlayListView() {
   const app = useContext(AppContext);
@@ -66,7 +68,10 @@ export function PlayListView() {
           <>
             <button
               className="pl-text-btn danger"
-              onClick={() => context.reducer.clearEntries()}
+              onClick={() => {
+                context.reducer.clearEntries();
+                setDisplayImage(null);
+              }}
             >
               All Clear
             </button>
@@ -229,6 +234,7 @@ export function PlayListView() {
         multiple
         style={{ display: "none" }}
       />
+      <PlaylistImage />
     </div>
   );
 }

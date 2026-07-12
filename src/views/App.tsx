@@ -1,6 +1,6 @@
 import { ThemeProvider } from "@mui/material/styles";
 import { CssBaseline } from "@mui/material";
-import { MoreVert, ViewAgenda } from "@mui/icons-material";
+import { Settings, ViewAgenda } from "@mui/icons-material";
 import { useContext, useEffect, useRef, useState } from "react";
 
 import { AppContext } from "../contexts/AppContext";
@@ -244,7 +244,7 @@ function Layout() {
                       onClick={() => setPrMenuOpen((o) => !o)}
                       title="Piano roll settings"
                     >
-                      <MoreVert sx={{ fontSize: 18 }} />
+                      <Settings sx={{ fontSize: 16 }} />
                     </button>
                     {prMenuOpen && (
                       <div className="pr-menu">

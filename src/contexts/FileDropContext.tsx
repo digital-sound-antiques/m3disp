@@ -3,6 +3,8 @@ import { PropsWithChildren, useContext, useRef, useState } from "react";
 import { FileDrop } from "react-file-drop";
 import { BinaryDataStorage } from "../utils/binary-data-storage";
 import { createEntriesFromFileList } from "../utils/loader";
+import { extractFirstImage } from "../utils/image-loader";
+import { setDisplayImage } from "../views/display-image";
 import { PlayerContext } from "./PlayerContext";
 
 export function useFileDrop(playOnDrop: boolean, clearOnDrop: boolean = false) {
@@ -40,6 +42,9 @@ export function useFileDrop(playOnDrop: boolean, clearOnDrop: boolean = false) {
     if (playOnDrop) {
       context.reducer.play(!clearOnDrop ? insertionIndex : 0);
     }
+    // Surface any image bundled with the drop (loose file or inside a ZIP).
+    const img = await extractFirstImage(files);
+    if (img) setDisplayImage(img);
   };
 
   const fileDropRef = useRef(null);
@@ -78,6 +83,7 @@ export function useFileDrop(playOnDrop: boolean, clearOnDrop: boolean = false) {
       if (files != null) {
         if (clearOnDrop) {
           context.reducer.setEntries([]);
+          setDisplayImage(null); // clearing the playlist also clears the artwork
         }
         loadFiles(context.storage, files, insertionIndex);
       }

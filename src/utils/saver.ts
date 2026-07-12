@@ -1,5 +1,6 @@
 import { PlayListEntry } from "../contexts/PlayerContext";
 import { BinaryDataStorage } from "./binary-data-storage";
+import { getDisplayImageBytes } from "../views/display-image";
 import * as fflate from "fflate";
 
 function extractExtension(name: string): string {
@@ -96,7 +97,11 @@ export async function zipEntries(
   for (const entry of targets) {
     data[entry.exportName] = await storage.get(entry.dataId);
   }
-  console.log(data);
+  // bundle the current artwork, if any
+  const artwork = await getDisplayImageBytes();
+  if (artwork) {
+    data["artwork.png"] = artwork;
+  }
   const zip = fflate.zipSync(data);
   return zip;
 }

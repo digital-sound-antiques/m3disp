@@ -88,11 +88,7 @@ function ChannelRow(props: {
   onSolo: () => void;
 }) {
   return (
-    <div
-      className={`ch-row${props.muted ? " muted" : ""}`}
-      onMouseEnter={() => setPianoRollHighlight(props.hi)}
-      onMouseLeave={() => setPianoRollHighlight(null)}
-    >
+    <div className={`ch-row${props.muted ? " muted" : ""}`}>
       <div className="ch-voice">
         <span className="ch-voice-name">{props.name}</span>
       </div>
@@ -112,6 +108,8 @@ function ChannelRow(props: {
           e.stopPropagation();
           props.onSolo();
         }}
+        onMouseEnter={() => setPianoRollHighlight(props.hi)}
+        onMouseLeave={() => setPianoRollHighlight(null)}
         title="Solo"
       >
         S
@@ -214,6 +212,10 @@ export function ChannelMaskPanel() {
                           <button
                             className={`ch-btn solo${isSoloed(s.dev, s.bits) ? " active" : ""}`}
                             onClick={() => solo(s.dev, s.bits)}
+                            onMouseEnter={() =>
+                              setPianoRollHighlight(s.rows.flatMap((r) => r.hi))
+                            }
+                            onMouseLeave={() => setPianoRollHighlight(null)}
                             title="Solo section"
                           >
                             S

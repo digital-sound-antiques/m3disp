@@ -264,23 +264,50 @@ function kbGeom(canvas: HTMLCanvasElement) {
   const bw = Math.max(2, Math.round(canvas.height / 38)); // black key length (shorter)
   const gap = 4; // gap between the white keys' right edge and the now line
   const off = kw + gap; // left edge offset from the now line
-  const flip = Math.round((kw * 6) / 28); // 3D black-key nudge
+  // In 3D the surface is flipped over (rotateX(-130deg)), so the "back" edge of
+  // the keyboard swaps sides. Right-anchor the black keys (share the white keys'
+  // far edge) so they still read as the raised keys at the back, not centered.
+  const flip = kw - bw;
   const dx = Math.floor(canvas.width * lpos - off);
   return { kw, bw, off, flip, dx };
+}
+
+// Diatonic keyboard layout, matching the standalone Keyboard tab: 56 evenly
+// spaced white keys (8 octaves × 7), with black keys centered on the boundary
+// between two white keys. Notes map to the same layout so they line up with the
+// keys (white notes on a key slot; black notes on the boundary between slots).
+const N_WHITE = 56;
+// kcode%12 -> white-key index within the octave (0..6), null for a black note
+const WHITE_INDEX: (number | null)[] = [0, null, 1, null, 2, 3, null, 4, null, 5, null, 6];
+// kcode%12 -> the white-key index a black note sits just above, null otherwise
+const BLACK_AFTER: (number | null)[] = [null, 0, null, 1, null, null, 3, null, 4, null, 5, null];
+
+// Vertical placement of a note on the roll: top y and height (device px).
+function noteGeom(canvas: HTMLCanvasElement, kcode: number) {
+  const slot = canvas.height / N_WHITE;
+  const k = ((kcode % 12) + 12) % 12;
+  const oct = Math.floor(kcode / 12);
+  const wi = WHITE_INDEX[k];
+  if (wi != null) {
+    const s = wi + oct * 7; // white slot index from the bottom
+    return { yTop: canvas.height * (1 - (s + 1) / N_WHITE), h: slot, black: false };
+  }
+  const s = BLACK_AFTER[k]! + oct * 7; // black key sits above white slot s
+  const boundary = canvas.height * (1 - (s + 1) / N_WHITE);
+  const h = slot * 0.6;
+  return { yTop: boundary - h / 2, h, black: true };
 }
 
 export function paintWhiteKeyboard(canvas: HTMLCanvasElement) {
   const ctx = canvas.getContext("2d")!;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const { kw, dx } = kbGeom(canvas);
-  // gap between white keys, scaled with the key slot so it keeps its proportion
-  // as the keyboard grows (instead of a fixed 1px that looks thin when enlarged)
-  const slot = canvas.height / 56;
+  const slot = canvas.height / N_WHITE;
   const gap = Math.max(1, Math.round(slot * 0.12));
   const kh = Math.max(1, Math.ceil(slot) - gap);
   ctx.fillStyle = "#f0f0f060";
-  for (let i = 0; i < 56; i++) {
-    ctx.fillRect(dx, canvas.height * (1.0 - (i + 1) / 56), kw, kh);
+  for (let i = 0; i < N_WHITE; i++) {
+    ctx.fillRect(dx, canvas.height * (1.0 - (i + 1) / N_WHITE), kw, kh);
   }
 }
 
@@ -289,12 +316,15 @@ export function paintBlackKeyboard(canvas: HTMLCanvasElement, flip: boolean) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const g = kbGeom(canvas);
   const dx = g.dx + (flip ? g.flip : 0);
-  const kh = Math.ceil(canvas.height / 96);
+  const slot = canvas.height / N_WHITE;
+  const bkh = Math.max(1, Math.round(slot * 0.6));
   ctx.fillStyle = "#121212";
-  for (let i = 0; i < 96; i++) {
-    const k = i % 12;
-    if (k === 1 || k === 3 || k === 6 || k === 8 || k === 10)
-      ctx.fillRect(dx, canvas.height * (1.0 - (i + 1) / 96), g.bw, kh);
+  // A black key sits centered on the boundary above each white key, except after
+  // E (i%7===2) and B (i%7===6) where two white keys are adjacent.
+  for (let i = 0; i < N_WHITE; i++) {
+    if (i % 7 === 2 || i % 7 === 6) continue;
+    const boundary = canvas.height * (1.0 - (i + 1) / N_WHITE);
+    ctx.fillRect(dx, boundary - bkh / 2, g.bw, bkh);
   }
 }
 
@@ -302,12 +332,11 @@ export function paintWhiteHighlight(canvas: HTMLCanvasElement, keys: number[]) {
   const ctx = canvas.getContext("2d")!;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const { kw, dx } = kbGeom(canvas);
-  const kh = Math.ceil(canvas.height / 96);
   ctx.fillStyle = "#f0f0f0f0";
-  for (const i of keys) {
-    const k = i % 12;
-    if (k !== 1 && k !== 3 && k !== 6 && k !== 8 && k !== 10)
-      ctx.fillRect(dx, canvas.height * (1.0 - (i + 1) / 96), kw, kh);
+  for (const kc of keys) {
+    const ng = noteGeom(canvas, kc);
+    if (ng.black) continue;
+    ctx.fillRect(dx, ng.yTop, kw, ng.h);
   }
 }
 
@@ -316,12 +345,11 @@ export function paintBlackHighlight(canvas: HTMLCanvasElement, keys: number[], f
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const g = kbGeom(canvas);
   const dx = g.dx + (flip ? g.flip : 0);
-  const kh = Math.ceil(canvas.height / 96);
   ctx.fillStyle = "#f0f0f0f0";
-  for (const i of keys) {
-    const k = i % 12;
-    if (k === 1 || k === 3 || k === 6 || k === 8 || k === 10)
-      ctx.fillRect(dx, canvas.height * (1.0 - (i + 1) / 96), g.bw, kh);
+  for (const kc of keys) {
+    const ng = noteGeom(canvas, kc);
+    if (!ng.black) continue;
+    ctx.fillRect(dx, ng.yTop, g.bw, ng.h);
   }
 }
 
@@ -381,28 +409,30 @@ export function paintPianoRoll(
   const decodedLen = playerContext.player._snapshots.length;
   if (decodedLen > 0 && currentNtsc >= decodedLen) currentNtsc = decodedLen - 1;
 
-  const kh = canvas.height / 96;
-  const h = kh - 2;
   const GAP = 2; // leading gap (canvas px) for hard breaks (real key-on / note change)
 
   // Deferred draws for currently-playing segments so they always sit on top,
   // giving a stable z-order regardless of channel index.
-  type Draw = { x: number; y: number; w: number; color: string; nowX: number; noteAge: number; vol: number; hilite: boolean };
+  type Draw = { x: number; y: number; w: number; h: number; color: string; nowX: number; noteAge: number; vol: number };
   const playingDraws: Draw[] = [];
 
-  // Channel spotlight (set on channel-panel row hover): outline the hovered
-  // channel's notes with a bright frame. Other channels are drawn normally.
+  // Channel spotlight (set on solo-button hover): outline every note of the
+  // hovered channel with a bright frame, drawn frontmost. This works even for a
+  // muted channel — the fill is hidden but the frame is still shown.
   const hi = pianoRollHighlight.channels;
   const hiActive = hi != null && hi.size > 0;
   const hiStroke = "#ffffff";
   const hiLineWidth = Math.max(1, Math.round(1.5 * devicePixelRatio));
+  const frameDraws: { x: number; y: number; w: number; h: number }[] = [];
 
   // Pass 1: build segments per channel, draw non-playing ones immediately
   const mask = playerContext.channelMask;
   for (let ch = 0; ch < channelIds.length; ch++) {
-    // muted channels are hidden from the roll entirely
-    if (isChannelMuted(mask, channelIds[ch])) continue;
     const hilite = hiActive && hi!.has(ch);
+    // Muted channels are hidden from the roll — unless the channel is spotlighted,
+    // in which case its note frames are still drawn (no fill).
+    const muted = isChannelMuted(mask, channelIds[ch]);
+    if (muted && !hilite) continue;
     const frames = Math.round(60 * rangeInSec) + (layered ? ch * 8 : 0);
     const step = canvas.width / frames;
     const nowIdx = Math.floor(frames * lpos);
@@ -449,21 +479,25 @@ export function paintPianoRoll(
       const g = seg.gap ? GAP : 0;
       const x = seg.start * step + g;
       const w = Math.max(1, (seg.end - seg.start + 1) * step - g);
-      const y = canvas.height * (1.0 - (seg.note + 1) / 96) + (kh - h) / 2;
+      // Diatonic vertical placement so notes line up with the keyboard.
+      const ng = noteGeom(canvas, seg.note);
+      const h = Math.max(1, ng.h - 2);
+      const y = ng.yTop + (ng.h - h) / 2;
       const isPlaying = seg.start <= nowIdx && nowIdx <= seg.end;
+
+      // Spotlight frames are collected and drawn last (frontmost), regardless of
+      // whether the channel's fill is drawn (muted channels skip the fill).
+      if (hilite) frameDraws.push({ x, y, w, h });
+
+      if (muted) continue; // spotlighted-but-muted: frame only, no fill
 
       if (isPlaying) {
         // Volume at the play head (0-15); windowStart + nowIdx === currentNtsc.
         const vol = getStatusCached(playerContext.player, ch, windowStart + nowIdx)?.vol ?? 15;
-        playingDraws.push({ x, y, w, color: seg.color, nowX, noteAge: nowIdx - seg.start, vol, hilite });
+        playingDraws.push({ x, y, w, h, color: seg.color, nowX, noteAge: nowIdx - seg.start, vol });
       } else {
         ctx.fillStyle = seg.color + "99"; // dimmer when not sounding
         ctx.fillRect(x, y, w, h);
-        if (hilite) {
-          ctx.strokeStyle = hiStroke;
-          ctx.lineWidth = hiLineWidth;
-          ctx.strokeRect(x + 0.5, y + 0.5, Math.max(1, w - 1), Math.max(1, h - 1));
-        }
       }
     }
   }
@@ -476,16 +510,16 @@ export function paintPianoRoll(
     ctx.shadowColor = d.color;
     ctx.shadowBlur = 10 * devicePixelRatio;
     ctx.fillStyle = d.color + "ff";
-    ctx.fillRect(d.x, d.y, d.w, h);
+    ctx.fillRect(d.x, d.y, d.w, d.h);
     // Second additive pass tightens the glow into a brighter core.
     ctx.shadowBlur = 3 * devicePixelRatio;
-    ctx.fillRect(d.x, d.y, d.w, h);
+    ctx.fillRect(d.x, d.y, d.w, d.h);
     ctx.restore();
 
     // Solid body on top so the note color stays true at its center.
     ctx.save();
     ctx.fillStyle = d.color + "ff";
-    ctx.fillRect(d.x, d.y, d.w, h);
+    ctx.fillRect(d.x, d.y, d.w, d.h);
     ctx.restore();
 
     if (showParticles) {
@@ -494,17 +528,20 @@ export function paintPianoRoll(
       const count = burst + trickle;
       // Scale particle size by channel volume: vol 0 → 50%, vol 15 → 100%.
       const sizeScale = 0.5 + 0.5 * (Math.max(0, Math.min(15, d.vol)) / 15);
-      if (count > 0) spawnParticles(d.nowX, d.y + h / 2, d.color, count, sizeScale);
-    }
-
-    if (d.hilite) {
-      ctx.save();
-      ctx.strokeStyle = hiStroke;
-      ctx.lineWidth = hiLineWidth;
-      ctx.strokeRect(d.x + 0.5, d.y + 0.5, Math.max(1, d.w - 1), Math.max(1, h - 1));
-      ctx.restore();
+      if (count > 0) spawnParticles(d.nowX, d.y + d.h / 2, d.color, count, sizeScale);
     }
   }
 
   drawParticles(ctx, dt);
+
+  // Frontmost pass: spotlight frames over everything (notes, glows, particles).
+  if (frameDraws.length > 0) {
+    ctx.save();
+    ctx.strokeStyle = hiStroke;
+    ctx.lineWidth = hiLineWidth;
+    for (const f of frameDraws) {
+      ctx.strokeRect(f.x + 0.5, f.y + 0.5, Math.max(1, f.w - 1), Math.max(1, f.h - 1));
+    }
+    ctx.restore();
+  }
 }
