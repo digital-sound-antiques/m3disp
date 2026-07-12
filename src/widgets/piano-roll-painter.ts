@@ -479,10 +479,14 @@ export function paintPianoRoll(
       const g = seg.gap ? GAP : 0;
       const x = seg.start * step + g;
       const w = Math.max(1, (seg.end - seg.start + 1) * step - g);
-      // Diatonic vertical placement so notes line up with the keyboard.
+      // Diatonic vertical placement so notes line up with the keyboard. Render
+      // every note at a uniform thickness (midway between the white-key slot and
+      // the narrower black-key height) centered on its own slot/boundary center,
+      // so black and white notes read as the same weight.
       const ng = noteGeom(canvas, seg.note);
-      const h = Math.max(1, ng.h - 2);
-      const y = ng.yTop + (ng.h - h) / 2;
+      const noteH = (canvas.height / N_WHITE) * 0.7;
+      const h = Math.max(1, noteH - 2);
+      const y = ng.yTop + ng.h / 2 - h / 2;
       const isPlaying = seg.start <= nowIdx && nowIdx <= seg.end;
 
       // Spotlight frames are collected and drawn last (frontmost), regardless of
