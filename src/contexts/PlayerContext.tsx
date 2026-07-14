@@ -132,6 +132,20 @@ async function applyPlayStateChange(
   state: PlayerContextState
 ) {
   const play = async (entry: PlayListEntry) => {
+    const ctx = state.audioContext;
+    const gain = state.gainNode.gain;
+    // Short fade-out before switching tracks: the outgoing waveform is cut
+    // mid-sample when the renderer buffer is replaced, which clicks. Ramp the
+    // master gain to 0 over ~10ms first, then restore it as the next track
+    // starts (its pre-roll silence covers the fade-in).
+    if (state.player.state === "playing") {
+      const t = ctx.currentTime;
+      gain.cancelScheduledValues(t);
+      gain.setValueAtTime(gain.value, t);
+      gain.linearRampToValueAtTime(0, t + 0.01);
+      await new Promise((r) => setTimeout(r, 15));
+    }
+
     const { channelMask } = state;
     const { dataId, song, duration, fadeDuration } = entry;
     const data = await state.storage.get(dataId);
@@ -141,10 +155,15 @@ async function applyPlayStateChange(
       song,
       duration,
       fadeDuration,
-      loop: state.defaultLoopCount,      
+      loop: state.defaultLoopCount,
       defaultDuration: state.defaultDuration,
     };
     await state.player.play(options);
+
+    const t2 = ctx.currentTime;
+    gain.cancelScheduledValues(t2);
+    gain.setValueAtTime(gain.value, t2);
+    gain.linearRampToValueAtTime(state.masterGain, t2 + 0.02);
   };
 
   if (state.playState == "playing") {
