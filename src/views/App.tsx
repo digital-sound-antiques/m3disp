@@ -1,6 +1,12 @@
 import { ThemeProvider } from "@mui/material/styles";
 import { CssBaseline } from "@mui/material";
-import { Settings, ViewAgenda } from "@mui/icons-material";
+import {
+  FormatAlignCenter,
+  FormatAlignLeft,
+  FormatAlignRight,
+  Settings,
+  ViewAgenda,
+} from "@mui/icons-material";
 import { useContext, useEffect, useRef, useState } from "react";
 
 import { AppContext } from "../contexts/AppContext";
@@ -95,6 +101,11 @@ function Layout() {
     const v = parseInt(localStorage.getItem("m3disp.titleHeight") ?? "", 10);
     return isNaN(v) ? TITLE_MIN : clampTitle(v);
   });
+  // title text alignment (left / center / right), persisted
+  const [titleAlign, setTitleAlign] = useState<"left" | "center" | "right">(() => {
+    const v = localStorage.getItem("m3disp.titleAlign");
+    return v === "center" || v === "right" ? v : "left";
+  });
   // center view tab: "pianoroll" (default) or "keyboard"
   const [vizTab, setVizTab] = useState<"pianoroll" | "keyboard">(() =>
     localStorage.getItem("m3disp.vizTab") === "keyboard" ? "keyboard" : "pianoroll"
@@ -139,6 +150,9 @@ function Layout() {
   useEffect(() => {
     localStorage.setItem("m3disp.titleHeight", String(titleHeight));
   }, [titleHeight]);
+  useEffect(() => {
+    localStorage.setItem("m3disp.titleAlign", titleAlign);
+  }, [titleAlign]);
 
   // "Reset all settings" also restores the layout to its defaults (live).
   useEffect(() => {
@@ -149,6 +163,7 @@ function Layout() {
       setChannelsWidth(210);
       setBottomHeight(BOTTOM_MIN);
       setTitleHeight(TITLE_MIN);
+      setTitleAlign("left");
       setVizTab("pianoroll");
       setKeyboardCols(1);
       resetSections();
@@ -330,10 +345,34 @@ function Layout() {
                   {
                     height: titleHeight,
                     "--title-font": `${titleFontFor(titleHeight)}px`,
+                    "--title-align": titleAlign,
                   } as React.CSSProperties
                 }
               >
                 <PlayControl />
+                <div className="viz-seg title-align-seg">
+                  <button
+                    className={`viz-seg-btn${titleAlign === "left" ? " active" : ""}`}
+                    onClick={() => setTitleAlign("left")}
+                    title="Align left"
+                  >
+                    <FormatAlignLeft sx={{ fontSize: 15 }} />
+                  </button>
+                  <button
+                    className={`viz-seg-btn${titleAlign === "center" ? " active" : ""}`}
+                    onClick={() => setTitleAlign("center")}
+                    title="Align center"
+                  >
+                    <FormatAlignCenter sx={{ fontSize: 15 }} />
+                  </button>
+                  <button
+                    className={`viz-seg-btn${titleAlign === "right" ? " active" : ""}`}
+                    onClick={() => setTitleAlign("right")}
+                    title="Align right"
+                  >
+                    <FormatAlignRight sx={{ fontSize: 15 }} />
+                  </button>
+                </div>
               </div>
               <TimeSlider />
               <div className="transport-buttons-bar">

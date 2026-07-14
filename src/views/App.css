@@ -1020,6 +1020,7 @@ textarea {
 /* title row under the piano roll; height is drag-resizable (see TITLE_MIN/MAX)
    and the title font scales with it via the --title-font custom property */
 .transport-row {
+  position: relative;
   display: flex;
   align-items: center;
   overflow: hidden;
@@ -1030,21 +1031,22 @@ textarea {
   position: absolute;
   left: 0;
   right: 0;
-  top: -8px;
+  /* top edge sits flush with the piano-roll bottom (the .main gap is 10px) */
+  top: -10px;
   height: 14px;
   cursor: row-resize;
   z-index: 4;
   touch-action: none;
 }
 /* highlight line revealing that the top edge is draggable — shown on hover of
-   the grip itself or of the title row below it */
+   the grip itself or of the title row below it; drawn flush at the piano-roll
+   bottom edge */
 .transport-resize::after {
   content: "";
   position: absolute;
   left: 0;
   right: 0;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 0;
   height: 2px;
   border-radius: 1px;
   /* match the bottom bar's drag-border hover colour */
@@ -1120,10 +1122,29 @@ textarea {
 }
 .transport-title {
   max-width: 100%;
-  text-align: left;
+  text-align: var(--title-align, left);
   font-weight: 700;
   font-size: var(--title-font, 0.9rem);
   color: #e6edf3;
+}
+/* title alignment segment, revealed at the bottom-center on hover */
+.title-align-seg {
+  position: absolute;
+  bottom: 1px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--panel-bg);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.12s;
+  z-index: 3;
+}
+.title-align-seg .viz-seg-btn {
+  padding: 2px 8px;
+}
+.transport-row:hover .title-align-seg {
+  opacity: 1;
+  pointer-events: auto;
 }
 .transport-buttons {
   align-self: center;
