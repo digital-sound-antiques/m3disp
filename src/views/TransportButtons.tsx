@@ -58,6 +58,13 @@ export function TransportButtons() {
         <SkipPrevious />
       </button>
       <button
+        className={`tbtn${context.repeatMode !== "none" ? " active" : ""}`}
+        onClick={toggleRepeatMode}
+        title="Repeat"
+      >
+        {repeatModeIcon}
+      </button>
+      <button
         className="tbtn play"
         onClick={async () => {
           if (playState == "playing") {
@@ -78,13 +85,6 @@ export function TransportButtons() {
       </button>
       <button className="tbtn" onClick={() => context.reducer.next()} title="Next">
         <SkipNext />
-      </button>
-      <button
-        className={`tbtn${context.repeatMode !== "none" ? " active" : ""}`}
-        onClick={toggleRepeatMode}
-        title="Repeat"
-      >
-        {repeatModeIcon}
       </button>
     </div>
   );

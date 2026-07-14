@@ -36,6 +36,17 @@ const SIDE_MAX = 560;
 const CH_MIN = 160;
 const CH_MAX = 320;
 const clampCh = (w: number) => Math.min(CH_MAX, Math.max(CH_MIN, w));
+const BOTTOM_MIN = 64;
+const BOTTOM_MAX = 120;
+const clampBottom = (h: number) => Math.min(BOTTOM_MAX, Math.max(BOTTOM_MIN, h));
+const TITLE_MIN = 24;
+const TITLE_MAX = 80;
+const clampTitle = (h: number) => Math.min(TITLE_MAX, Math.max(TITLE_MIN, h));
+const TITLE_FONT_MIN = 18; // px, the base title size at TITLE_MIN
+const TITLE_FONT_MAX = 40; // px, at TITLE_MAX
+const titleFontFor = (h: number) =>
+  TITLE_FONT_MIN +
+  ((h - TITLE_MIN) / (TITLE_MAX - TITLE_MIN)) * (TITLE_FONT_MAX - TITLE_FONT_MIN);
 
 export function App() {
   const app = useContext(AppContext);
@@ -73,6 +84,16 @@ function Layout() {
   const [channelsWidth, setChannelsWidth] = useState(() => {
     const v = parseInt(localStorage.getItem("m3disp.channelsWidth") ?? "", 10);
     return isNaN(v) ? 210 : clampCh(v);
+  });
+  // bottom bar height (drag-resizable upward, persisted)
+  const [bottomHeight, setBottomHeight] = useState(() => {
+    const v = parseInt(localStorage.getItem("m3disp.bottomHeight") ?? "", 10);
+    return isNaN(v) ? BOTTOM_MIN : clampBottom(v);
+  });
+  // title-bar height under the piano roll (drag-resizable, grows the title font)
+  const [titleHeight, setTitleHeight] = useState(() => {
+    const v = parseInt(localStorage.getItem("m3disp.titleHeight") ?? "", 10);
+    return isNaN(v) ? TITLE_MIN : clampTitle(v);
   });
   // center view tab: "pianoroll" (default) or "keyboard"
   const [vizTab, setVizTab] = useState<"pianoroll" | "keyboard">(() =>
@@ -112,6 +133,12 @@ function Layout() {
   useEffect(() => {
     localStorage.setItem("m3disp.channelsWidth", String(channelsWidth));
   }, [channelsWidth]);
+  useEffect(() => {
+    localStorage.setItem("m3disp.bottomHeight", String(bottomHeight));
+  }, [bottomHeight]);
+  useEffect(() => {
+    localStorage.setItem("m3disp.titleHeight", String(titleHeight));
+  }, [titleHeight]);
 
   // "Reset all settings" also restores the layout to its defaults (live).
   useEffect(() => {
@@ -120,6 +147,8 @@ function Layout() {
       setSideCollapsed(false);
       setSideWidth(300);
       setChannelsWidth(210);
+      setBottomHeight(BOTTOM_MIN);
+      setTitleHeight(TITLE_MIN);
       setVizTab("pianoroll");
       setKeyboardCols(1);
       resetSections();
@@ -168,19 +197,42 @@ function Layout() {
     e.currentTarget.releasePointerCapture(e.pointerId);
   };
 
+  const bottomDragRef = useRef<{ y: number; h: number } | null>(null);
+  const startBottomResize = (e: React.PointerEvent) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    bottomDragRef.current = { y: e.clientY, h: bottomHeight };
+  };
+  const onBottomResize = (e: React.PointerEvent) => {
+    const d = bottomDragRef.current;
+    if (!d) return;
+    // dragging up (smaller clientY) grows the bar
+    setBottomHeight(clampBottom(d.h - (e.clientY - d.y)));
+  };
+  const endBottomResize = (e: React.PointerEvent) => {
+    bottomDragRef.current = null;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
+  const titleDragRef = useRef<{ y: number; h: number } | null>(null);
+  const startTitleResize = (e: React.PointerEvent) => {
+    e.currentTarget.setPointerCapture(e.pointerId);
+    titleDragRef.current = { y: e.clientY, h: titleHeight };
+  };
+  const onTitleResize = (e: React.PointerEvent) => {
+    const d = titleDragRef.current;
+    if (!d) return;
+    // dragging the piano-roll bottom edge up grows the title bar (and shrinks
+    // the piano roll); dragging down shrinks it
+    setTitleHeight(clampTitle(d.h - (e.clientY - d.y)));
+  };
+  const endTitleResize = (e: React.PointerEvent) => {
+    titleDragRef.current = null;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
   return (
     <FileDropContext>
       <div className="app">
-        <header className="app-header">
-          <div className="app-title">
-            M<sup>3</sup>disp
-          </div>
-          <div className="header-actions">
-            <VolumeControl />
-            <OptionMenu />
-          </div>
-        </header>
-
         <div className="layout">
           <aside
             className={`channels${channelsCollapsed ? " collapsed" : ""}`}
@@ -263,18 +315,29 @@ function Layout() {
                   </div>
                 )}
               </div>
-              <div className="pr-overlay pr-overlay-bottom">
-                <TransportButtons />
-              </div>
             </div>
 
             <section className="transport">
+              <div
+                className="transport-resize"
+                onPointerDown={startTitleResize}
+                onPointerMove={onTitleResize}
+                onPointerUp={endTitleResize}
+              />
+              <div
+                className="transport-row"
+                style={
+                  {
+                    height: titleHeight,
+                    "--title-font": `${titleFontFor(titleHeight)}px`,
+                  } as React.CSSProperties
+                }
+              >
+                <PlayControl />
+              </div>
               <TimeSlider />
               <div className="transport-buttons-bar">
                 <TransportButtons />
-              </div>
-              <div className="transport-row">
-                <PlayControl />
               </div>
             </section>
           </div>
@@ -302,17 +365,33 @@ function Layout() {
           </aside>
         </div>
 
-        <footer className="app-footer">
-          <span className="af-left">
+        <div className="app-bottom" style={{ height: bottomHeight }}>
+          <div
+            className="app-bottom-resize"
+            onPointerDown={startBottomResize}
+            onPointerMove={onBottomResize}
+            onPointerUp={endBottomResize}
+          />
+          <div className="ab-title app-title">
+            M<sup>3</sup>disp
+          </div>
+          <div className="ab-transport">
+            <TransportButtons />
+          </div>
+          <div className="ab-actions header-actions">
+            <VolumeControl />
+            <OptionMenu />
+          </div>
+          <span className="ab-version">
             <a href="https://github.com/digital-sound-antiques/m3disp" target="github">
               <img src={ghlogo} width={14} height={14} alt="github" />
             </a>
             <span>v{packageJson.version}</span>
           </span>
-          <span className="af-right">
+          <span className="ab-latency">
             Output Latency: {Math.round(context.player.outputLatency * 1000)}ms
           </span>
-        </footer>
+        </div>
       </div>
     </FileDropContext>
   );

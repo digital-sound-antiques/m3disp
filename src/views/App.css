@@ -28,7 +28,7 @@ textarea {
 }
 
 .app {
-  padding: 4px 16px 12px;
+  padding: 16px 16px 12px;
   height: 100vh;
   display: flex;
   flex-direction: column;
@@ -38,14 +38,85 @@ textarea {
   --pl-font-size: 13px;
 }
 
-/* app-wide header row (modest height): title left, controls right */
-.app-header {
+/* app-wide bottom bar: title over version (left), volume/options over latency
+   (right), and the transport centered over the combined two-row height. A rule
+   at the top separates it from the layout above. */
+.app-bottom {
+  position: relative;
   flex: 0 0 auto;
-  display: flex;
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 2px solid #30363d;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  grid-template-areas:
+    "title   transport actions"
+    "version transport latency";
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  height: 44px;
+  /* when the bar is dragged taller: row 1 (title / volume+menu) hugs the top,
+     row 2 (version / latency) hugs the bottom; the transport spans both rows
+     and stays vertically centered via its own align-self */
+  align-content: space-between;
+  column-gap: 16px;
+  row-gap: 2px;
+  font-size: 11px;
+  color: #6e7681;
+}
+/* drag the top edge to expand the bar upward (see BOTTOM_MIN/MAX) */
+.app-bottom-resize {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -4px;
+  height: 10px;
+  cursor: row-resize;
+  z-index: 4;
+  touch-action: none;
+}
+.app-bottom:has(.app-bottom-resize:hover) {
+  border-top-color: #4a5058;
+}
+.ab-title {
+  grid-area: title;
+  justify-self: start;
+  /* app-title's 4px indent; the version below matches it with padding-left */
+  margin-left: 4px;
+}
+.ab-transport {
+  grid-area: transport;
+  justify-self: center;
+  align-self: center;
+  display: flex;
+}
+.ab-transport .transport-buttons {
+  margin-top: 0;
+  gap: 14px;
+}
+.ab-actions {
+  grid-area: actions;
+  justify-self: end;
+}
+.ab-version {
+  grid-area: version;
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 4px;
+  font-size: 12px;
+}
+.ab-version a {
+  display: inline-flex;
+  opacity: 0.55;
+  transition: opacity 0.12s;
+}
+.ab-version a:hover {
+  opacity: 1;
+}
+.ab-latency {
+  grid-area: latency;
+  justify-self: end;
+  padding-left: 4px;
 }
 .app-title {
   margin-left: 4px;
@@ -291,6 +362,18 @@ textarea {
 }
 .fdlg-settings .crd-body {
   min-height: 240px;
+}
+/* stack every tab panel in one grid cell so the body height is constant
+   (== the tallest tab); only the active panel is visible/interactive */
+.crd-panels {
+  display: grid;
+}
+.crd-panels > .crd-panel {
+  grid-area: 1 / 1;
+  visibility: hidden;
+}
+.crd-panels > .crd-panel.active {
+  visibility: visible;
 }
 .crd-fields {
   display: flex;
@@ -801,6 +884,10 @@ textarea {
 }
 .opt-menu {
   right: 0;
+  /* the options button lives in the bottom bar, so open upward */
+  top: auto;
+  bottom: calc(100% + 4px);
+  box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.5);
 }
 .pl-art-menu {
   right: 0;
@@ -902,10 +989,8 @@ textarea {
   width: 100%;
   height: 100%;
   overflow-y: auto;
-  /* outer padding scales with the content width (% is relative to the width);
-     the bottom adds a fixed clearance so the last row can scroll clear of the
-     transport-controls overlay */
-  padding: 2% 2% 56px;
+  /* outer padding scales with the content width (% is relative to the width) */
+  padding: 2%;
   background: #121212;
   border: 1px solid #21262d;
   border-radius: 4px;
@@ -926,21 +1011,56 @@ textarea {
   display: flex;
   flex-direction: column;
   gap: 8px;
-  padding: 8px 4px 4px;
+  padding: 2px 4px 4px;
 }
 /* transport buttons below the seek bar — only used on the mobile layout */
 .transport-buttons-bar {
   display: none;
 }
-/* transport controls (left) + volume/surround (bottom-right) share a row */
+/* title row under the piano roll; height is drag-resizable (see TITLE_MIN/MAX)
+   and the title font scales with it via the --title-font custom property */
 .transport-row {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
+  overflow: hidden;
+  margin-bottom: 5px;
+}
+/* drag grip at the piano-roll bottom edge (top of the transport section) */
+.transport-resize {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: -8px;
+  height: 14px;
+  cursor: row-resize;
+  z-index: 4;
+  touch-action: none;
+}
+/* highlight line revealing that the top edge is draggable — shown on hover of
+   the grip itself or of the title row below it */
+.transport-resize::after {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: 2px;
+  border-radius: 1px;
+  /* match the bottom bar's drag-border hover colour */
+  background: #4a5058;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.transport-resize:hover::after,
+.transport:has(.transport-row:hover) .transport-resize::after {
+  opacity: 1;
 }
 .transport-seek {
   display: flex;
   align-items: center;
   gap: 10px;
+  margin-bottom: 8px;
 }
 .seek-time {
   flex: 0 0 auto;
@@ -959,8 +1079,8 @@ textarea {
   min-width: 0;
   -webkit-appearance: none;
   appearance: none;
-  height: 3px;
-  border-radius: 2px;
+  height: 6px;
+  border-radius: 4px;
   cursor: pointer;
 }
 .seek:disabled {
@@ -972,11 +1092,11 @@ textarea {
   height: 12px;
   border-radius: 50%;
   background: var(--secondary);
-  opacity: 0;
-  transition: opacity 0.1s;
+  transition: width 0.1s, height 0.1s;
 }
 .seek:hover::-webkit-slider-thumb {
-  opacity: 1;
+  width: 20px;
+  height: 20px;
 }
 .seek::-moz-range-thumb {
   width: 12px;
@@ -984,10 +1104,11 @@ textarea {
   border: none;
   border-radius: 50%;
   background: var(--secondary);
-  opacity: 0;
+  transition: width 0.1s, height 0.1s;
 }
 .seek:hover::-moz-range-thumb {
-  opacity: 1;
+  width: 20px;
+  height: 20px;
 }
 .transport-controls {
   flex: 1;
@@ -999,9 +1120,9 @@ textarea {
 }
 .transport-title {
   max-width: 100%;
-  text-align: center;
+  text-align: left;
   font-weight: 700;
-  font-size: 0.9rem;
+  font-size: var(--title-font, 0.9rem);
   color: #e6edf3;
 }
 .transport-buttons {
@@ -1026,31 +1147,25 @@ textarea {
 .tbtn:hover {
   background: #21262d;
 }
+/* active repeat + play: filled with the primary colour, white icon */
 .tbtn.active {
-  color: var(--primary);
+  background: var(--primary);
+  color: #fff;
 }
-/* play button: filled with the primary colour */
+.tbtn.active:hover {
+  background: var(--primary);
+  filter: brightness(1.1);
+}
+.tbtn.play {
+  background: var(--primary);
+  color: #fff;
+}
+.tbtn.play:hover {
+  background: var(--primary);
+  filter: brightness(1.1);
+}
 
 /* app-wide footer row: version at the left, output latency at the right */
-.app-footer {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding-top: 6px;
-  font-size: 11px;
-  color: #6e7681;
-}
-.app-footer .af-left {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-.app-footer a {
-  display: inline-flex;
-}
-
 /* ---- right column: playlist ---- */
 .side {
   position: relative;
@@ -1515,12 +1630,17 @@ textarea {
     gap: 0;
     justify-content: space-evenly;
   }
-  .pr-overlay-bottom .transport-buttons {
+  /* phones: transport lives in the seek row, and version/latency are dropped;
+     the bottom bar keeps only the title and volume/options, at natural height
+     with no drag resize. */
+  .ab-transport,
+  .ab-version,
+  .ab-latency,
+  .app-bottom-resize {
     display: none;
   }
-  /* remaining overlay controls (view settings) sit at the right */
-  .pr-overlay-bottom {
-    justify-content: flex-end;
+  .app-bottom {
+    height: auto !important;
   }
   .side {
     width: auto !important;
@@ -1540,14 +1660,11 @@ textarea {
     padding-top: 12px;
     padding-bottom: 12px;
   }
-  /* footer is not shown on phones */
-  .app-footer {
-    display: none;
-  }
   /* no collapse toggles or resize grips in the mobile stack */
   .panel-toggle,
   .channels-resize,
-  .side-resize {
+  .side-resize,
+  .transport-resize {
     display: none;
   }
 }

@@ -156,9 +156,19 @@ function SettingsDialogBody(props: { id: string }) {
             </button>
           ))}
         </div>
-        {tab === 0 && <PlayerPanel />}
-        {tab === 1 && <ThemePanel />}
-        {tab === 2 && <OtherPanel onReset={onResetAll} />}
+        {/* all panels share one grid cell so the body height stays fixed at the
+            tallest tab — switching tabs no longer resizes the dialog */}
+        <div className="crd-panels">
+          <div className={`crd-panel${tab === 0 ? " active" : ""}`}>
+            <PlayerPanel />
+          </div>
+          <div className={`crd-panel${tab === 1 ? " active" : ""}`}>
+            <ThemePanel />
+          </div>
+          <div className={`crd-panel${tab === 2 ? " active" : ""}`}>
+            <OtherPanel onReset={onResetAll} />
+          </div>
+        </div>
       </div>
 
       <div className="fdlg-foot">
