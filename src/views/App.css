@@ -30,6 +30,7 @@ textarea {
 .app {
   padding: 12px 12px 8px;
   height: 100vh;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
   /* label font sizes for the channel list and playlist; stepped down under

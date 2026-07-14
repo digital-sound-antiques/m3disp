@@ -1,3 +1,13 @@
+/* the app is a fixed full-viewport shell; keep the page itself from scrolling
+   (and stop mobile Safari's rubber-band / body scroll) — panels scroll inside */
+html,
+body,
+#root {
+  height: 100%;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 ::-webkit-scrollbar{
   width: 10px;
 }
