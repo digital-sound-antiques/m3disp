@@ -28,7 +28,7 @@ textarea {
 }
 
 .app {
-  padding: 16px 16px 12px;
+  padding: 12px 12px 8px;
   height: 100vh;
   display: flex;
   flex-direction: column;
@@ -44,8 +44,13 @@ textarea {
 .app-bottom {
   position: relative;
   flex: 0 0 auto;
-  margin-top: 8px;
-  padding-top: 8px;
+  /* distance from the layout (channels/playlist) bottom down to the top line */
+  margin-top: 12px;
+  /* full-bleed top border: cancel the .app 12px side padding with negative
+     margins, then restore the content inset with padding */
+  margin-left: -12px;
+  margin-right: -12px;
+  padding: 8px 12px 0;
   border-top: 2px solid #30363d;
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -1680,6 +1685,11 @@ textarea {
   }
   .app-bottom {
     height: auto !important;
+    /* match the 8px side padding of .app on phones */
+    margin-left: -8px;
+    margin-right: -8px;
+    padding-left: 8px;
+    padding-right: 8px;
   }
   .side {
     width: auto !important;
