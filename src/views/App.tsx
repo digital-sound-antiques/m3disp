@@ -42,6 +42,21 @@ const SIDE_MAX = 560;
 const CH_MIN = 160;
 const CH_MAX = 320;
 const clampCh = (w: number) => Math.min(CH_MAX, Math.max(CH_MIN, w));
+
+/** Pick black or white for a (hex) background using perceived brightness (YIQ).
+ *  Dark text on light colours, white on dark; the threshold is tuned to read
+ *  well on saturated mid-tones (e.g. white on a medium blue). */
+const ON_COLOR_THRESHOLD = 150; // 0..255
+function onColor(hex: string): string {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})/i.exec(hex);
+  if (!m) return "#ffffff";
+  const r = parseInt(m[1], 16);
+  const g = parseInt(m[2], 16);
+  const b = parseInt(m[3], 16);
+  const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+  return brightness >= ON_COLOR_THRESHOLD ? "#0d1117" : "#ffffff";
+}
+
 const BOTTOM_MIN = 64;
 const BOTTOM_MAX = 120;
 const clampBottom = (h: number) => Math.min(BOTTOM_MAX, Math.max(BOTTOM_MIN, h));
@@ -178,6 +193,7 @@ function Layout() {
   useEffect(() => {
     const root = document.documentElement.style;
     root.setProperty("--primary", app.theme.palette.primary.main);
+    root.setProperty("--on-primary", onColor(app.theme.palette.primary.main));
     root.setProperty("--secondary", app.theme.palette.secondary.main);
     root.setProperty("--panel-bg", app.theme.palette.background.paper);
     root.setProperty(

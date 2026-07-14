@@ -1542,8 +1542,11 @@ textarea {
   background: rgba(255, 255, 255, 0.08);
 }
 .playlist li.active {
-  background: color-mix(in srgb, var(--primary) 22%, transparent);
-  color: var(--primary);
+  background: var(--primary);
+  color: var(--on-primary, #fff);
+}
+.playlist li.active .pl-act {
+  color: var(--on-primary, #fff);
 }
 .playlist .pl-title {
   flex: 1;
