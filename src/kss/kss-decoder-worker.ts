@@ -577,41 +577,33 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     const player = this._player;
     if (player == null) return null;
 
-    // end-of-track handling (mirrors the previous single-engine policy)
+    // end-of-track handling
     if (player.getFadeFlag() == 2 || player.getStopFlag() != 0) {
       return null;
     }
 
-    // Prefer the keyframer's detected end. It scans at a fine granularity and
-    // reliably catches the exact loop point, even when the driver's loop counter
-    // is only transiently >= maxLoop. The audible player samples that counter
-    // coarsely (once per ~1/8s chunk) and can miss such a spike, which would let
-    // it overrun the reported duration and never fade out; anchoring to
-    // `_endFrame` keeps audio and the seek bar in sync.
     if (this._endFrame > 0) {
-      const fadeFrames = (this.sampleRate * this._fadeDuration) / 1000;
-      // Only fade for loop cut-off / duration-cap ends. Songs that stop on their
-      // own (stop flag) have a definite ending and are played through unfaded.
-      if (
-        this._endIsFadeOut &&
-        this._playerFrames >= this._endFrame - fadeFrames &&
-        player.getFadeFlag() == 0
-      ) {
-        player.fadeStart(this._fadeDuration);
-      }
+      // The keyframer has found the exact end. A loop cut-off / duration-cap end
+      // fades out over the last fadeFrames; that fade is applied by position to
+      // the decoded samples below, so it lands exactly on zero at _endFrame — no
+      // chunk-timing click, and correct even when seeking into the fade region.
+      // A natural stop-flag end plays through unfaded. Either way, stop at the
+      // detected frame.
       if (this._playerFrames >= this._endFrame) {
         return null;
       }
-    }
-
-    const currentTimeInMs = (this._playerFrames / this.sampleRate) * 1000;
-    if (player.getLoopCount() >= this._maxLoop || this._duration <= currentTimeInMs) {
-      if (player.getFadeFlag() == 0) {
-        player.fadeStart(this._fadeDuration);
+    } else {
+      // End not found yet (keyframer still catching up): fall back to the
+      // driver's own time-based fade.
+      const currentTimeInMs = (this._playerFrames / this.sampleRate) * 1000;
+      if (player.getLoopCount() >= this._maxLoop || this._duration <= currentTimeInMs) {
+        if (player.getFadeFlag() == 0) {
+          player.fadeStart(this._fadeDuration);
+        }
       }
-    }
-    if (this._duration + this._fadeDuration <= currentTimeInMs) {
-      return null;
+      if (this._duration + this._fadeDuration <= currentTimeInMs) {
+        return null;
+      }
     }
 
     // Decode-ahead throttle: keep only ~lookaheadMs of audio ahead of the play
@@ -645,6 +637,26 @@ class KSSDecoderWorker extends AudioDecoderWorker {
       const total = Math.floor(this.sampleRate * FADE_IN_SEC);
       for (let i = 0; i < res.length && this._fadeInRemaining > 0; i++, this._fadeInRemaining--) {
         res[i] = Math.round((res[i] * (total - this._fadeInRemaining)) / total);
+      }
+    }
+
+    // position-based fade-out over the last fadeFrames before _endFrame (loop
+    // cut-off / duration-cap ends). Scaling by the exact frame position — rather
+    // than letting the driver run a timed fade — lands on zero precisely at
+    // _endFrame regardless of chunk timing, and stays correct when seeking into
+    // the fade region (the level matches the position instead of restarting).
+    if (this._endIsFadeOut && this._endFrame > 0) {
+      const fadeFrames = (this.sampleRate * this._fadeDuration) / 1000;
+      const fadeStart = this._endFrame - fadeFrames;
+      const chunkStart = this._playerFrames - res.length;
+      if (chunkStart + res.length > fadeStart) {
+        for (let i = 0; i < res.length; i++) {
+          const f = chunkStart + i;
+          if (f >= fadeStart) {
+            const g = (this._endFrame - f) / fadeFrames;
+            res[i] = g > 0 ? Math.round(res[i] * g) : 0;
+          }
+        }
       }
     }
 

@@ -134,10 +134,10 @@ async function applyPlayStateChange(
   const play = async (entry: PlayListEntry) => {
     const ctx = state.audioContext;
     const gain = state.gainNode.gain;
-    // Short fade-out before switching tracks: the outgoing waveform is cut
-    // mid-sample when the renderer buffer is replaced, which clicks. Ramp the
-    // master gain to 0 over ~10ms first, then restore it as the next track
-    // starts (its pre-roll silence covers the fade-in).
+    // Short fade-out before switching tracks: on a manual next/prev the
+    // outgoing waveform is cut mid-sample when the renderer buffer is replaced,
+    // which clicks. Ramp the master gain to 0 over ~10ms first, then restore it
+    // as the next track starts (its pre-roll silence covers the fade-in).
     if (state.player.state === "playing") {
       const t = ctx.currentTime;
       gain.cancelScheduledValues(t);
