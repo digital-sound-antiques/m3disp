@@ -488,8 +488,10 @@ class KSSDecoderWorker extends AudioDecoderWorker {
    *  KEYFRAME_SECONDS boundaries and posting device-register snapshots (one per
    *  NTSC frame). Bounded per call so it never starves the audio render. The
    *  NTSC step (sampleRate/60) evenly divides the 2s interval, so scheduled
-   *  keyframe frames are always reached exactly. */
-  private _advanceKeyframer(target: number): void {
+   *  keyframe frames are always reached exactly. `maxAdvanceFrames` caps how far
+   *  a single call may progress, so the initial 13s look-ahead is spread over
+   *  many calls instead of blocking the first audible chunk (slow devices). */
+  private _advanceKeyframer(target: number, maxAdvanceFrames = Infinity): void {
     const kf = this._keyframer;
     if (kf == null) return;
     const step = Math.floor(this.sampleRate / 60);
@@ -497,7 +499,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     const endLimit = (this.sampleRate * (this._duration + this._fadeDuration)) / 1000;
     // once the actual end is known, don't scan past it
     const scanLimit = this._endFrame > 0 ? this._endFrame : endLimit;
-    const hardTarget = Math.min(target, scanLimit);
+    const hardTarget = Math.min(target, this._keyframerFrames + maxAdvanceFrames, scanLimit);
     const snapshots: KSSDecoderDeviceSnapshot[] = [];
     let guard = 0;
     while (
@@ -568,9 +570,6 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     const player = this._player;
     if (player == null) return null;
 
-    // keep the piano-roll / score look-ahead fed ahead of the (small) audio buffer
-    this._advanceKeyframer(this._playhead + SCAN_AHEAD_SECONDS * this.sampleRate);
-
     // end-of-track handling (mirrors the previous single-engine policy)
     if (player.getFadeFlag() == 2 || player.getStopFlag() != 0) {
       return null;
@@ -626,10 +625,22 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     }
     if (this._aborted || this._player == null) return null;
 
-    // ~1/8s chunk keeps the buffer near the lookahead target
+    // ~1/8s chunk keeps the buffer near the lookahead target. Decode the audible
+    // chunk BEFORE advancing the keyframer so the first chunk after a track
+    // change isn't delayed by the look-ahead scan (a slow-device glitch source).
     const step = Math.floor(this.sampleRate / 8);
     const res = player.calc(step);
     this._playerFrames += step;
+
+    // then feed the piano-roll / score look-ahead ahead of the play head, capped
+    // to ~1s per call so the full SCAN_AHEAD lead (13s of silent synthesis) is
+    // spread over many calls instead of blocking audio; the throttle above fills
+    // the rest during idle time once the buffer is primed
+    this._advanceKeyframer(
+      this._playhead + SCAN_AHEAD_SECONDS * this.sampleRate,
+      this.sampleRate
+    );
+
     return [res];
   }
 
