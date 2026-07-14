@@ -18,6 +18,7 @@ export function TimeSlider() {
   const [seekingTo, setSeekingTo] = useState<number | null>(null);
 
   // drop the seek preview once playback catches up to (near) the seek target
+  // (fast path; commitSeek also clears it once the seek resolves)
   useEffect(() => {
     if (seekingTo != null && Math.abs(currentSec - seekingTo) < 1) setSeekingTo(null);
   }, [currentSec, seekingTo]);
@@ -31,14 +32,18 @@ export function TimeSlider() {
   // (buffered) region may lie past the actual end of the track; such a seek is
   // rejected (mirroring KSSPlayer.seek), so snap the thumb back instead of
   // pinning the preview on a position playback will never reach.
-  const commitSeek = (sec: number) => {
+  const commitSeek = async (sec: number) => {
     if (measuring && sec > bufferedSec) {
       setSeekingTo(null);
       return;
     }
     const target = Math.min(sec, totalSec);
     setSeekingTo(target);
-    context.player.seek(target);
+    // clear the preview once the seek has actually taken effect, rather than
+    // relying on playback catching up to within 1s (which never happens for a
+    // seek to 0, leaving the preview stuck)
+    await context.player.seek(target);
+    setSeekingTo(null);
   };
 
   const displaySec = seekingTo ?? currentSec;

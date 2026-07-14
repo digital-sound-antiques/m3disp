@@ -49,6 +49,9 @@ const KEYFRAME_SECONDS = 2;
  *  snapshots so the piano-roll / score look-ahead stays populated (the piano
  *  roll can show up to ~12s ahead at its widest range). */
 const SCAN_AHEAD_SECONDS = 13;
+/** Short ramp applied to the first samples of every (re)start so a track that
+ *  opens on a non-zero sample doesn't click at the transition. */
+const FADE_IN_SEC = 0.006;
 
 type Keyframe = { frame: number; data: Uint8Array };
 
@@ -114,6 +117,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
   private _playhead = 0;
   private _lookaheadMs = 500;
   private _aborted = false;
+  private _fadeInRemaining = 0; // samples of start-fade left to apply
   // current per-device channel mute mask; applied to both engines and re-applied
   // after every loadState/reset so a keyframe's mask never overrides the live one
   private _channelMask: KSSChannelMask = { psg: 0, scc: 0, opll: 0, opl: 0 };
@@ -158,6 +162,9 @@ class KSSDecoderWorker extends AudioDecoderWorker {
 
   async start(args: KSSDecoderStartOptions): Promise<void> {
     this._aborted = false;
+    // ramp the first few ms of output up from zero so the track (or seek target)
+    // doesn't begin on a click
+    this._fadeInRemaining = Math.floor(this.sampleRate * FADE_IN_SEC);
 
     this._fadeDuration = args.fadeDuration ?? defaultFadeDuration;
     this._duration =
@@ -631,6 +638,15 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     const step = Math.floor(this.sampleRate / 8);
     const res = player.calc(step);
     this._playerFrames += step;
+
+    // ramp the first samples of a (re)start up from zero to avoid a click when
+    // the track/seek target opens on a non-zero sample
+    if (this._fadeInRemaining > 0) {
+      const total = Math.floor(this.sampleRate * FADE_IN_SEC);
+      for (let i = 0; i < res.length && this._fadeInRemaining > 0; i++, this._fadeInRemaining--) {
+        res[i] = Math.round((res[i] * (total - this._fadeInRemaining)) / total);
+      }
+    }
 
     // then feed the piano-roll / score look-ahead ahead of the play head, capped
     // to ~1s per call so the full SCAN_AHEAD lead (13s of silent synthesis) is
