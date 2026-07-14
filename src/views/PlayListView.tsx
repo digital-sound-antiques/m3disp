@@ -81,11 +81,11 @@ export function PlayListView() {
                 setDisplayImage(null);
               }}
             >
-              All Clear
+              CLEAR
             </button>
             <span className="pl-spacer" />
             <button className="pl-text-btn ok" onClick={() => setEditMode(false)}>
-              Done
+              DONE
             </button>
           </>
         ) : (

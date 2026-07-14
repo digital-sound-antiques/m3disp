@@ -171,7 +171,7 @@ export function ChannelMaskPanel() {
           disabled={maskEq(mask, NONE)}
           title="Unmute all channels"
         >
-          Reset
+          RESET
         </button>
       </div>
       <DragDropContext onDragEnd={onSecDragEnd}>

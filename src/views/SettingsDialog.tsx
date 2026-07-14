@@ -275,7 +275,10 @@ export function SettingsDialog(props: { id: string }) {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, app, props.id]);
+    // only re-run when the dialog opens/closes — depending on `app` would reset
+    // the dragged position on every settings change (app is a new object then)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   if (!open) return null;
 

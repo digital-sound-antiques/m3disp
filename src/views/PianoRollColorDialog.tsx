@@ -194,7 +194,10 @@ export function PianoRollColorDialog() {
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [open, app]);
+    // only re-run when the dialog opens/closes — depending on `app` would reset
+    // the dragged position on every colour change (app is a new object then)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   if (!open) return null;
 
