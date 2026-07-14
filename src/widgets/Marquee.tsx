@@ -1,4 +1,12 @@
-import { useState, useRef, useEffect, PropsWithChildren, Fragment, CSSProperties } from "react";
+import {
+  useState,
+  useRef,
+  useLayoutEffect,
+  useId,
+  PropsWithChildren,
+  Fragment,
+  CSSProperties,
+} from "react";
 
 type MarqueeProps = PropsWithChildren & {
   play: boolean;
@@ -11,41 +19,47 @@ export function Marquee({ play, children }: MarqueeProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const marqueeRef = useRef<HTMLDivElement>(null);
 
-  const calculateWidth = () => {
-    // Find width of container and width of marquee
-    if (marqueeRef.current && containerRef.current) {
-      setContainerWidth(containerRef.current.getBoundingClientRect().width);
-      setMarqueeWidth(marqueeRef.current.getBoundingClientRect().width);
-    }
-  };
+  // unique keyframe name so multiple marquees don't clobber each other's rule
+  const animName = `marquee-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
 
-  useEffect(() => {
-    calculateWidth();
-    window.addEventListener("resize", calculateWidth);
-    return () => {
-      window.removeEventListener("resize", calculateWidth);
+  // measure synchronously before paint so the scroll state is correct on the
+  // first frame — otherwise the (unmeasured) full title flashes into view when
+  // the marquee remounts on a song change
+  useLayoutEffect(() => {
+    const measure = () => {
+      if (marqueeRef.current && containerRef.current) {
+        setContainerWidth(containerRef.current.getBoundingClientRect().width);
+        setMarqueeWidth(marqueeRef.current.getBoundingClientRect().width);
+      }
     };
-  }, []);
-
-  // Recalculate width when children change
-  useEffect(() => {
-    calculateWidth();
+    measure();
+    // recalc on any size change: window resize, or the title font being scaled
+    // (dragging the title bar) which changes the text width without new children
+    const ro = new ResizeObserver(measure);
+    if (containerRef.current) ro.observe(containerRef.current);
+    if (marqueeRef.current) ro.observe(marqueeRef.current);
+    return () => ro.disconnect();
   }, [children]);
 
   const speed = 25;
-  const active = play && marqueeWidth > containerWidth;
-  const duration = marqueeWidth / speed;
+  const active = play && marqueeWidth > containerWidth + 1;
+  // scroll the text in from the container's right edge and out past its left —
+  // travel is container + text width, so it never over-shoots for large fonts
+  const duration = Math.max(1, (containerWidth + marqueeWidth) / speed);
 
   return (
     <Fragment>
-      <style>{keyframes}</style>
+      <style>{`@keyframes ${animName} {
+  from { transform: translateX(${containerWidth}px); }
+  to { transform: translateX(${-marqueeWidth}px); }
+}`}</style>
       <div ref={containerRef} style={containerStyle}>
         <div
           ref={marqueeRef}
           style={{
             ...marqueeStyle,
             animationDuration: `${duration}s`,
-            animationName: active ? "scroll" : "none",
+            animationName: active ? animName : "none",
           }}
         >
           {children}
@@ -70,14 +84,3 @@ const marqueeStyle: CSSProperties = {
   animationTimingFunction: "linear",
   animationPlayState: "running",
 };
-
-const keyframes = `
-@keyframes scroll {
-  0% {
-      transform: translateX(100%);
-  }
-  100% {
-      transform: translateX(-100%);
-  }
-}
-`;
