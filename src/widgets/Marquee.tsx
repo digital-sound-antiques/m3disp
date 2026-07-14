@@ -60,6 +60,8 @@ export function Marquee({ play, children }: MarqueeProps) {
           style={{
             ...marqueeStyle,
             animationDuration: `${duration}s`,
+            // hold the head at the left edge for 2s before scrolling starts
+            animationDelay: "2s",
             animationName: active ? animName : "none",
           }}
         >

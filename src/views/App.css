@@ -238,7 +238,7 @@ textarea {
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 700;
   color: #c9d1d9;
   border-bottom: 1px solid #21262d;
@@ -278,7 +278,7 @@ textarea {
 }
 .crd-tab {
   padding: 4px 12px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   color: #8b949e;
   background: transparent;
@@ -394,7 +394,7 @@ textarea {
   gap: 10px;
 }
 .crd-field-label {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.5px;
@@ -426,7 +426,7 @@ textarea {
   flex: 1 1 auto;
   height: 40px;
   padding: 0 32px 0 12px;
-  font-size: 13px;
+  font-size: 14px;
   color: #c9d1d9;
   background-color: #0d1117;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238b949e' stroke-width='2'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
@@ -451,7 +451,7 @@ textarea {
 .crd-danger-btn {
   align-self: flex-start;
   padding: 6px 14px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.5px;
   color: #f85149;
@@ -464,7 +464,7 @@ textarea {
   background: rgba(248, 81, 73, 0.12);
 }
 .crd-hint {
-  font-size: 11px;
+  font-size: 12px;
   color: #8b949e;
 }
 .crd-radio-row {
@@ -475,7 +475,7 @@ textarea {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 13px;
+  font-size: 14px;
   color: #c9d1d9;
   cursor: pointer;
 }
@@ -505,7 +505,7 @@ textarea {
 .fdlg-txtbtn {
   height: 40px;
   padding: 0 14px;
-  font-size: 12px;
+  font-size: 13px;
   font-weight: 600;
   letter-spacing: 0.5px;
   color: var(--primary);
@@ -871,6 +871,10 @@ textarea {
   border-radius: 6px;
   overflow: hidden;
 }
+/* keyboard column toggle: keep a little gap from the right edge */
+.viz-tabs .viz-seg {
+  margin-right: 8px;
+}
 .viz-seg-btn {
   display: inline-flex;
   align-items: center;
@@ -958,7 +962,7 @@ textarea {
   width: 100%;
   height: 48px;
   padding: 0 12px;
-  font-size: 13px;
+  font-size: 14px;
   text-align: left;
   text-decoration: none;
   color: #c9d1d9;
@@ -1010,7 +1014,8 @@ textarea {
 .menu-sep {
   height: 1px;
   margin: 4px 6px;
-  background: #30363d;
+  /* lighter than the menu (panel-bg ≈ #303030) so it's actually visible */
+  background: rgba(255, 255, 255, 0.15);
 }
 .viz-tab {
   padding: 4px 12px;

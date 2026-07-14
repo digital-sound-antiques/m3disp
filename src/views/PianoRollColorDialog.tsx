@@ -91,10 +91,6 @@ function DialogBody(props: { id: string }) {
   };
   const onOk = () => app.closeDialog(props.id);
 
-  const g = channelGroups[tab];
-  const gMode = mode[g.device];
-  const disabled = gMode === "voice"; // channel colors only apply "By Channel"
-
   return (
     <>
       <div className="crd-body">
@@ -110,48 +106,64 @@ function DialogBody(props: { id: string }) {
           ))}
         </div>
 
-        <div className="crd-section-label">Coloring Mode</div>
-        <div className="crd-radios">
-          <label className="crd-radio">
-            <input
-              type="radio"
-              name={`crd-mode-${g.device}`}
-              checked={gMode === "voice"}
-              onChange={() => updateMode(g.device, "voice")}
-            />
-            <span>By Tone</span>
-          </label>
-          <label className="crd-radio">
-            <input
-              type="radio"
-              name={`crd-mode-${g.device}`}
-              checked={gMode === "channel"}
-              onChange={() => updateMode(g.device, "channel")}
-            />
-            <span>By Channel</span>
-          </label>
-        </div>
-
-        <div className={`crd-colors${disabled ? " disabled" : ""}`}>
-          <div className="crd-section-label">Channel Colors</div>
-          <div className="crd-grid">
-            {g.labels.map((label, i) => {
-              const index = g.base + i;
-              return (
-                <div className="crd-cell" key={label}>
-                  <ColorPickerBall
-                    color={channelColors[index]}
-                    disabled={disabled}
-                    onChange={(c) => updateChannelColorAt(index, c)}
-                  />
-                  <span className="crd-cell-label">{label}</span>
+        {/* stack all device groups in one grid cell so switching tabs doesn't
+            resize the dialog (height stays at the tallest group) */}
+        <div className="crd-panels">
+          {channelGroups.map((grp, i) => {
+            const gMode = mode[grp.device];
+            const disabled = gMode === "voice"; // channel colors only apply "By Channel"
+            return (
+              <div className={`crd-panel${tab === i ? " active" : ""}`} key={grp.device}>
+                <div className="crd-section-label">Coloring Mode</div>
+                <div className="crd-radios">
+                  <label className="crd-radio">
+                    <input
+                      type="radio"
+                      name={`crd-mode-${grp.device}`}
+                      checked={gMode === "voice"}
+                      onChange={() => updateMode(grp.device, "voice")}
+                    />
+                    <span>By Tone</span>
+                  </label>
+                  <label className="crd-radio">
+                    <input
+                      type="radio"
+                      name={`crd-mode-${grp.device}`}
+                      checked={gMode === "channel"}
+                      onChange={() => updateMode(grp.device, "channel")}
+                    />
+                    <span>By Channel</span>
+                  </label>
                 </div>
-              );
-            })}
-          </div>
-          <button className="crd-reset" disabled={disabled} onClick={() => resetChannelColors(g)}>
-            Reset to Default
-          </button>
+
+                <div className={`crd-colors${disabled ? " disabled" : ""}`}>
+                  <div className="crd-section-label">Channel Colors</div>
+                  <div className="crd-grid">
+                    {grp.labels.map((label, j) => {
+                      const index = grp.base + j;
+                      return (
+                        <div className="crd-cell" key={label}>
+                          <ColorPickerBall
+                            color={channelColors[index]}
+                            disabled={disabled}
+                            onChange={(c) => updateChannelColorAt(index, c)}
+                          />
+                          <span className="crd-cell-label">{label}</span>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <button
+                    className="crd-reset"
+                    disabled={disabled}
+                    onClick={() => resetChannelColors(grp)}
+                  >
+                    Reset to Default
+                  </button>
+                </div>
+              </div>
+            );
+          })}
         </div>
       </div>
 
