@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
-import { AppContext, KeyHighlightColorType } from "../contexts/AppContext";
+import { AppContext, KeyHighlightColorType, SeekSliderColorType } from "../contexts/AppContext";
 import { PlayerContext } from "../contexts/PlayerContext";
 import { SettingsContext, SettingsContextProvider } from "../contexts/SettingsContext";
 import { ColorBall, ColorSelector } from "../widgets/ColorSelector";
@@ -33,6 +33,7 @@ function ThemePanel() {
   const [primaryColor, setPrimaryColor] = useState(palette.primary.main);
   const [secondaryColor, setSecondaryColor] = useState(palette.secondary.main);
   const [keyType, setKeyType] = useState<KeyHighlightColorType>(app.keyHighlightColorType);
+  const [seekType, setSeekType] = useState<SeekSliderColorType>(app.seekSliderColorType);
 
   return (
     <div className="crd-fields">
@@ -57,19 +58,45 @@ function ThemePanel() {
       <div className="crd-field">
         <div className="crd-field-label">Keyboard Highlight</div>
         <div className="crd-field-row">
-          <ColorBall color={palette[keyType].main} />
-          <select
-            className="crd-select"
-            value={keyType}
-            onChange={(e) => {
-              const t = e.target.value as KeyHighlightColorType;
-              app.setKeyHighlightColorType(t);
-              setKeyType(t);
-            }}
-          >
-            <option value="primary">Primary Color</option>
-            <option value="secondary">Accent Color</option>
-          </select>
+          <div className="crd-select-wrap">
+            <span className="crd-select-swatch">
+              <ColorBall color={palette[keyType].main} />
+            </span>
+            <select
+              className="crd-select"
+              value={keyType}
+              onChange={(e) => {
+                const t = e.target.value as KeyHighlightColorType;
+                app.setKeyHighlightColorType(t);
+                setKeyType(t);
+              }}
+            >
+              <option value="primary">Primary Color</option>
+              <option value="secondary">Accent Color</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div className="crd-field">
+        <div className="crd-field-label">Seek Slider</div>
+        <div className="crd-field-row">
+          <div className="crd-select-wrap">
+            <span className="crd-select-swatch">
+              <ColorBall color={palette[seekType].main} />
+            </span>
+            <select
+              className="crd-select"
+              value={seekType}
+              onChange={(e) => {
+                const t = e.target.value as SeekSliderColorType;
+                app.setSeekSliderColorType(t);
+                setSeekType(t);
+              }}
+            >
+              <option value="primary">Primary Color</option>
+              <option value="secondary">Accent Color</option>
+            </select>
+          </div>
         </div>
       </div>
     </div>
@@ -123,11 +150,13 @@ function SettingsDialogBody(props: { id: string }) {
   const [savedPrimaryColor] = useState(app.theme.palette.primary.main);
   const [savedSecondaryColor] = useState(app.theme.palette.secondary.main);
   const [savedKeyHighlightColorType] = useState(app.keyHighlightColorType);
+  const [savedSeekSliderColorType] = useState(app.seekSliderColorType);
 
   const onCancel = () => {
     app.setPrimaryColor(savedPrimaryColor);
     app.setSecondaryColor(savedSecondaryColor);
     app.setKeyHighlightColorType(savedKeyHighlightColorType);
+    app.setSeekSliderColorType(savedSeekSliderColorType);
     app.closeDialog(props.id);
     settings.revert();
   };

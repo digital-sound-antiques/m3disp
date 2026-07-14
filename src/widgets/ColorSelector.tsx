@@ -167,28 +167,32 @@ export function ColorSelector(props: {
     <div className="crd-field">
       <div className="crd-field-label">{label}</div>
       <div className="crd-field-row">
-        <ColorBall color={colorDefToString(colorDef)} />
-        <select
-          className="crd-select"
-          value={colorDef.palette}
-          onChange={(e) => onPaletteChange(e.target.value as PaletteName)}
-        >
-          {Object.keys(palettes).map((e) => (
-            <option key={e} value={e}>
-              {paletteNameToLabel[e as PaletteName]}
-            </option>
+        <div className="crd-select-wrap">
+          <span className="crd-select-swatch">
+            <ColorBall color={colorDefToString(colorDef)} />
+          </span>
+          <select
+            className="crd-select"
+            value={colorDef.palette}
+            onChange={(e) => onPaletteChange(e.target.value as PaletteName)}
+          >
+            {Object.keys(palettes).map((e) => (
+              <option key={e} value={e}>
+                {paletteNameToLabel[e as PaletteName]}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="crd-balls">
+          {variants.map((v) => (
+            <ColorBall
+              key={v}
+              color={colorDefToString({ palette: colorDef.palette, variant: v })}
+              selected={colorDef.variant == v}
+              onClick={() => onVariantChange(v)}
+            />
           ))}
-        </select>
-      </div>
-      <div className="crd-balls">
-        {variants.map((v) => (
-          <ColorBall
-            key={v}
-            color={colorDefToString({ palette: colorDef.palette, variant: v })}
-            selected={colorDef.variant == v}
-            onClick={() => onVariantChange(v)}
-          />
-        ))}
+        </div>
       </div>
     </div>
   );

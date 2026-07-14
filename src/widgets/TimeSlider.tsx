@@ -9,7 +9,7 @@ function seekBackground(current: number, buffered: number, max: number): string 
   const denom = Math.max(max, 1e-6);
   const played = (Math.min(current, max) / denom) * 100;
   const buf = Math.max(played, (Math.min(buffered, max) / denom) * 100);
-  return `linear-gradient(to right, var(--secondary) ${played}%, #6b7480 ${played}%, #6b7480 ${buf}%, #30363d ${buf}%)`;
+  return `linear-gradient(to right, var(--seek-color, var(--secondary)) ${played}%, #6b7480 ${played}%, #6b7480 ${buf}%, #30363d ${buf}%)`;
 }
 
 export function TimeSlider() {

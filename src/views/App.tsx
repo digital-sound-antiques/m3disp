@@ -180,7 +180,13 @@ function Layout() {
     root.setProperty("--primary", app.theme.palette.primary.main);
     root.setProperty("--secondary", app.theme.palette.secondary.main);
     root.setProperty("--panel-bg", app.theme.palette.background.paper);
-  }, [app.theme]);
+    root.setProperty(
+      "--seek-color",
+      app.seekSliderColorType === "primary"
+        ? app.theme.palette.primary.main
+        : app.theme.palette.secondary.main
+    );
+  }, [app.theme, app.seekSliderColorType]);
 
   const sideDragRef = useRef<{ x: number; w: number } | null>(null);
   const startSideResize = (e: React.PointerEvent) => {

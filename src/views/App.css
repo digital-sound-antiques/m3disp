@@ -398,6 +398,23 @@ textarea {
   align-items: center;
   gap: 8px;
 }
+.crd-select-wrap {
+  position: relative;
+  /* dropdown occupies half the dialog content width */
+  flex: 0 0 50%;
+  display: flex;
+}
+.crd-select-swatch {
+  position: absolute;
+  left: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  pointer-events: none;
+  z-index: 1;
+}
+.crd-select-wrap .crd-select {
+  padding-left: 34px;
+}
 .crd-select {
   flex: 1 1 auto;
   height: 40px;
@@ -419,6 +436,7 @@ textarea {
   border-color: var(--primary);
 }
 .crd-balls {
+  flex: 0 0 auto;
   display: flex;
   flex-wrap: wrap;
   gap: 2px;
@@ -1093,7 +1111,7 @@ textarea {
   width: 12px;
   height: 12px;
   border-radius: 50%;
-  background: var(--secondary);
+  background: var(--seek-color, var(--secondary));
   transition: width 0.1s, height 0.1s;
 }
 .seek:hover::-webkit-slider-thumb {
@@ -1105,7 +1123,7 @@ textarea {
   height: 12px;
   border: none;
   border-radius: 50%;
-  background: var(--secondary);
+  background: var(--seek-color, var(--secondary));
   transition: width 0.1s, height 0.1s;
 }
 .seek:hover::-moz-range-thumb {

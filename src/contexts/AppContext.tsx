@@ -32,6 +32,7 @@ const defaultTheme = createTheme({
 });
 
 export type KeyHighlightColorType = "primary" | "secondary";
+export type SeekSliderColorType = "primary" | "secondary";
 export type PianoRollMode = "2d" | "3d";
 export type PianoRollColorModeMap = {
   opll: PianoRollColorMode;
@@ -75,6 +76,7 @@ function channelColorsFromMap(obj: unknown, fallback: string[]): string[] | null
 type AppContextData = {
   theme: Theme;
   keyHighlightColorType: KeyHighlightColorType;
+  seekSliderColorType: SeekSliderColorType;
   pianoRollRangeInSec: number;
   pianoRollLayered: boolean;
   pianoRollMode: string;
@@ -92,6 +94,7 @@ type AppContextData = {
   setPrimaryColor: (id: string) => void;
   setSecondaryColor: (id: string) => void;
   setKeyHighlightColorType: (id: KeyHighlightColorType) => void;
+  setSeekSliderColorType: (id: SeekSliderColorType) => void;
   setPianoRollRangeInSec: (value: number) => void;
   setPianoRollLayered: (value: boolean) => void;
   setPianoRollMode: (value: PianoRollMode) => void;
@@ -109,6 +112,7 @@ const noop = () => {
 const defaultContextData: AppContextData = {
   theme: defaultTheme,
   keyHighlightColorType: "primary",
+  seekSliderColorType: "primary",
   pianoRollRangeInSec: 4.0,
   pianoRollLayered: false,
   pianoRollMode: "2d",
@@ -126,6 +130,7 @@ const defaultContextData: AppContextData = {
   setPrimaryColor: noop,
   setSecondaryColor: noop,
   setKeyHighlightColorType: noop,
+  setSeekSliderColorType: noop,
   setPianoRollRangeInSec: noop,
   setPianoRollLayered: noop,
   setPianoRollMode: noop,
@@ -141,6 +146,7 @@ export const AppContext = createContext(defaultContextData);
 const keyPrimaryColor = "m3disp.palette.primary.main";
 const keySecondaryColor = "m3disp.palette.secondary.main";
 const keyKeyHighlightColorType = "m3disp.keyHighlightColorType";
+const keySeekSliderColorType = "m3disp.seekSliderColorType";
 const keyPianoRollRangeInSec = "m3disp.pianoRoll.rangeInSec";
 const keyPianoRollLayered = "m3disp.pianoRoll.layered";
 const keyPianoRollShowParticles = "m3disp.pianoRoll.showParticles";
@@ -209,6 +215,15 @@ export function AppContextProvider(props: PropsWithChildren) {
     }
   };
 
+  const setSeekSliderColorType = (type: SeekSliderColorType, save: boolean = true) => {
+    setState((oldState) => {
+      return { ...oldState, seekSliderColorType: type };
+    });
+    if (save) {
+      localStorage.setItem(keySeekSliderColorType, type);
+    }
+  };
+
   const setPianoRollRangeInSec = (value: number, save: boolean = true) => {
     setState((oldState) => {
       return { ...oldState, pianoRollRangeInSec: value };
@@ -269,6 +284,7 @@ export function AppContextProvider(props: PropsWithChildren) {
     setPrimaryColor(defaultTheme.palette.primary.main);
     setSecondaryColor(defaultTheme.palette.secondary.main);
     setKeyHighlightColorType("primary");
+    setSeekSliderColorType("primary");
     setPianoRollRangeInSec(4.0);
     setPianoRollLayered(false);
     setPianoRollMode("2d");
@@ -297,6 +313,11 @@ export function AppContextProvider(props: PropsWithChildren) {
     setKeyHighlightColorType(
       (localStorage.getItem(keyKeyHighlightColorType) ??
         state.keyHighlightColorType) as KeyHighlightColorType,
+      false
+    );
+    setSeekSliderColorType(
+      (localStorage.getItem(keySeekSliderColorType) ??
+        state.seekSliderColorType) as SeekSliderColorType,
       false
     );
 
@@ -364,6 +385,7 @@ export function AppContextProvider(props: PropsWithChildren) {
         setPrimaryColor,
         setSecondaryColor,
         setKeyHighlightColorType,
+        setSeekSliderColorType,
         setPianoRollRangeInSec,
         setPianoRollLayered,
         setPianoRollMode,
