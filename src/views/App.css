@@ -97,7 +97,15 @@ textarea {
 }
 .ab-transport .transport-buttons {
   margin-top: 0;
-  gap: 14px;
+  gap: calc(14px * var(--transport-scale, 1));
+}
+/* transport buttons grow proportionally as the bottom bar is dragged taller */
+.ab-transport .tbtn {
+  width: calc(40px * var(--transport-scale, 1));
+  height: calc(40px * var(--transport-scale, 1));
+}
+.ab-transport .tbtn svg {
+  font-size: calc(24px * var(--transport-scale, 1));
 }
 .ab-actions {
   grid-area: actions;
@@ -124,6 +132,20 @@ textarea {
   grid-area: latency;
   justify-self: end;
   padding-left: 4px;
+}
+/* when the bar is dragged shorter than BOTTOM_COMPACT, shrink the logo and put
+   the version inline to its right (no GitHub icon); drop the latency line */
+.app-bottom.compact .ab-title {
+  font-size: 15px;
+}
+.ab-title-ver {
+  margin-left: 8px;
+  font-size: 12px;
+  font-weight: 400;
+  color: #6e7681;
+}
+.app-bottom.compact .ab-latency {
+  display: none;
 }
 .app-title {
   margin-left: 4px;

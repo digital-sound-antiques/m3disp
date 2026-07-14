@@ -57,8 +57,14 @@ function onColor(hex: string): string {
   return brightness >= ON_COLOR_THRESHOLD ? "#0d1117" : "#ffffff";
 }
 
-const BOTTOM_MIN = 64;
-const BOTTOM_MAX = 120;
+const BOTTOM_MIN = 48;
+const BOTTOM_MAX = 128;
+const BOTTOM_DEFAULT = 64;
+// below this bar height, drop the version/latency line
+const BOTTOM_COMPACT = 64;
+// transport controls scale from 1.0 (min bar height) up to 1.5 (max)
+const transportScaleFor = (h: number) =>
+  1 + ((h - BOTTOM_MIN) / (BOTTOM_MAX - BOTTOM_MIN)) * 0.5;
 const clampBottom = (h: number) => Math.min(BOTTOM_MAX, Math.max(BOTTOM_MIN, h));
 const TITLE_MIN = 24;
 const TITLE_MAX = 80;
@@ -109,7 +115,7 @@ function Layout() {
   // bottom bar height (drag-resizable upward, persisted)
   const [bottomHeight, setBottomHeight] = useState(() => {
     const v = parseInt(localStorage.getItem("m3disp.bottomHeight") ?? "", 10);
-    return isNaN(v) ? BOTTOM_MIN : clampBottom(v);
+    return isNaN(v) ? BOTTOM_DEFAULT : clampBottom(v);
   });
   // title-bar height under the piano roll (drag-resizable, grows the title font)
   const [titleHeight, setTitleHeight] = useState(() => {
@@ -176,7 +182,7 @@ function Layout() {
       setSideCollapsed(false);
       setSideWidth(300);
       setChannelsWidth(210);
-      setBottomHeight(BOTTOM_MIN);
+      setBottomHeight(BOTTOM_DEFAULT);
       setTitleHeight(TITLE_MIN);
       setTitleAlign("left");
       setVizTab("pianoroll");
@@ -250,7 +256,11 @@ function Layout() {
     const d = bottomDragRef.current;
     if (!d) return;
     // dragging up (smaller clientY) grows the bar
-    setBottomHeight(clampBottom(d.h - (e.clientY - d.y)));
+    const raw = clampBottom(d.h - (e.clientY - d.y));
+    // snap the 48–64 band to either end (no intermediate heights there); the
+    // range above BOTTOM_COMPACT stays continuous
+    const h = raw < BOTTOM_COMPACT ? (raw < (BOTTOM_MIN + BOTTOM_COMPACT) / 2 ? BOTTOM_MIN : BOTTOM_COMPACT) : raw;
+    setBottomHeight(h);
   };
   const endBottomResize = (e: React.PointerEvent) => {
     bottomDragRef.current = null;
@@ -433,7 +443,12 @@ function Layout() {
           </aside>
         </div>
 
-        <div className="app-bottom" style={{ height: bottomHeight }}>
+        <div
+          className={`app-bottom${bottomHeight < BOTTOM_COMPACT ? " compact" : ""}`}
+          style={
+            { height: bottomHeight, "--transport-scale": transportScaleFor(bottomHeight) } as React.CSSProperties
+          }
+        >
           <div
             className="app-bottom-resize"
             onPointerDown={startBottomResize}
@@ -442,6 +457,9 @@ function Layout() {
           />
           <div className="ab-title app-title">
             M<sup>3</sup>disp
+            {bottomHeight < BOTTOM_COMPACT && (
+              <span className="ab-title-ver">{packageJson.version}</span>
+            )}
           </div>
           <div className="ab-transport">
             <TransportButtons />
@@ -450,12 +468,14 @@ function Layout() {
             <VolumeControl />
             <OptionMenu />
           </div>
-          <span className="ab-version">
-            <a href="https://github.com/digital-sound-antiques/m3disp" target="github">
-              <img src={ghlogo} width={14} height={14} alt="github" />
-            </a>
-            <span>v{packageJson.version}</span>
-          </span>
+          {bottomHeight >= BOTTOM_COMPACT && (
+            <span className="ab-version">
+              <a href="https://github.com/digital-sound-antiques/m3disp" target="github">
+                <img src={ghlogo} width={14} height={14} alt="github" />
+              </a>
+              <span>{packageJson.version}</span>
+            </span>
+          )}
           <span className="ab-latency">
             Output Latency: {Math.round(context.player.outputLatency * 1000)}ms
           </span>
