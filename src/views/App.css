@@ -134,7 +134,15 @@ textarea {
   padding-left: 4px;
 }
 /* when the bar is dragged shorter than BOTTOM_COMPACT, shrink the logo and put
-   the version inline to its right (no GitHub icon); drop the latency line */
+   the version inline to its right (no GitHub icon); drop the latency line, and
+   tighten the top padding so the transport still fits at the 40px minimum */
+.app-bottom.compact {
+  padding-top: 2px;
+  /* version is inline in the title and latency is hidden, so collapse to a
+     single centered row — logo, transport and volume/options line up vertically */
+  grid-template-areas: "title transport actions";
+  align-content: center;
+}
 .app-bottom.compact .ab-title {
   font-size: 15px;
 }

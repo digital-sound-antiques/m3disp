@@ -57,7 +57,7 @@ function onColor(hex: string): string {
   return brightness >= ON_COLOR_THRESHOLD ? "#0d1117" : "#ffffff";
 }
 
-const BOTTOM_MIN = 48;
+const BOTTOM_MIN = 40;
 const BOTTOM_MAX = 128;
 const BOTTOM_DEFAULT = 64;
 // below this bar height, drop the version/latency line
