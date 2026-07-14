@@ -212,17 +212,15 @@ export function PlayListView() {
                               >
                                 ✕
                               </button>
-                            ) : (
+                            ) : selected ? (
                               <span className="pl-act">
-                                {selected ? (
-                                  playing ? (
-                                    <Pause sx={{ fontSize: 16 }} />
-                                  ) : (
-                                    <PlayArrow sx={{ fontSize: 16 }} />
-                                  )
-                                ) : null}
+                                {playing ? (
+                                  <Pause sx={{ fontSize: 16 }} />
+                                ) : (
+                                  <PlayArrow sx={{ fontSize: 16 }} />
+                                )}
                               </span>
-                            )}
+                            ) : null}
                           </li>
                         )}
                       </Draggable>

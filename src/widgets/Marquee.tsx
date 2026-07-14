@@ -43,14 +43,15 @@ export function Marquee({ play, children }: MarqueeProps) {
 
   const speed = 25;
   const active = play && marqueeWidth > containerWidth + 1;
-  // scroll the text in from the container's right edge and out past its left —
-  // travel is container + text width, so it never over-shoots for large fonts
-  const duration = Math.max(1, (containerWidth + marqueeWidth) / speed);
+  // start with the title's head at the left edge (fully readable), then scroll
+  // left until it has passed out of view; travel is just the text width, so it
+  // never over-shoots for large fonts
+  const duration = Math.max(1, marqueeWidth / speed);
 
   return (
     <Fragment>
       <style>{`@keyframes ${animName} {
-  from { transform: translateX(${containerWidth}px); }
+  from { transform: translateX(0); }
   to { transform: translateX(${-marqueeWidth}px); }
 }`}</style>
       <div ref={containerRef} style={containerStyle}>
