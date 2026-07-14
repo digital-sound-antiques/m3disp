@@ -512,8 +512,12 @@ class KSSDecoderWorker extends AudioDecoderWorker {
       // Determine the actual song length: the driver fades once it has looped
       // `maxLoop` times, ending fadeFrames later. (The audible player applies the
       // same policy; the keyframer just discovers the frame first.)
-      if (this._endFrame === 0 && kf.getLoopCount() >= this._maxLoop) {
-        // Loop cut-off: fade out over the fadeFrames that follow the loop point.
+      // A song can reach its loop count and set its stop flag on the very same
+      // frame (it ends exactly at the loop point). Only treat this as a loop
+      // cut-off (which fades over the following fadeFrames) when the driver has
+      // NOT also stopped; otherwise fall through to the natural-stop path below,
+      // which ends cleanly at the exact frame with no fade.
+      if (this._endFrame === 0 && kf.getStopFlag() == 0 && kf.getLoopCount() >= this._maxLoop) {
         this._reportDuration(this._keyframerFrames + fadeFrames, true);
       }
       snapshots.push({
