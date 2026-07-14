@@ -660,13 +660,14 @@ class KSSDecoderWorker extends AudioDecoderWorker {
       }
     }
 
-    // then feed the piano-roll / score look-ahead ahead of the play head, capped
-    // to ~1s per call so the full SCAN_AHEAD lead (13s of silent synthesis) is
-    // spread over many calls instead of blocking audio; the throttle above fills
-    // the rest during idle time once the buffer is primed
+    // then feed the piano-roll / score look-ahead ahead of the play head. Cap it
+    // to ~1s per call only while the audio buffer is still filling, so the first
+    // chunks after a (re)start aren't blocked by the 13s scan on a slow device;
+    // once the buffer is primed, let it build the full look-ahead at once again.
+    const primed = this._playerFrames - this._playhead >= (this._lookaheadMs / 1000) * this.sampleRate;
     this._advanceKeyframer(
       this._playhead + SCAN_AHEAD_SECONDS * this.sampleRate,
-      this.sampleRate
+      primed ? Infinity : this.sampleRate
     );
 
     return [res];
