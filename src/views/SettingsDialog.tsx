@@ -103,6 +103,47 @@ function ThemePanel() {
   );
 }
 
+function FontPanel() {
+  const app = useContext(AppContext);
+  const levels = [1, 2, 3, 4, 5];
+  return (
+    <div className="crd-fields">
+      <div className="crd-field">
+        <div className="crd-field-label">Channel Font Size</div>
+        <div className="crd-radio-row">
+          {levels.map((n) => (
+            <label key={n} className="crd-radio">
+              <input
+                type="radio"
+                name="ch-font-scale"
+                checked={app.channelFontScaleLevel === n}
+                onChange={() => app.setChannelFontScaleLevel(n)}
+              />
+              <span>{n}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+      <div className="crd-field">
+        <div className="crd-field-label">Playlist Font Size</div>
+        <div className="crd-radio-row">
+          {levels.map((n) => (
+            <label key={n} className="crd-radio">
+              <input
+                type="radio"
+                name="pl-font-scale"
+                checked={app.playlistFontScaleLevel === n}
+                onChange={() => app.setPlaylistFontScaleLevel(n)}
+              />
+              <span>{n}</span>
+            </label>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function OtherPanel(props: { onReset: () => void }) {
   const [confirming, setConfirming] = useState(false);
   return (
@@ -125,12 +166,12 @@ function OtherPanel(props: { onReset: () => void }) {
           </>
         ) : (
           <>
-            <button className="crd-danger-btn" onClick={() => setConfirming(true)}>
-              RESET ALL SETTINGS
-            </button>
             <div className="crd-hint">
               Restores the theme, piano-roll and player settings to their defaults.
             </div>
+            <button className="crd-danger-btn" onClick={() => setConfirming(true)}>
+              RESET ALL SETTINGS
+            </button>
           </>
         )}
       </div>
@@ -138,7 +179,7 @@ function OtherPanel(props: { onReset: () => void }) {
   );
 }
 
-const TABS = ["Player", "Theme", "Other"];
+const TABS = ["Player", "Theme", "Font", "Other"];
 
 function SettingsDialogBody(props: { id: string }) {
   const app = useContext(AppContext);
@@ -151,12 +192,16 @@ function SettingsDialogBody(props: { id: string }) {
   const [savedSecondaryColor] = useState(app.theme.palette.secondary.main);
   const [savedKeyHighlightColorType] = useState(app.keyHighlightColorType);
   const [savedSeekSliderColorType] = useState(app.seekSliderColorType);
+  const [savedChannelFontScaleLevel] = useState(app.channelFontScaleLevel);
+  const [savedPlaylistFontScaleLevel] = useState(app.playlistFontScaleLevel);
 
   const onCancel = () => {
     app.setPrimaryColor(savedPrimaryColor);
     app.setSecondaryColor(savedSecondaryColor);
     app.setKeyHighlightColorType(savedKeyHighlightColorType);
     app.setSeekSliderColorType(savedSeekSliderColorType);
+    app.setChannelFontScaleLevel(savedChannelFontScaleLevel);
+    app.setPlaylistFontScaleLevel(savedPlaylistFontScaleLevel);
     app.closeDialog(props.id);
     settings.revert();
   };
@@ -195,6 +240,9 @@ function SettingsDialogBody(props: { id: string }) {
             <ThemePanel />
           </div>
           <div className={`crd-panel${tab === 2 ? " active" : ""}`}>
+            <FontPanel />
+          </div>
+          <div className={`crd-panel${tab === 3 ? " active" : ""}`}>
             <OtherPanel onReset={onResetAll} />
           </div>
         </div>

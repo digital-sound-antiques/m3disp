@@ -62,11 +62,12 @@ export function PlaylistImage() {
           <button
             className={`pl-art-menu-btn${menuOpen ? " active" : ""}`}
             title="Artwork options"
+            disabled={collapsed}
             onClick={() => setMenuOpen((o) => !o)}
           >
             <MoreVert sx={{ fontSize: 18 }} />
           </button>
-          {menuOpen && (
+          {menuOpen && !collapsed && (
             <div className="pl-art-menu">
               <div className="menu-list">
                 <button

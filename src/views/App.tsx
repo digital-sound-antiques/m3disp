@@ -188,6 +188,13 @@ function Layout() {
     );
   }, [app.theme, app.seekSliderColorType]);
 
+  // channel/playlist font scale: level 1..5 -> 100%..200% in 25% steps
+  useEffect(() => {
+    const root = document.documentElement.style;
+    root.setProperty("--ch-font-scale", String(1 + (app.channelFontScaleLevel - 1) * 0.25));
+    root.setProperty("--pl-font-scale", String(1 + (app.playlistFontScaleLevel - 1) * 0.25));
+  }, [app.channelFontScaleLevel, app.playlistFontScaleLevel]);
+
   const sideDragRef = useRef<{ x: number; w: number } | null>(null);
   const startSideResize = (e: React.PointerEvent) => {
     e.currentTarget.setPointerCapture(e.pointerId);

@@ -28,6 +28,14 @@ export function PlayListView() {
   const [addOpen, setAddOpen] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const addWrapRef = useRef<HTMLDivElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // when playback moves to another track, scroll it into view if it's off-screen
+  // (block: "nearest" leaves it alone when already visible)
+  useEffect(() => {
+    const el = rootRef.current?.querySelector("li.active");
+    el?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [context.currentEntry]);
 
   const onAddClick = () => {
     fileInputRef.current!.value = "";
@@ -62,7 +70,7 @@ export function PlayListView() {
   const entries = context.entries;
 
   return (
-    <div className="pl">
+    <div className="pl" ref={rootRef}>
       <div className="pl-toolbar">
         {editMode ? (
           <>

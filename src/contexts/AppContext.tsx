@@ -77,6 +77,8 @@ type AppContextData = {
   theme: Theme;
   keyHighlightColorType: KeyHighlightColorType;
   seekSliderColorType: SeekSliderColorType;
+  channelFontScaleLevel: number;
+  playlistFontScaleLevel: number;
   pianoRollRangeInSec: number;
   pianoRollLayered: boolean;
   pianoRollMode: string;
@@ -95,6 +97,8 @@ type AppContextData = {
   setSecondaryColor: (id: string) => void;
   setKeyHighlightColorType: (id: KeyHighlightColorType) => void;
   setSeekSliderColorType: (id: SeekSliderColorType) => void;
+  setChannelFontScaleLevel: (value: number) => void;
+  setPlaylistFontScaleLevel: (value: number) => void;
   setPianoRollRangeInSec: (value: number) => void;
   setPianoRollLayered: (value: boolean) => void;
   setPianoRollMode: (value: PianoRollMode) => void;
@@ -113,6 +117,8 @@ const defaultContextData: AppContextData = {
   theme: defaultTheme,
   keyHighlightColorType: "primary",
   seekSliderColorType: "primary",
+  channelFontScaleLevel: 1,
+  playlistFontScaleLevel: 3,
   pianoRollRangeInSec: 4.0,
   pianoRollLayered: false,
   pianoRollMode: "2d",
@@ -131,6 +137,8 @@ const defaultContextData: AppContextData = {
   setSecondaryColor: noop,
   setKeyHighlightColorType: noop,
   setSeekSliderColorType: noop,
+  setChannelFontScaleLevel: noop,
+  setPlaylistFontScaleLevel: noop,
   setPianoRollRangeInSec: noop,
   setPianoRollLayered: noop,
   setPianoRollMode: noop,
@@ -147,6 +155,8 @@ const keyPrimaryColor = "m3disp.palette.primary.main";
 const keySecondaryColor = "m3disp.palette.secondary.main";
 const keyKeyHighlightColorType = "m3disp.keyHighlightColorType";
 const keySeekSliderColorType = "m3disp.seekSliderColorType";
+const keyChannelFontScaleLevel = "m3disp.channelFontScaleLevel";
+const keyPlaylistFontScaleLevel = "m3disp.playlistFontScaleLevel";
 const keyPianoRollRangeInSec = "m3disp.pianoRoll.rangeInSec";
 const keyPianoRollLayered = "m3disp.pianoRoll.layered";
 const keyPianoRollShowParticles = "m3disp.pianoRoll.showParticles";
@@ -224,6 +234,26 @@ export function AppContextProvider(props: PropsWithChildren) {
     }
   };
 
+  const setChannelFontScaleLevel = (value: number, save: boolean = true) => {
+    const level = Math.min(5, Math.max(1, Math.round(value)));
+    setState((oldState) => {
+      return { ...oldState, channelFontScaleLevel: level };
+    });
+    if (save) {
+      localStorage.setItem(keyChannelFontScaleLevel, String(level));
+    }
+  };
+
+  const setPlaylistFontScaleLevel = (value: number, save: boolean = true) => {
+    const level = Math.min(5, Math.max(1, Math.round(value)));
+    setState((oldState) => {
+      return { ...oldState, playlistFontScaleLevel: level };
+    });
+    if (save) {
+      localStorage.setItem(keyPlaylistFontScaleLevel, String(level));
+    }
+  };
+
   const setPianoRollRangeInSec = (value: number, save: boolean = true) => {
     setState((oldState) => {
       return { ...oldState, pianoRollRangeInSec: value };
@@ -285,6 +315,8 @@ export function AppContextProvider(props: PropsWithChildren) {
     setSecondaryColor(defaultTheme.palette.secondary.main);
     setKeyHighlightColorType("primary");
     setSeekSliderColorType("primary");
+    setChannelFontScaleLevel(1);
+    setPlaylistFontScaleLevel(3);
     setPianoRollRangeInSec(4.0);
     setPianoRollLayered(false);
     setPianoRollMode("2d");
@@ -320,6 +352,14 @@ export function AppContextProvider(props: PropsWithChildren) {
         state.seekSliderColorType) as SeekSliderColorType,
       false
     );
+    {
+      const s = localStorage.getItem(keyChannelFontScaleLevel);
+      if (s != null) setChannelFontScaleLevel(parseInt(s, 10), false);
+    }
+    {
+      const s = localStorage.getItem(keyPlaylistFontScaleLevel);
+      if (s != null) setPlaylistFontScaleLevel(parseInt(s, 10), false);
+    }
 
     let str = localStorage.getItem(keyPianoRollRangeInSec);
     if (str != null) {
@@ -386,6 +426,8 @@ export function AppContextProvider(props: PropsWithChildren) {
         setSecondaryColor,
         setKeyHighlightColorType,
         setSeekSliderColorType,
+        setChannelFontScaleLevel,
+        setPlaylistFontScaleLevel,
         setPianoRollRangeInSec,
         setPianoRollLayered,
         setPianoRollMode,
