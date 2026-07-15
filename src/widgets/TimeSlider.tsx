@@ -1,4 +1,4 @@
-import { useContext, useEffect, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 
 import { PlayerContext } from "../contexts/PlayerContext";
 import { toTimeString, usePlaybackTime } from "./usePlaybackTime";
@@ -41,6 +41,19 @@ export function TimeSlider() {
     context.player.seek(target);
   };
 
+  // Commit on release. iOS Safari doesn't reliably fire `pointerup` on a range
+  // input, so we also listen for touchend/mouseup; a value guard (re-armed on
+  // each drag via onChange) collapses the duplicate events into one seek. Without
+  // this, a missed commit leaves the preview (and thus the time display) frozen
+  // at the drag/tap position while playback keeps running from the old spot.
+  const lastCommitted = useRef<number | null>(null);
+  const handleRelease = (el: HTMLInputElement) => {
+    const v = Number(el.value);
+    if (lastCommitted.current === v) return;
+    lastCommitted.current = v;
+    commitSeek(v);
+  };
+
   const displaySec = seekingTo ?? currentSec;
   // Axis extent = the real total (or the seek preview if it runs past it).
   // Don't floor it to 1s: a sub-second track would then leave the buffered
@@ -59,8 +72,13 @@ export function TimeSlider() {
         value={Math.min(displaySec, maxSec)}
         disabled={entry == null}
         style={{ background: seekBackground(displaySec, bufferedSec, maxSec) }}
-        onChange={(e) => setSeekingTo(Number(e.target.value))}
-        onPointerUp={(e) => commitSeek(Number((e.target as HTMLInputElement).value))}
+        onChange={(e) => {
+          setSeekingTo(Number(e.target.value));
+          lastCommitted.current = null; // re-arm the release guard for this drag
+        }}
+        onPointerUp={(e) => handleRelease(e.target as HTMLInputElement)}
+        onTouchEnd={(e) => handleRelease(e.target as HTMLInputElement)}
+        onMouseUp={(e) => handleRelease(e.target as HTMLInputElement)}
         onKeyUp={(e) => {
           if (["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) {
             commitSeek(Number((e.target as HTMLInputElement).value));
