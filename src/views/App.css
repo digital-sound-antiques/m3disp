@@ -1108,7 +1108,11 @@ textarea {
   position: relative;
   display: flex;
   align-items: center;
-  overflow: hidden;
+  /* clip the marquee horizontally, but let the title font's descenders overflow
+     vertically (line-height:1 doesn't contain them) — the transport padding
+     around it absorbs the overhang. clip+visible avoids a scrollbar. */
+  overflow-x: clip;
+  overflow-y: visible;
   margin-bottom: 5px;
 }
 /* drag grip at the piano-roll bottom edge (top of the transport section) */
@@ -1210,6 +1214,10 @@ textarea {
   text-align: var(--title-align, left);
   font-weight: 700;
   font-size: var(--title-font, 0.9rem);
+  /* line box tall enough to contain descenders and keep the text optically
+     centered in the row (line-height:1 cut descenders and looked top-shifted).
+     font is 0.8×row, so 1.2× line-height still fits within the row height. */
+  line-height: 1.2;
   color: #e6edf3;
 }
 /* title alignment segment, revealed at the bottom-center on hover */

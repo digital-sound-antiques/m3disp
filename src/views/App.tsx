@@ -66,14 +66,14 @@ const BOTTOM_COMPACT = 64;
 const transportScaleFor = (h: number) =>
   1 + ((h - BOTTOM_MIN) / (BOTTOM_MAX - BOTTOM_MIN)) * 0.5;
 const clampBottom = (h: number) => Math.min(BOTTOM_MAX, Math.max(BOTTOM_MIN, h));
-const TITLE_MIN = 24;
+const TITLE_MIN = 16;
 const TITLE_MAX = 80;
+const TITLE_DEFAULT = 20;
 const clampTitle = (h: number) => Math.min(TITLE_MAX, Math.max(TITLE_MIN, h));
-const TITLE_FONT_MIN = 18; // px, the base title size at TITLE_MIN
-const TITLE_FONT_MAX = 40; // px, at TITLE_MAX
-const titleFontFor = (h: number) =>
-  TITLE_FONT_MIN +
-  ((h - TITLE_MIN) / (TITLE_MAX - TITLE_MIN)) * (TITLE_FONT_MAX - TITLE_FONT_MIN);
+const TITLE_FONT_MAX = 64; // px, upper cap for the title font
+// The title font tracks the bar height (so it fills without being clipped by the
+// row) up to a cap; with line-height:1 on the title, 0.8×height always fits.
+const titleFontFor = (h: number) => Math.min(TITLE_FONT_MAX, Math.round(h * 0.8));
 
 export function App() {
   const app = useContext(AppContext);
@@ -120,7 +120,7 @@ function Layout() {
   // title-bar height under the piano roll (drag-resizable, grows the title font)
   const [titleHeight, setTitleHeight] = useState(() => {
     const v = parseInt(localStorage.getItem("m3disp.titleHeight") ?? "", 10);
-    return isNaN(v) ? TITLE_MIN : clampTitle(v);
+    return isNaN(v) ? TITLE_DEFAULT : clampTitle(v);
   });
   // title text alignment (left / center / right), persisted
   const [titleAlign, setTitleAlign] = useState<"left" | "center" | "right">(() => {
@@ -183,7 +183,7 @@ function Layout() {
       setSideWidth(300);
       setChannelsWidth(210);
       setBottomHeight(BOTTOM_DEFAULT);
-      setTitleHeight(TITLE_MIN);
+      setTitleHeight(TITLE_DEFAULT);
       setTitleAlign("left");
       setVizTab("pianoroll");
       setKeyboardCols(1);

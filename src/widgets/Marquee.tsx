@@ -73,7 +73,12 @@ export function Marquee({ play, children }: MarqueeProps) {
 }
 
 const containerStyle: CSSProperties = {
-  overflowX: "hidden",
+  // clip horizontally (the marquee scrolls sideways) but let the text overflow
+  // vertically so descenders aren't cut — the surrounding padding absorbs it.
+  // Use clip+visible, NOT hidden+visible (the latter computes overflow-y to
+  // `auto` and pops a vertical scrollbar when the text is a hair too tall).
+  overflowX: "clip",
+  overflowY: "visible",
   display: "flex",
   flexDirection: "row",
   position: "relative",

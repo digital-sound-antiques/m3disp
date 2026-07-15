@@ -54,24 +54,30 @@ function autoResumeAudioContext(audioContext: AudioContext) {
   }
 }
 
+export const DEFAULT_MASTER_GAIN = 4.0;
+export const DEFAULT_SURROUND_MODE: SurroundMode = "off";
+export const DEFAULT_REPEAT_MODE: RepeatMode = "none";
+export const DEFAULT_LOOP_COUNT = 2;
+export const DEFAULT_DURATION_MS = 300 * 1000;
+
 const createDefaultContextState = () => {
   const audioContext = new AudioContext({ sampleRate: 44100, latencyHint: "interactive" });
   const state: PlayerContextState = {
     audioContext: audioContext,
     gainNode: new GainNode(audioContext),
     surround: new SurroundEffect(audioContext),
-    surroundMode: "off",
+    surroundMode: DEFAULT_SURROUND_MODE,
     storage: new BinaryDataStorage(),
     // Workaround: AudioWorklet's playback is broken in iOS 17.5.1
     player: new KSSPlayer(isIOS ? "script" : "worklet"),
-    repeatMode: "none",
+    repeatMode: DEFAULT_REPEAT_MODE,
     entries: [],
     currentEntry: null,
     playStateChangeCount: 0,
     playState: "stopped",
-    masterGain: 4.0,
-    defaultLoopCount: 2,
-    defaultDuration: 300 * 1000,
+    masterGain: DEFAULT_MASTER_GAIN,
+    defaultLoopCount: DEFAULT_LOOP_COUNT,
+    defaultDuration: DEFAULT_DURATION_MS,
     channelMask: {
       psg: 0,
       opl: 0,
@@ -98,7 +104,9 @@ const createDefaultContextState = () => {
     const pls = localStorage.getItem("m3disp.entries");
     const entries = pls != null ? JSON.parse(pls) : [];
     state.entries = entries;
-    state.masterGain = json.masterGain ?? state.masterGain;
+    // clamp against the current slider range: a value persisted under an older,
+    // wider range (was 1.0–7.0) could otherwise land out of bounds
+    state.masterGain = Math.min(6.0, Math.max(0.0, json.masterGain ?? state.masterGain));
     state.gainNode.gain.value = state.masterGain;
     state.repeatMode = json.repeatMode ?? state.repeatMode;
     state.surroundMode = json.surroundMode ?? state.surroundMode;
@@ -207,6 +215,22 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
   useEffect(() => {
     state.surround.setMode(state.surroundMode);
   }, [state.surroundMode]);
+
+  // "Reset all settings" (dispatched from AppContext) also restores the
+  // player-side settings: volume, surround, repeat, loop count, duration
+  useEffect(() => {
+    const onReset = () =>
+      setState((s) => ({
+        ...s,
+        masterGain: DEFAULT_MASTER_GAIN,
+        surroundMode: DEFAULT_SURROUND_MODE,
+        repeatMode: DEFAULT_REPEAT_MODE,
+        defaultLoopCount: DEFAULT_LOOP_COUNT,
+        defaultDuration: DEFAULT_DURATION_MS,
+      }));
+    window.addEventListener("m3disp:reset-layout", onReset);
+    return () => window.removeEventListener("m3disp:reset-layout", onReset);
+  }, []);
 
   const reducer = new PlayerContextReducer(setState);
   const [initialized, setInitialized] = useState(false);

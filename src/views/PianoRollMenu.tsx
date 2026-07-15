@@ -34,7 +34,7 @@ export function PianoRollMenu() {
           title={`${ctx.pianoRollRangeInSec}s`}
         />
       </div>
-      {toggle(<Layers sx={{ fontSize: 18 }} />, "Depth", ctx.pianoRollLayered, () =>
+      {toggle(<Layers sx={{ fontSize: 18 }} />, "Layer", ctx.pianoRollLayered, () =>
         ctx.setPianoRollLayered(!ctx.pianoRollLayered)
       )}
       {toggle(<AutoAwesome sx={{ fontSize: 18 }} />, "Particles", ctx.pianoRollShowParticles, () =>

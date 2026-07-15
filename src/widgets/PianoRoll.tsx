@@ -186,8 +186,23 @@ export function PianoRoll(props: { mode: string }) {
     const zKb = yc * Math.sin(rotX); // keyboard depth after rotateX
     const kbFactor = PERSP / (PERSP - zKb); // perspective magnification at that depth
     const yProj = yc * Math.cos(rotX) * kbFactor;
-    // translateY so the now-line lands NOW_FROM_BOTTOM up from the bottom
-    const ty = ((0.5 - NOW_FROM_BOTTOM) * h) / SCALE_Y - yProj;
+    // Projected (pre-scaleY) vertical position of a point at time-fraction t
+    // along the roll. rotateZ swaps axes, so the depth (time) plane's on-screen
+    // length is tied to the WIDTH; a tall box leaves the future (far) edge short
+    // of the top → black band. Raise the now-line just enough to bring that far
+    // edge up to the top — no extra data drawn. Clamp so the past (below the
+    // now-line) doesn't in turn run short and open a gap at the bottom.
+    const projAt = (t: number) => {
+      const y = (t - 0.5) * w;
+      return y * Math.cos(rotX) * (PERSP / (PERSP - y * Math.sin(rotX)));
+    };
+    const futureSpan = SCALE_Y * (yProj - projAt(1)); // px from now-line to far edge
+    const nowFromBottom =
+      h > 0
+        ? Math.min(0.45, Math.max(NOW_FROM_BOTTOM, 1 - futureSpan / h))
+        : NOW_FROM_BOTTOM;
+    // translateY so the now-line lands nowFromBottom up from the bottom
+    const ty = ((0.5 - nowFromBottom) * h) / SCALE_Y - yProj;
     // scaleX so the keyboard (projected width = h * kbFactor) fills ~90% of w
     const scaleX = h > 0 ? (KB_WIDTH_FRAC * w) / (h * kbFactor) : 1;
     transform = `scaleY(${SCALE_Y}) scaleX(${scaleX}) translateY(${ty}px) perspective(${PERSP}px) rotateX(${rotXDeg}deg) rotateZ(90deg)`;
