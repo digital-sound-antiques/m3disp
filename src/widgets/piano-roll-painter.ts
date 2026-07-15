@@ -164,12 +164,18 @@ function getStatusCached(
   return v;
 }
 
+// Particle appearance. "off" disables them; the others pick the sprite shape.
+export type PianoRollParticleType = "off" | "spark" | "star" | "heart";
+export const particleTypeCycle: PianoRollParticleType[] = ["off", "spark", "star", "heart"];
+type ParticleShape = "spark" | "star" | "heart";
+
 type Particle = {
   x: number; y: number;
   vx: number; vy: number;
   life: number;
   size: number;
   color: string;
+  shape: ParticleShape;
 };
 
 // ---- Particle system ----
@@ -177,39 +183,120 @@ type Particle = {
 const particles: Particle[] = [];
 let lastRenderTime = 0;
 
-// Pre-rendered radial-gradient glow sprite per color. The blur is baked once,
-// so drawing a particle is just a (GPU) drawImage — far cheaper than setting
-// shadowBlur per particle, while still looking glowy.
-const glowSprites = new Map<string, HTMLCanvasElement>();
-function getGlowSprite(color: string): HTMLCanvasElement {
-  let s = glowSprites.get(color);
+// Trace a 5-point star / a heart into the current path, centered at the origin
+// and bounded by radius R. Used to bake the shaped particle sprites.
+function traceStar(g: CanvasRenderingContext2D, R: number) {
+  const spikes = 5, inner = R * 0.42;
+  g.beginPath();
+  for (let i = 0; i < spikes * 2; i++) {
+    const rad = i % 2 === 0 ? R : inner;
+    const a = -Math.PI / 2 + (i * Math.PI) / spikes;
+    const x = Math.cos(a) * rad, y = Math.sin(a) * rad;
+    if (i === 0) g.moveTo(x, y); else g.lineTo(x, y);
+  }
+  g.closePath();
+}
+// The classic heart curve (x = 16sin³t, y = 13cos t − 5cos2t − 2cos3t − cos4t),
+// sampled once and normalized to fit centered in a unit box. Its natural
+// proportions give a clean, symmetric heart — nicer than a hand-tuned bezier.
+const HEART_PATH: [number, number][] = (() => {
+  const N = 96;
+  const raw: [number, number][] = [];
+  for (let i = 0; i < N; i++) {
+    const t = (i / N) * Math.PI * 2;
+    const x = 16 * Math.pow(Math.sin(t), 3);
+    const y = 13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t);
+    raw.push([x, -y]); // canvas y is down, so negate to put the lobes on top
+  }
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  for (const [x, y] of raw) {
+    if (x < minX) minX = x; if (x > maxX) maxX = x;
+    if (y < minY) minY = y; if (y > maxY) maxY = y;
+  }
+  const cx = (minX + maxX) / 2, cy = (minY + maxY) / 2;
+  const half = Math.max(maxX - minX, maxY - minY) / 2;
+  return raw.map(([x, y]): [number, number] => [(x - cx) / half, (y - cy) / half]);
+})();
+
+function traceHeart(g: CanvasRenderingContext2D, R: number) {
+  g.beginPath();
+  for (let i = 0; i < HEART_PATH.length; i++) {
+    const [x, y] = HEART_PATH[i];
+    if (i === 0) g.moveTo(x * R, y * R);
+    else g.lineTo(x * R, y * R);
+  }
+  g.closePath();
+}
+
+// Pre-rendered glow sprite per (shape, color). Baking the blur/shape once makes
+// drawing a particle just a (GPU) drawImage — far cheaper than per-particle
+// shadowBlur, while still looking glowy. Keyed by "shape|color".
+const particleSprites = new Map<string, HTMLCanvasElement>();
+function getParticleSprite(color: string, shape: ParticleShape): HTMLCanvasElement {
+  const key = `${shape}|${color}`;
+  let s = particleSprites.get(key);
   if (!s) {
     const R = 16;
     s = document.createElement("canvas");
     s.width = s.height = R * 2;
     const g = s.getContext("2d")!;
-    const grad = g.createRadialGradient(R, R, 0, R, R, R);
-    grad.addColorStop(0, "#ffffff");      // hot white core
-    grad.addColorStop(0.25, color);        // channel color
-    grad.addColorStop(1, color + "00");    // fade to transparent
-    g.fillStyle = grad;
-    g.fillRect(0, 0, R * 2, R * 2);
-    glowSprites.set(color, s);
+    if (shape === "spark") {
+      const grad = g.createRadialGradient(R, R, 0, R, R, R);
+      grad.addColorStop(0, "#ffffff");    // hot white core
+      grad.addColorStop(0.25, color);      // channel color
+      grad.addColorStop(1, color + "00");  // fade to transparent
+      g.fillStyle = grad;
+      g.fillRect(0, 0, R * 2, R * 2);
+    } else {
+      // Crisp solid shape (normal compositing, no glow/highlight) so the
+      // star/heart outline stays clean and readable.
+      g.translate(R, R);
+      if (shape === "star") traceStar(g, R * 0.92);
+      else traceHeart(g, R * 0.92);
+      g.fillStyle = color;
+      g.fill();
+    }
+    particleSprites.set(key, s);
   }
   return s;
 }
 
-export function spawnParticles(x: number, y: number, color: string, count: number, sizeScale = 1) {
+// Hard cap on live particles: bounds worst-case additive overdraw (SPARK's main
+// cost) on dense chords without changing how it looks in normal playback.
+const MAX_PARTICLES = 1000;
+
+// Particle size/speed scale with the roll height so they keep their proportions
+// as the window grows/shrinks (like notes and keys do). `unit` ≈ this at a
+// reference roll height, and also folds in devicePixelRatio (canvas height is in
+// backing pixels).
+const PARTICLE_REF_H = 400;
+
+export function spawnParticles(
+  x: number, y: number, color: string, count: number, sizeScale = 1, shape: ParticleShape = "spark", unit = devicePixelRatio,
+) {
+  const isShape = shape !== "spark";
+  if (particles.length >= MAX_PARTICLES) return;
+  count = Math.min(count, MAX_PARTICLES - particles.length);
   for (let i = 0; i < count; i++) {
-    const angle = -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.4;
-    const speed = (60 + Math.random() * 140) * devicePixelRatio;
+    // star/heart: size random 1–4×, and much more varied launch angle & distance
+    // (and a longer life) so they scatter and read as shapes. spark: tight fan.
+    const angle = isShape
+      ? Math.random() * Math.PI * 2 // star/heart scatter evenly in all directions
+      : -Math.PI / 2 + (Math.random() - 0.5) * Math.PI * 1.4;
+    const speed = isShape
+      ? (15 + Math.random() * 130) * unit
+      : (30 + Math.random() * 70) * unit;
+    const size = isShape
+      ? (0.25 + Math.random() * 2.75) * (shape === "star" ? 1.25 : 1.0) * unit * sizeScale
+      : (0.6 + Math.random() * 1.0) * unit * sizeScale;
     particles.push({
       x, y,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
-      life: 0.8 + Math.random() * 0.2,
-      size: (0.8 + Math.random() * 1.6) * devicePixelRatio * sizeScale,
+      life: isShape ? 1.2 + Math.random() * 0.9 : 0.8 + Math.random() * 0.2,
+      size,
       color,
+      shape,
     });
   }
 }
@@ -218,24 +305,42 @@ export function spawnParticles(x: number, y: number, color: string, count: numbe
 // per-particle shadowBlur (the expensive part), yet dense bursts add up to a
 // bright flash. Lifetime is short (~0.4s) so the live count stays naturally
 // bounded without a hard cap.
-function drawParticles(ctx: CanvasRenderingContext2D, dt: number) {
+function drawParticles(
+  ctx: CanvasRenderingContext2D, dt: number, is3d = false, shape3d: { sx: number; sy: number } | null = null,
+) {
+  const unit = ctx.canvas.height / PARTICLE_REF_H; // roll-relative pixel scale
   // advance + cull
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     p.x += p.vx * dt;
     p.y += p.vy * dt;
-    p.vy += 250 * devicePixelRatio * dt;
+    // spark falls like a fountain; star/heart drift with no gravity (even spread)
+    if (p.shape === "spark") p.vy += 250 * unit * dt;
     p.life -= dt * 2.5;
     if (p.life <= 0) particles.splice(i, 1);
   }
   if (particles.length === 0) return;
 
-  ctx.globalCompositeOperation = "lighter";
   for (let i = 0; i < particles.length; i++) {
     const p = particles[i];
+    // spark glows (additive); star/heart draw as solid shapes so they stay crisp
+    ctx.globalCompositeOperation = p.shape === "spark" ? "lighter" : "source-over";
     ctx.globalAlpha = p.life * p.life;
-    const r = p.size * 2.5; // glow radius (wider than the core)
-    ctx.drawImage(getGlowSprite(p.color), p.x - r, p.y - r, r * 2, r * 2);
+    // size already carries the star/heart size boost (see spawnParticles)
+    const r = p.size * 2.5;
+    const sprite = getParticleSprite(p.color, p.shape);
+    if (is3d && p.shape !== "spark" && shape3d) {
+      // Pre-distort shaped sprites by the inverse of the 3D transform's
+      // non-uniform scale + 90° swap, so they render upright and undistorted
+      // (otherwise the star/heart look squashed on the tilted surface).
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.transform(0, shape3d.sx, -shape3d.sy, 0, 0, 0);
+      ctx.drawImage(sprite, -r, -r, r * 2, r * 2);
+      ctx.restore();
+    } else {
+      ctx.drawImage(sprite, p.x - r, p.y - r, r * 2, r * 2);
+    }
   }
   ctx.globalAlpha = 1.0;
   ctx.globalCompositeOperation = "source-over";
@@ -358,7 +463,7 @@ export function paintKeyboardEdgeLine(canvas: HTMLCanvasElement) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const { kw, dx } = kbGeom(canvas);
   const x = dx + kw;
-  ctx.strokeStyle = "rgba(200,200,200,0.6)";
+  ctx.strokeStyle = "rgba(200,200,200,0.5)";
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(x, 0);
@@ -373,8 +478,10 @@ export function paintPianoRoll(
   playerContext: PlayerContextState,
   rangeInSec: number,
   layered: boolean,
-  showParticles: boolean,
-  colorConfig: PianoRollColorConfig = defaultColorConfig
+  particleType: PianoRollParticleType,
+  colorConfig: PianoRollColorConfig = defaultColorConfig,
+  mode: string = "2d",
+  shape3d: { sx: number; sy: number } | null = null
 ) {
   const now = performance.now();
   const dt = Math.min((now - lastRenderTime) / 1000, 1 / 20);
@@ -526,17 +633,25 @@ export function paintPianoRoll(
     ctx.fillRect(d.x, d.y, d.w, d.h);
     ctx.restore();
 
-    if (showParticles) {
-      const burst = d.noteAge < 16 ? Math.round((1 - d.noteAge / 16) ** 2 * 4) : 0;
-      const trickle = Math.random() < 0.35 ? 1 : 0;
-      const count = burst + trickle;
+    if (particleType !== "off") {
+      let count: number;
+      if (particleType === "spark") {
+        const burst = d.noteAge < 16 ? Math.round((1 - d.noteAge / 16) ** 2 * 2) : 0;
+        count = burst + (Math.random() < 0.15 ? 1 : 0);
+      } else {
+        // star/heart are big — emit them very sparingly
+        const onset = d.noteAge < 4 && Math.random() < 0.06 ? 1 : 0;
+        count = onset + (Math.random() < 0.003 ? 1 : 0);
+      }
       // Scale particle size by channel volume: vol 0 → 50%, vol 15 → 100%.
       const sizeScale = 0.5 + 0.5 * (Math.max(0, Math.min(15, d.vol)) / 15);
-      if (count > 0) spawnParticles(d.nowX, d.y + d.h / 2, d.color, count, sizeScale);
+      if (count > 0) {
+        spawnParticles(d.nowX, d.y + d.h / 2, d.color, count, sizeScale, particleType, canvas.height / PARTICLE_REF_H);
+      }
     }
   }
 
-  drawParticles(ctx, dt);
+  drawParticles(ctx, dt, mode === "3d", shape3d);
 
   // Frontmost pass: spotlight frames over everything (notes, glows, particles).
   if (frameDraws.length > 0) {

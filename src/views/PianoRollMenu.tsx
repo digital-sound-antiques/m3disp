@@ -2,6 +2,10 @@ import { AutoAwesome, Layers, Palette, Piano, ThreeDRotation, ZoomIn } from "@mu
 import { ReactNode, useContext } from "react";
 import { AppContext } from "../contexts/AppContext";
 import { pianoRollColorDialogId } from "../widgets/PianoRollControl";
+import { particleTypeCycle, type PianoRollParticleType } from "../widgets/piano-roll-painter";
+
+const nextParticleType = (t: PianoRollParticleType) =>
+  particleTypeCycle[(particleTypeCycle.indexOf(t) + 1) % particleTypeCycle.length];
 
 /** Labelled vertical menu of piano-roll settings (shown from the gear in the
  *  Piano Roll tab header). */
@@ -37,9 +41,16 @@ export function PianoRollMenu() {
       {toggle(<Layers sx={{ fontSize: 18 }} />, "Layer", ctx.pianoRollLayered, () =>
         ctx.setPianoRollLayered(!ctx.pianoRollLayered)
       )}
-      {toggle(<AutoAwesome sx={{ fontSize: 18 }} />, "Particles", ctx.pianoRollShowParticles, () =>
-        ctx.setPianoRollShowParticles(!ctx.pianoRollShowParticles)
-      )}
+      <button
+        className={`menu-item${ctx.pianoRollParticleType !== "off" ? " active" : ""}`}
+        onClick={() => ctx.setPianoRollParticleType(nextParticleType(ctx.pianoRollParticleType))}
+      >
+        <span className="menu-ico">
+          <AutoAwesome sx={{ fontSize: 18 }} />
+        </span>
+        <span className="menu-label">Particles</span>
+        <span className="menu-state">{ctx.pianoRollParticleType.toUpperCase()}</span>
+      </button>
       {toggle(<Piano sx={{ fontSize: 18 }} />, "Keyboard", ctx.pianoRollShowKeyboard, () =>
         ctx.setPianoRollShowKeyboard(!ctx.pianoRollShowKeyboard)
       )}

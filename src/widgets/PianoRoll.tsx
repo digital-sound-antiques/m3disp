@@ -92,12 +92,14 @@ function HighlightCanvas(props: {
 
 // ---- Main piano roll canvas ----
 
-function PianoRollCanvas(props: { width: number; height: number; resX?: number; resY?: number }) {
+function PianoRollCanvas(props: { width: number; height: number; resX?: number; resY?: number; shape3d?: { sx: number; sy: number } | null }) {
   const appContext = useContext(AppContext);
   const playerContext = useContext(PlayerContext);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const appContextRef = useRef(appContext);
   appContextRef.current = appContext;
+  const shape3dRef = useRef(props.shape3d);
+  shape3dRef.current = props.shape3d;
   // keep a live reference so the rAF loop sees the current channel mask (and
   // other state), not the value captured when the effect mounted
   const playerContextRef = useRef(playerContext);
@@ -130,12 +132,14 @@ function PianoRollCanvas(props: { width: number; height: number; resX?: number; 
           playerContextRef.current,
           ac.pianoRollRangeInSec,
           ac.pianoRollLayered,
-          ac.pianoRollShowParticles,
+          ac.pianoRollParticleType,
           {
             mode: ac.pianoRollColorMode,
             channelColors: ac.pianoRollChannelColors,
             voiceColors: defaultVoiceColors,
-          }
+          },
+          ac.pianoRollMode,
+          shape3dRef.current
         );
       }
     };
@@ -166,7 +170,11 @@ export function PianoRoll(props: { mode: string }) {
   // so translateY is computed from the measured width/height rather than being a
   // fixed percentage. Transform order (applied last→first): scaleY, translateY,
   // perspective, rotateX, rotateZ — so translateY/scaleY act in projected space.
-  const PERSP = 900;
+  // Perspective distance scales with the roll width. The 3D geometry (yc/zKb) is
+  // proportional to width, so a FIXED perspective made kbFactor blow up as the
+  // window widened (zKb approaching PERSP) → extreme magnification. Tying PERSP
+  // to width keeps zKb/PERSP constant, so the view scales proportionally instead.
+  const PERSP_RATIO = 1.1;
   const SCALE_Y = 1.2;
   const NOW_FROM_BOTTOM = 0.25; // keyboard sits 25% up from the bottom
   const KB_WIDTH_FRAC = 0.8; // keyboard spans ~80% of the display width
@@ -174,9 +182,14 @@ export function PianoRoll(props: { mode: string }) {
   let transform = "none";
   let resX = 1;
   let resY = 1;
+  // Non-uniform-scale correction for shaped particles (star/heart): the 3D
+  // transform squashes them, so they're pre-distorted by its inverse to render
+  // upright and undistorted (billboard-like). null in 2D.
+  let shape3d: { sx: number; sy: number } | null = null;
   if (props.mode === "3d") {
     const w = size.width;
     const h = size.height;
+    const PERSP = w * PERSP_RATIO;
     const rotXDeg = -130; // fixed tilt
     const rotX = (rotXDeg * Math.PI) / 180;
     // After rotateZ(90deg): the now-line (keyboard) is a single horizontal line
@@ -212,6 +225,12 @@ export function PianoRoll(props: { mode: string }) {
     // → screen-x (scaleX). Include the keyboard's perspective magnification.
     resX = Math.min(RES_CAP, Math.max(1, SCALE_Y * kbFactor));
     resY = Math.min(RES_CAP, Math.max(1, scaleX * kbFactor));
+    // Aspect scales for un-squishing shaped particles: canvas x maps to screen-y
+    // at ~cos(tilt)·scaleY, canvas y maps to screen-x at ~scaleX. Normalize to be
+    // area-preserving so only the aspect (not the size) is corrected.
+    const c = Math.abs(Math.cos(rotX));
+    const norm = Math.sqrt(scaleX * c * SCALE_Y);
+    shape3d = { sx: norm / scaleX, sy: norm / (c * SCALE_Y) };
   }
 
   return (
@@ -228,7 +247,7 @@ export function PianoRoll(props: { mode: string }) {
         }}
       >
         <AutoSizeCanvas painter={paintPianoRollBg} width={size.width} height={size.height} resX={resX} resY={resY} />
-        <PianoRollCanvas width={size.width} height={size.height} resX={resX} resY={resY} />
+        <PianoRollCanvas width={size.width} height={size.height} resX={resX} resY={resY} shape3d={shape3d} />
 
         {appContext.pianoRollShowKeyboard ? <>
           <AutoSizeCanvas painter={paintWhiteKeyboard} width={size.width} height={size.height} resX={resX} resY={resY} />

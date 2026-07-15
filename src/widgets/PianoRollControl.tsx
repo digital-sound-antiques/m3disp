@@ -1,8 +1,12 @@
 import { AutoAwesome, Layers, Piano, Settings, ThreeDRotation, ZoomIn } from "@mui/icons-material";
 import { useContext } from "react";
 import { AppContext } from "../contexts/AppContext";
+import { particleTypeCycle, type PianoRollParticleType } from "./piano-roll-painter";
 
 export const pianoRollColorDialogId = "piano-roll-color-dialog";
+
+const nextParticleType = (t: PianoRollParticleType) =>
+  particleTypeCycle[(particleTypeCycle.indexOf(t) + 1) % particleTypeCycle.length];
 
 export function PianoRollControl() {
   const context = useContext(AppContext);
@@ -30,9 +34,9 @@ export function PianoRollControl() {
         <Layers sx={{ fontSize: 16 }} />
       </button>
       <button
-        className={`pr-toggle${context.pianoRollShowParticles ? " active" : ""}`}
-        onClick={() => context.setPianoRollShowParticles(!context.pianoRollShowParticles)}
-        title="Particles"
+        className={`pr-toggle${context.pianoRollParticleType !== "off" ? " active" : ""}`}
+        onClick={() => context.setPianoRollParticleType(nextParticleType(context.pianoRollParticleType))}
+        title={`Particles: ${context.pianoRollParticleType}`}
       >
         <AutoAwesome sx={{ fontSize: 16 }} />
       </button>
