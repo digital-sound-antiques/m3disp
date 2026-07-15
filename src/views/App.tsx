@@ -333,7 +333,7 @@ function Layout() {
                   className={`viz-tab${vizTab === "grid" ? " active" : ""}`}
                   onClick={() => setVizTab("grid")}
                 >
-                  Piano Grid
+                  Grid
                 </button>
                 {vizTab === "keyboard" && (
                   <div className="viz-seg">

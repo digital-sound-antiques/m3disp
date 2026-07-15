@@ -330,7 +330,7 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
         <Typography
           sx={{
             flex: "0 0 auto",
-            fontSize: "inherit",
+            fontSize: "0.82em",
             fontWeight: "bold",
             color: "#8b949e",
             whiteSpace: "nowrap",
@@ -378,7 +378,7 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
         <Typography
           sx={{
             flex: "0 0 auto",
-            fontSize: "inherit",
+            fontSize: "0.82em",
             fontWeight: "bold",
             color: "#8b949e",
             whiteSpace: "nowrap",

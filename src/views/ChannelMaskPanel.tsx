@@ -233,7 +233,7 @@ export function ChannelMaskPanel() {
                             return (
                               <ChannelRow
                                 key={r.label}
-                                name={`${s.label}${r.label}`}
+                                name={`CH${r.label}`}
                                 hi={r.hi}
                                 muted={muted}
                                 soloed={isSoloed(s.dev, rowBits)}

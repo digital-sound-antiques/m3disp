@@ -1075,6 +1075,8 @@ textarea {
   /* transparent so the view composites over whatever is behind it (the old
      panel background is gone, so its outer padding is removed too) */
   background: transparent;
+  /* breathing room below the content */
+  padding-bottom: 16px;
 }
 .pianoroll-wrap {
   position: relative;
@@ -1083,6 +1085,8 @@ textarea {
   /* transparent so the roll composites over whatever is behind it */
   background: transparent;
   overflow: hidden;
+  /* breathing room above and below the roll content */
+  padding: 16px 0;
 }
 /* per-channel grid: OPLL/PSG/SCC sections (collapsible/reorderable like the
    Keyboard view), each a 3-column grid of channel-roll cells. The whole grid
@@ -1094,6 +1098,8 @@ textarea {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  /* breathing room below the content */
+  padding-bottom: 16px;
 }
 .pr-grid-list {
   flex: 1 1 0;
@@ -1120,6 +1126,12 @@ textarea {
   min-height: 0;
   overflow: hidden;
   cursor: pointer;
+  /* crisp CSS border (canvas edge strokes were clipping/vanishing) */
+  border: 1px solid #5a5a5a;
+  border-radius: 4px;
+}
+.pr-grid-cell.muted {
+  border-color: #333;
 }
 
 /* seek bar + transport as an independent panel below the piano roll */
@@ -1742,15 +1754,18 @@ textarea {
     display: none;
   }
   .main {
-    flex: 0 0 auto;
+    flex: 1 1 auto;
     gap: 6px;
     overflow: visible;
+    min-height: 0;
   }
+  /* visualizer fills the space above the playlist (playlist is a fixed fraction
+     below), instead of a fixed aspect ratio that left the playlist ~50% tall */
   .viz {
-    flex: 0 0 auto;
+    flex: 1 1 0;
     width: auto;
     margin: 0 -8px;
-    aspect-ratio: 16 / 10;
+    aspect-ratio: auto;
     min-height: 0;
   }
   /* only the title lived in the transport row; hide it on phones */
@@ -1791,7 +1806,8 @@ textarea {
   }
   .side {
     width: auto !important;
-    flex: 1 1 auto;
+    /* playlist ≈ a third of the screen (was filling ~half) */
+    flex: 0 0 37%;
     min-height: 0;
     /* full-bleed playlist: no rounded corners, no side margins/borders */
     margin: 0 -8px;

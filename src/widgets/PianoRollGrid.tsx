@@ -7,6 +7,7 @@ import {
   channelIds,
   createParticleStore,
   defaultVoiceColors,
+  isChannelMuted,
   opllBit,
   paintCellRoll,
 } from "./piano-roll-painter";
@@ -105,9 +106,19 @@ function GridCell(props: {
     ctx.reducer.setChannelMaskLive(mask);
   };
 
+  // fully-muted cell: dim the whole canvas via CSS opacity (no canvas scrim)
+  const muted = props.channels.every((ch) => isChannelMuted(player.channelMask, channelIds[ch]));
   return (
-    <div ref={boxRef} className="pr-grid-cell" onClick={onClick} title="Mute / unmute">
-      <canvas ref={canvasRef} style={{ position: "absolute", top: 0, left: 0 }} />
+    <div
+      ref={boxRef}
+      className={`pr-grid-cell${muted ? " muted" : ""}`}
+      onClick={onClick}
+      title="Mute / unmute"
+    >
+      <canvas
+        ref={canvasRef}
+        style={{ position: "absolute", top: 0, left: 0, opacity: muted ? 0.33 : 1 }}
+      />
     </div>
   );
 }
@@ -178,7 +189,7 @@ export function PianoRollGrid() {
                               return (
                                 <GridCell
                                   key={i}
-                                  label={String(i + 1)}
+                                  label={`CH${i + 1}`}
                                   channels={targets.map((e) => flatIndex(card.device, e))}
                                   device={card.device}
                                   targets={targets}

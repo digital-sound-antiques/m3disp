@@ -795,7 +795,6 @@ export function paintCellRoll(
   const labelPx = Math.max(9 * dpr, Math.min(H * 0.16, 14 * dpr));
   const labelFont = `500 ${Math.round(labelPx)}px Roboto, system-ui, sans-serif`;
   const labelPad = Math.round(labelPx * 0.4);
-  const cellMuted = cell.channels.every((ch) => isChannelMuted(mask, channelIds[ch]));
 
   // chrome: octave guides + now line
   ctx.fillStyle = "rgba(255,255,255,0.06)";
@@ -808,6 +807,10 @@ export function paintCellRoll(
 
   if (active) {
     const step = W / frames;
+    const slot = H / N_WHITE;
+    // uniform note thickness (white and black keys alike); noteGeomIn returns a
+    // shorter height for black keys, which made them look thinner otherwise
+    const noteH = Math.max(2, slot * 2 - Math.min(2, slot * 0.25));
     type Draw = { x: number; y: number; w: number; h: number; color: string };
     const playingDraws: Draw[] = [];
     const noteLabels: { text: string; color: string }[] = [];
@@ -832,9 +835,8 @@ export function paintCellRoll(
         const x = seg.start * step + g;
         const w = Math.max(1, (seg.end - seg.start + 1) * step - g);
         const ng = noteGeomIn(H, seg.note);
-        // draw notes at ~2× slot height so small cells stay legible
-        const h = Math.max(2, ng.h * 2 - Math.min(2, ng.h * 0.25));
-        const y = ng.yTop + (ng.h - h) / 2;
+        const h = noteH; // uniform thickness, centered on the note's slot
+        const y = ng.yTop + ng.h / 2 - h / 2;
         if (chMuted) {
           ctx.fillStyle = seg.color + "40";
           ctx.fillRect(x, y, w, h);
@@ -884,21 +886,28 @@ export function paintCellRoll(
     }
   }
 
-  // cell label (top-left); dimmed when the whole cell is muted
-  ctx.font = labelFont;
+  // cell label (top-left); a touch smaller than the note names; dimmed if muted
+  ctx.font = `500 ${Math.round(labelPx * 0.82)}px Roboto, system-ui, sans-serif`;
   ctx.textBaseline = "top";
   ctx.textAlign = "left";
-  ctx.fillStyle = cellMuted ? "rgba(200,200,200,0.30)" : "rgba(200,200,200,0.75)";
+  ctx.fillStyle = "rgba(200,200,200,0.75)";
   ctx.fillText(cell.label, labelPad, labelPad);
 
-  // border; spotlight (solo-button hover) replaces it with a bright frame
+  // (a fully-muted cell is dimmed via the canvas element's CSS opacity, not a
+  // scrim — see PianoRollGrid)
+
+  // The resting / muted border is a CSS border on the cell (crisp, no canvas
+  // edge-clipping). Only the solo-hover spotlight frame is drawn on the canvas,
+  // inset by its line width so it stays fully inside.
   const hilite = hiActive && cell.channels.some((ch) => hi!.has(ch));
-  const rr = 4 * dpr;
-  ctx.strokeStyle = hilite ? "#ffffff" : "#3a3a3a";
-  ctx.lineWidth = hilite ? Math.max(1, Math.round(1.5 * dpr)) : px;
-  ctx.beginPath();
-  ctx.roundRect(0.5, 0.5, Math.max(1, W - 1), Math.max(1, H - 1), rr);
-  ctx.stroke();
+  if (hilite) {
+    const lw = Math.max(1, Math.round(1.5 * dpr));
+    ctx.strokeStyle = "#ffffff";
+    ctx.lineWidth = lw;
+    ctx.beginPath();
+    ctx.roundRect(lw, lw, Math.max(1, W - lw * 2), Math.max(1, H - lw * 2), 4 * dpr);
+    ctx.stroke();
+  }
 
   drawParticles(ctx, dt, false, null, store);
 }

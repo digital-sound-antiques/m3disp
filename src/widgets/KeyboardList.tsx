@@ -96,7 +96,7 @@ function DeviceCard(props: DeviceCardProps) {
             sx={{ width: "72px" }}
           />
         ) : (
-          <TrackInfoPanel title={String(i + 1)} targets={channels} disabled={false} top={cols2} />
+          <TrackInfoPanel title={`CH${i + 1}`} targets={channels} disabled={false} top={cols2} />
         )}
 
         <div
