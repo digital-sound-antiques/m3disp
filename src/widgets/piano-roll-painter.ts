@@ -808,9 +808,13 @@ export function paintCellRoll(
   if (active) {
     const step = W / frames;
     const slot = H / N_WHITE;
-    // uniform note thickness (white and black keys alike); noteGeomIn returns a
-    // shorter height for black keys, which made them look thinner otherwise
-    const noteH = Math.max(2, slot * 2 - Math.min(2, slot * 0.25));
+    // note thickness scales with the cell's aspect ratio: 2× a pitch slot when
+    // wider than 2:1, 1× when taller than 16:9, linearly interpolated between.
+    // (uniform across white/black keys; noteGeomIn returns a shorter height for
+    // black keys, which would otherwise look thinner)
+    const ratio = H > 0 ? W / H : 2;
+    const thickFactor = Math.max(1, Math.min(2, 1 + (ratio - 16 / 9) / (2 - 16 / 9)));
+    const noteH = Math.max(2, slot * thickFactor - Math.min(2, slot * 0.25));
     type Draw = { x: number; y: number; w: number; h: number; color: string };
     const playingDraws: Draw[] = [];
     const noteLabels: { text: string; color: string }[] = [];
