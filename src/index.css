@@ -8,6 +8,19 @@ body,
   overscroll-behavior: none;
 }
 
+body {
+  font-family: "Roboto", "Helvetica", "Arial", sans-serif;
+}
+
+/* form controls don't inherit font-family by default — make custom buttons,
+   inputs and selects use Roboto too */
+button,
+input,
+select,
+textarea {
+  font-family: inherit;
+}
+
 ::-webkit-scrollbar{
   width: 10px;
 }

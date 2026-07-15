@@ -4,6 +4,11 @@ import { PropsWithChildren, createContext, useEffect, useState } from "react";
 import AppGlobal from "./AppGlobal";
 import { defaultChannelColors, type PianoRollColorMode, type PianoRollParticleType } from "../widgets/piano-roll-painter";
 
+// Keyboard overlay on the roll: "on" full keyboard, "line" just the now-line,
+// "off" nothing. Cycled OFF → ON → LINE.
+export type PianoRollKeyboardMode = "off" | "on" | "line";
+export const keyboardModeCycle: PianoRollKeyboardMode[] = ["off", "on", "line"];
+
 const defaultTheme = createTheme({
   palette: {
     mode: "dark",
@@ -83,7 +88,7 @@ type AppContextData = {
   pianoRollLayered: boolean;
   pianoRollMode: string;
   pianoRollParticleType: PianoRollParticleType;
-  pianoRollShowKeyboard: boolean;
+  pianoRollKeyboard: PianoRollKeyboardMode;
   pianoRollColorMode: PianoRollColorModeMap;
   pianoRollChannelColors: string[];
   openMap: { [key: string]: boolean };
@@ -103,7 +108,7 @@ type AppContextData = {
   setPianoRollLayered: (value: boolean) => void;
   setPianoRollMode: (value: PianoRollMode) => void;
   setPianoRollParticleType: (value: PianoRollParticleType) => void;
-  setPianoRollShowKeyboard: (value: boolean) => void;
+  setPianoRollKeyboard: (value: PianoRollKeyboardMode) => void;
   setPianoRollColorMode: (value: PianoRollColorModeMap) => void;
   setPianoRollChannelColors: (value: string[]) => void;
   resetAllSettings: () => void;
@@ -123,7 +128,7 @@ const defaultContextData: AppContextData = {
   pianoRollLayered: false,
   pianoRollMode: "2d",
   pianoRollParticleType: "off",
-  pianoRollShowKeyboard: false,
+  pianoRollKeyboard: "line",
   pianoRollColorMode: { opll: "voice", psg: "voice", scc: "voice" },
   pianoRollChannelColors: [...defaultChannelColors],
   openMap: {},
@@ -143,7 +148,7 @@ const defaultContextData: AppContextData = {
   setPianoRollLayered: noop,
   setPianoRollMode: noop,
   setPianoRollParticleType: noop,
-  setPianoRollShowKeyboard: noop,
+  setPianoRollKeyboard: noop,
   setPianoRollColorMode: noop,
   setPianoRollChannelColors: noop,
   resetAllSettings: noop,
@@ -161,7 +166,8 @@ const keyPianoRollRangeInSec = "m3disp.pianoRoll.rangeInSec";
 const keyPianoRollLayered = "m3disp.pianoRoll.layered";
 const keyPianoRollShowParticles = "m3disp.pianoRoll.showParticles"; // legacy boolean, migrated
 const keyPianoRollParticleType = "m3disp.pianoRoll.particleType";
-const keyPianoRollShowKeyboard = "m3disp.pianoRoll.showKeyboard";
+const keyPianoRollShowKeyboard = "m3disp.pianoRoll.showKeyboard"; // legacy boolean, migrated
+const keyPianoRollKeyboard = "m3disp.pianoRoll.keyboard";
 const keyPianoRollMode = "m3disp.pianoRoll.mode";
 const keyPianoRollColorMode = "m3disp.pianoRoll.colorMode";
 const keyPianoRollChannelColors = "m3disp.pianoRoll.channelColors";
@@ -289,10 +295,10 @@ export function AppContextProvider(props: PropsWithChildren) {
     }
   };
 
-  const setPianoRollShowKeyboard = (value: boolean, save: boolean = true) => {
-    setState((oldState) => ({ ...oldState, pianoRollShowKeyboard: value }));
+  const setPianoRollKeyboard = (value: PianoRollKeyboardMode, save: boolean = true) => {
+    setState((oldState) => ({ ...oldState, pianoRollKeyboard: value }));
     if (save) {
-      localStorage.setItem(keyPianoRollShowKeyboard, value.toString());
+      localStorage.setItem(keyPianoRollKeyboard, value);
     }
   };
 
@@ -322,7 +328,7 @@ export function AppContextProvider(props: PropsWithChildren) {
     setPianoRollLayered(false);
     setPianoRollMode("2d");
     setPianoRollParticleType("off");
-    setPianoRollShowKeyboard(false);
+    setPianoRollKeyboard("line");
     setPianoRollColorMode({ opll: "voice", psg: "voice", scc: "voice" });
     setPianoRollChannelColors([...defaultChannelColors]);
     // Let the layout (channel/playlist collapse, widths, section order, view
@@ -377,9 +383,13 @@ export function AppContextProvider(props: PropsWithChildren) {
       // migrate the old boolean setting: previous "on" becomes the spark preset
       setPianoRollParticleType("spark", false);
     }
-    str = localStorage.getItem(keyPianoRollShowKeyboard);
-    if (str != null) {
-      setPianoRollShowKeyboard(str == "true", false);
+    str = localStorage.getItem(keyPianoRollKeyboard);
+    if (str === "off" || str === "on" || str === "line") {
+      setPianoRollKeyboard(str, false);
+    } else {
+      // migrate old boolean: true → full keyboard, false → now-line only
+      const old = localStorage.getItem(keyPianoRollShowKeyboard);
+      if (old != null) setPianoRollKeyboard(old === "true" ? "on" : "line", false);
     }
     str = localStorage.getItem(keyPianoRollMode);
     if (str != null) {
@@ -436,7 +446,7 @@ export function AppContextProvider(props: PropsWithChildren) {
         setPianoRollLayered,
         setPianoRollMode,
         setPianoRollParticleType,
-        setPianoRollShowKeyboard,
+        setPianoRollKeyboard,
         setPianoRollColorMode,
         setPianoRollChannelColors,
         resetAllSettings,

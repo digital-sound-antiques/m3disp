@@ -131,8 +131,10 @@ function DeviceCard(props: DeviceCardProps) {
 }
 
 // device-section cards keyed to match the channel list's section keys, so both
-// can share the same (reorderable) display order
-const DEVICE_CARDS: Record<
+// can share the same (reorderable) display order. Also consumed by the
+// per-channel piano-roll grid (PianoRollGrid) so all views group rhythm-sharing
+// OPLL slots and PSG tone+noise pairs identically.
+export const DEVICE_CARDS: Record<
   string,
   { name: string; device: KSSDeviceName; targets: Array<number[] | number> }
 > = {

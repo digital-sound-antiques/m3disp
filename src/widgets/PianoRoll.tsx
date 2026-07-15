@@ -246,10 +246,19 @@ export function PianoRoll(props: { mode: string }) {
           transform,
         }}
       >
-        <AutoSizeCanvas painter={paintPianoRollBg} width={size.width} height={size.height} resX={resX} resY={resY} />
+        <AutoSizeCanvas
+          painter={(c) =>
+            paintPianoRollBg(c, appContext.theme.palette.primary.main, appContext.pianoRollKeyboard !== "off")
+          }
+          width={size.width} height={size.height} resX={resX} resY={resY}
+        />
+        {/* now-line drawn BEHIND the notes in "line" mode */}
+        {appContext.pianoRollKeyboard === "line" && (
+          <AutoSizeCanvas painter={paintKeyboardEdgeLine} width={size.width} height={size.height} resX={resX} resY={resY} />
+        )}
         <PianoRollCanvas width={size.width} height={size.height} resX={resX} resY={resY} shape3d={shape3d} />
 
-        {appContext.pianoRollShowKeyboard ? <>
+        {appContext.pianoRollKeyboard === "on" && <>
           <AutoSizeCanvas painter={paintWhiteKeyboard} width={size.width} height={size.height} resX={resX} resY={resY} />
           <HighlightCanvas painter={paintWhiteHighlight} width={size.width} height={size.height} resX={resX} resY={resY} />
           <AutoSizeCanvas
@@ -260,9 +269,7 @@ export function PianoRoll(props: { mode: string }) {
             painter={(c, keys) => paintBlackHighlight(c, keys, props.mode === "3d")}
             width={size.width} height={size.height} resX={resX} resY={resY}
           />
-        </> : (
-          <AutoSizeCanvas painter={paintKeyboardEdgeLine} width={size.width} height={size.height} resX={resX} resY={resY} />
-        )}
+        </>}
       </div>
     </div>
   );

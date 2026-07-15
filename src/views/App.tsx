@@ -5,6 +5,7 @@ import {
   FormatAlignLeft,
   FormatAlignRight,
   Settings,
+  ThreeDRotation,
   ViewAgenda,
 } from "@mui/icons-material";
 import { useContext, useEffect, useRef, useState } from "react";
@@ -15,6 +16,7 @@ import { PlayerContext } from "../contexts/PlayerContext";
 
 import { ChannelMaskPanel } from "./ChannelMaskPanel";
 import { PianoRoll } from "../widgets/PianoRoll";
+import { PianoRollGrid } from "../widgets/PianoRollGrid";
 import { PianoRollMenu } from "./PianoRollMenu";
 import { KeyboardList } from "../widgets/KeyboardList";
 import { TimeSlider } from "../widgets/TimeSlider";
@@ -128,9 +130,11 @@ function Layout() {
     return v === "center" || v === "right" ? v : "left";
   });
   // center view tab: "pianoroll" (default) or "keyboard"
-  const [vizTab, setVizTab] = useState<"pianoroll" | "keyboard">(() =>
-    localStorage.getItem("m3disp.vizTab") === "keyboard" ? "keyboard" : "pianoroll"
-  );
+  // center view tab: "pianoroll" (default), "grid" (per-channel rolls), "keyboard"
+  const [vizTab, setVizTab] = useState<"pianoroll" | "grid" | "keyboard">(() => {
+    const v = localStorage.getItem("m3disp.vizTab");
+    return v === "keyboard" || v === "grid" ? v : "pianoroll";
+  });
   useEffect(() => {
     localStorage.setItem("m3disp.vizTab", vizTab);
   }, [vizTab]);
@@ -325,6 +329,12 @@ function Layout() {
                 >
                   Piano Roll
                 </button>
+                <button
+                  className={`viz-tab${vizTab === "grid" ? " active" : ""}`}
+                  onClick={() => setVizTab("grid")}
+                >
+                  Piano Grid
+                </button>
                 {vizTab === "keyboard" && (
                   <div className="viz-seg">
                     <button
@@ -343,8 +353,17 @@ function Layout() {
                     </button>
                   </div>
                 )}
-                {vizTab === "pianoroll" && (
+                {(vizTab === "pianoroll" || vizTab === "grid") && (
                   <div className="pr-menu-wrap" ref={prMenuRef}>
+                    {vizTab === "pianoroll" && (
+                      <button
+                        className={`viz-gear${app.pianoRollMode === "3d" ? " active" : ""}`}
+                        onClick={() => app.setPianoRollMode(app.pianoRollMode === "3d" ? "2d" : "3d")}
+                        title="3D"
+                      >
+                        <ThreeDRotation sx={{ fontSize: 16 }} />
+                      </button>
+                    )}
                     <button
                       className={`viz-gear${prMenuOpen ? " active" : ""}`}
                       onClick={() => setPrMenuOpen((o) => !o)}
@@ -354,7 +373,7 @@ function Layout() {
                     </button>
                     {prMenuOpen && (
                       <div className="pr-menu">
-                        <PianoRollMenu />
+                        <PianoRollMenu grid={vizTab === "grid"} />
                       </div>
                     )}
                   </div>
@@ -363,6 +382,8 @@ function Layout() {
               <div className="viz-body">
                 {vizTab === "pianoroll" ? (
                   <PianoRoll mode={app.pianoRollMode} />
+                ) : vizTab === "grid" ? (
+                  <PianoRollGrid />
                 ) : (
                   <div className="viz-keyboard">
                     <KeyboardList isSmall={false} columns={keyboardCols} />

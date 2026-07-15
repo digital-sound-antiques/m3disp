@@ -328,7 +328,6 @@ textarea {
   margin-top: 16px;
   font-size: 10px;
   font-weight: 700;
-  text-transform: uppercase;
   letter-spacing: 0.5px;
   color: #8b949e;
 }
@@ -427,7 +426,6 @@ textarea {
 .crd-field-label {
   font-size: 11px;
   font-weight: 700;
-  text-transform: uppercase;
   letter-spacing: 0.5px;
   color: #8b949e;
 }
@@ -1074,20 +1072,54 @@ textarea {
   width: 100%;
   height: 100%;
   overflow-y: auto;
-  /* outer padding scales with the content width (% is relative to the width) */
-  padding: 2%;
-  background: #121212;
-  border: 1px solid #21262d;
-  border-radius: 4px;
+  /* transparent so the view composites over whatever is behind it (the old
+     panel background is gone, so its outer padding is removed too) */
+  background: transparent;
 }
 .pianoroll-wrap {
   position: relative;
   width: 100%;
   height: 100%;
-  background: #121212;
-  border: 1px solid #21262d;
-  border-radius: 4px;
+  /* transparent so the roll composites over whatever is behind it */
+  background: transparent;
   overflow: hidden;
+}
+/* per-channel grid: OPLL/PSG/SCC sections (collapsible/reorderable like the
+   Keyboard view), each a 3-column grid of channel-roll cells. The whole grid
+   stretches to fit the viewport (no scroll): sections grow by their row count
+   and cells fill the remaining height. */
+.pr-grid {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.pr-grid-list {
+  flex: 1 1 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pr-grid-section {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.pr-grid-body {
+  flex: 1 1 0;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: 1fr;
+  gap: 6px;
+}
+.pr-grid-cell {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+  cursor: pointer;
 }
 
 /* seek bar + transport as an independent panel below the piano roll */

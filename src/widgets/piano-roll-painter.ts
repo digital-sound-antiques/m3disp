@@ -3,11 +3,11 @@ import type { PlayerContextState } from "../contexts/PlayerContext";
 import { type ChannelId, type ChannelStatus, getStatusFromSnapshot } from "../kss/channel-status";
 import { pianoRollHighlight } from "./piano-roll-highlight";
 import type { KSSDecoderDeviceSnapshot } from "../kss/kss-decoder-worker";
-import type { KSSChannelMask } from "../kss/kss-device";
+import type { KSSChannelMask, KSSDeviceName } from "../kss/kss-device";
 
 // OPLL rhythm channels (index 9-13) use reversed mute bits (BD=13 … HH=9); PSG
 // tone channels 3-5 share bits 0-2 with 0-2; SCC and OPLL melody map 1:1.
-const opllBit = (i: number) => (i < 9 ? i : 22 - i);
+export const opllBit = (i: number) => (i < 9 ? i : 22 - i);
 export function isChannelMuted(mask: KSSChannelMask, id: ChannelId): boolean {
   switch (id.device) {
     case "opll":
@@ -108,6 +108,8 @@ const defaultColorConfig: PianoRollColorConfig = {
 };
 
 export const lpos = 0.25;
+// leading gap (canvas px) for hard breaks (real key-on / note change)
+const GAP = 2;
 
 // ---- Types ----
 
@@ -176,6 +178,7 @@ type Particle = {
   size: number;
   color: string;
   shape: ParticleShape;
+  grav: number; // downward accel (px/s²), scaled to the spawn unit; 0 for shapes
 };
 
 // ---- Particle system ----
@@ -271,12 +274,23 @@ const MAX_PARTICLES = 1000;
 // backing pixels).
 const PARTICLE_REF_H = 400;
 
+// A per-canvas particle store; the grid uses one per cell so many small canvases
+// don't share (and fight over) a single global array.
+export type ParticleStore = { list: Particle[]; last: number };
+export const createParticleStore = (): ParticleStore => ({ list: [], last: 0 });
+const defaultStore: ParticleStore = { list: particles, last: 0 };
+
 export function spawnParticles(
-  x: number, y: number, color: string, count: number, sizeScale = 1, shape: ParticleShape = "spark", unit = devicePixelRatio,
+  x: number, y: number, color: string, count: number, sizeScale = 1, shape: ParticleShape = "spark",
+  unit = devicePixelRatio, store: ParticleStore = defaultStore,
 ) {
   const isShape = shape !== "spark";
-  if (particles.length >= MAX_PARTICLES) return;
-  count = Math.min(count, MAX_PARTICLES - particles.length);
+  const list = store.list;
+  if (list.length >= MAX_PARTICLES) return;
+  count = Math.min(count, MAX_PARTICLES - list.length);
+  // spark falls like a fountain; scale gravity to the spawn unit so it matches
+  // the particle's size/speed (the grid uses a much smaller unit than the roll)
+  const grav = isShape ? 0 : 250 * unit;
   for (let i = 0; i < count; i++) {
     // star/heart: size random 1–4×, and much more varied launch angle & distance
     // (and a longer life) so they scatter and read as shapes. spark: tight fan.
@@ -289,7 +303,7 @@ export function spawnParticles(
     const size = isShape
       ? (0.25 + Math.random() * 2.75) * (shape === "star" ? 1.25 : 1.0) * unit * sizeScale
       : (0.6 + Math.random() * 1.0) * unit * sizeScale;
-    particles.push({
+    list.push({
       x, y,
       vx: Math.cos(angle) * speed,
       vy: Math.sin(angle) * speed,
@@ -297,6 +311,7 @@ export function spawnParticles(
       size,
       color,
       shape,
+      grav,
     });
   }
 }
@@ -307,15 +322,15 @@ export function spawnParticles(
 // bounded without a hard cap.
 function drawParticles(
   ctx: CanvasRenderingContext2D, dt: number, is3d = false, shape3d: { sx: number; sy: number } | null = null,
+  store: ParticleStore = defaultStore,
 ) {
-  const unit = ctx.canvas.height / PARTICLE_REF_H; // roll-relative pixel scale
+  const particles = store.list;
   // advance + cull
   for (let i = particles.length - 1; i >= 0; i--) {
     const p = particles[i];
     p.x += p.vx * dt;
     p.y += p.vy * dt;
-    // spark falls like a fountain; star/heart drift with no gravity (even spread)
-    if (p.shape === "spark") p.vy += 250 * unit * dt;
+    p.vy += p.grav * dt; // spark falls like a fountain; shapes have grav 0
     p.life -= dt * 2.5;
     if (p.life <= 0) particles.splice(i, 1);
   }
@@ -348,14 +363,30 @@ function drawParticles(
 
 // ---- Keyboard / background ----
 
-export function paintPianoRollBg(canvas: HTMLCanvasElement) {
+export function paintPianoRollBg(canvas: HTMLCanvasElement, primary = "#ffffff", showLanes = true) {
   const ctx = canvas.getContext("2d")!;
+  // transparent background (no dark fill) so the roll composites over whatever is
+  // behind it; white-key rows get a faint primary-colour tint (black-key rows are
+  // left blank), plus faint per-octave lines to hint the pitch lanes. The key
+  // lanes are hidden when the keyboard overlay is off.
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  const kh = Math.ceil(canvas.height / 96);
+  // when the keyboard overlay is off, the roll background stays fully blank
+  if (!showLanes) return;
+  const px = Math.max(1, Math.floor(devicePixelRatio));
+  const rowH = Math.ceil(canvas.height / 96);
+  ctx.globalAlpha = 0.03;
+  ctx.fillStyle = primary;
   for (let i = 0; i < 96; i++) {
     const k = i % 12;
-    ctx.fillStyle = (k === 1 || k === 3 || k === 6 || k === 8 || k === 10) ? "#101010" : "#181818";
-    ctx.fillRect(0, canvas.height * (1.0 - (i + 1) / 96), canvas.width, kh);
+    const isBlack = k === 1 || k === 3 || k === 6 || k === 8 || k === 10;
+    if (isBlack) continue; // black-key rows: nothing
+    ctx.fillRect(0, canvas.height * (1 - (i + 1) / 96), canvas.width, rowH);
+  }
+  ctx.globalAlpha = 1;
+  ctx.fillStyle = "rgba(255,255,255,0.08)";
+  for (let o = 1; o < 8; o++) {
+    const gy = canvas.height * (1 - (o * 12) / 96);
+    ctx.fillRect(0, Math.round(gy), canvas.width, px);
   }
 }
 
@@ -387,20 +418,25 @@ const WHITE_INDEX: (number | null)[] = [0, null, 1, null, 2, 3, null, 4, null, 5
 // kcode%12 -> the white-key index a black note sits just above, null otherwise
 const BLACK_AFTER: (number | null)[] = [null, 0, null, 1, null, null, 3, null, 4, null, 5, null];
 
-// Vertical placement of a note on the roll: top y and height (device px).
-function noteGeom(canvas: HTMLCanvasElement, kcode: number) {
-  const slot = canvas.height / N_WHITE;
+// Vertical placement of a note on a roll of the given height: top y and height
+// (device px). Parameterized by height so the per-channel grid cells can reuse
+// the same diatonic layout at any cell size.
+function noteGeomIn(height: number, kcode: number) {
+  const slot = height / N_WHITE;
   const k = ((kcode % 12) + 12) % 12;
   const oct = Math.floor(kcode / 12);
   const wi = WHITE_INDEX[k];
   if (wi != null) {
     const s = wi + oct * 7; // white slot index from the bottom
-    return { yTop: canvas.height * (1 - (s + 1) / N_WHITE), h: slot, black: false };
+    return { yTop: height * (1 - (s + 1) / N_WHITE), h: slot, black: false };
   }
   const s = BLACK_AFTER[k]! + oct * 7; // black key sits above white slot s
-  const boundary = canvas.height * (1 - (s + 1) / N_WHITE);
+  const boundary = height * (1 - (s + 1) / N_WHITE);
   const h = slot * 0.6;
   return { yTop: boundary - h / 2, h, black: true };
+}
+function noteGeom(canvas: HTMLCanvasElement, kcode: number) {
+  return noteGeomIn(canvas.height, kcode);
 }
 
 export function paintWhiteKeyboard(canvas: HTMLCanvasElement) {
@@ -463,12 +499,67 @@ export function paintKeyboardEdgeLine(canvas: HTMLCanvasElement) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const { kw, dx } = kbGeom(canvas);
   const x = dx + kw;
-  ctx.strokeStyle = "rgba(200,200,200,0.5)";
+  ctx.strokeStyle = "rgba(140,140,140,0.4)";
   ctx.lineWidth = 2;
   ctx.beginPath();
   ctx.moveTo(x, 0);
   ctx.lineTo(x, canvas.height);
   ctx.stroke();
+}
+
+// Latency-corrected current NTSC frame (absolute song frame / 735), clamped to
+// the decoded snapshot range. Shared by the main roll and the per-channel grid.
+function currentNtscFrame(playerContext: PlayerContextState): number {
+  const audioFrame =
+    playerContext.player.seekBaseFrame + (playerContext.player.progress?.renderer?.currentFrame ?? 0);
+  const latencySamples =
+    (playerContext.player.outputLatency ?? 0) * (playerContext.player.audioContext?.sampleRate ?? 44100);
+  let ntsc = Math.floor(Math.max(0, audioFrame - latencySamples) / 735);
+  const decodedLen = playerContext.player._snapshots.length;
+  if (decodedLen > 0 && ntsc >= decodedLen) ntsc = decodedLen - 1;
+  return ntsc;
+}
+
+// Note segments of one channel over [windowStart, windowStart+frames). Statuses
+// are read on demand (cached per NTSC frame). Segments split on key-on edges
+// (hard break with a leading gap) and on mid-note timbre changes (soft break,
+// no gap). Shared by the main roll and the grid.
+function buildSegments(
+  player: PlayerContextState["player"],
+  ch: number,
+  windowStart: number,
+  frames: number,
+  channelMode: PianoRollColorMode,
+  colorConfig: PianoRollColorConfig
+): Seg[] {
+  const baseColor: string = (colorMap[ch] as any)["A200"];
+  const segments: Seg[] = [];
+  let cur: Seg | null = null;
+  for (let i = 0; i < frames; i++) {
+    const s = getStatusCached(player, ch, windowStart + i);
+    const note = s?.kcode ?? null;
+    const isAttack = (s?.keyKeepFrames ?? Infinity) === 0;
+    if (note != null && note >= 0 && note < 96) {
+      const color =
+        channelMode === "channel"
+          ? colorConfig.channelColors[ch] ?? baseColor
+          : s?.vnum != null
+            ? colorConfig.voiceColors[s.vnum % 16] ?? baseColor
+            : baseColor;
+      if (cur === null || cur.note !== note || isAttack) {
+        cur = { note, start: i, end: i, color, gap: true };
+        segments.push(cur);
+      } else if (cur.color !== color) {
+        cur = { note, start: i, end: i, color, gap: false };
+        segments.push(cur);
+      } else {
+        cur.end = i;
+      }
+    } else {
+      cur = null;
+    }
+  }
+  return segments;
 }
 
 // ---- Main piano roll drawing ----
@@ -498,25 +589,8 @@ export function paintPianoRoll(
   // Reset the status cache if the song changed (snapshot array replaced).
   resetCacheIfSongChanged(playerContext.player);
 
-  // Compute latency-corrected current NTSC frame once, shared across channels.
-  // The renderer reports frames relative to the current stream start; snapshots
-  // are keyed by ABSOLUTE song frame, so add the stream's base (nonzero after a
-  // seek) — otherwise the roll always paints from the song head.
-  const audioFrame =
-    playerContext.player.seekBaseFrame + (playerContext.player.progress?.renderer?.currentFrame ?? 0);
-  const latencySamples = (playerContext.player.outputLatency ?? 0)
-    * (playerContext.player.audioContext?.sampleRate ?? 44100);
-  let currentNtsc = Math.floor(Math.max(0, audioFrame - latencySamples) / 735);
-
-  // During a song switch the renderer's currentFrame can briefly still point at
-  // the previous song's (later) position while the new song's _snapshots only
-  // holds a few decoded frames. Reading that undecoded future range would render
-  // blank. Clamp to the decoded range so the latest available data is shown until
-  // currentFrame catches up.
-  const decodedLen = playerContext.player._snapshots.length;
-  if (decodedLen > 0 && currentNtsc >= decodedLen) currentNtsc = decodedLen - 1;
-
-  const GAP = 2; // leading gap (canvas px) for hard breaks (real key-on / note change)
+  // latency-corrected current NTSC frame, shared across channels
+  const currentNtsc = currentNtscFrame(playerContext);
 
   // Deferred draws for currently-playing segments so they always sit on top,
   // giving a stable z-order regardless of channel index.
@@ -643,6 +717,9 @@ export function paintPianoRoll(
         const onset = d.noteAge < 4 && Math.random() < 0.06 ? 1 : 0;
         count = onset + (Math.random() < 0.003 ? 1 : 0);
       }
+      // guarantee at least one particle at the note's attack (the frame it
+      // crosses the now line, noteAge === 0)
+      if (d.noteAge === 0) count = Math.max(1, count);
       // Scale particle size by channel volume: vol 0 → 50%, vol 15 → 100%.
       const sizeScale = 0.5 + 0.5 * (Math.max(0, Math.min(15, d.vol)) / 15);
       if (count > 0) {
@@ -663,4 +740,165 @@ export function paintPianoRoll(
     }
     ctx.restore();
   }
+}
+
+
+// ---- Per-channel grid cell ----
+//
+// One small piano roll per channel, each drawn into its OWN canvas so the grid
+// can be a DOM section list (collapsible / reorderable like the Keyboard view).
+// Rhythm-sharing OPLL slots and PSG tone+noise pairs render into a single cell.
+
+export type GridCell = {
+  /** cell label, e.g. "OPLL 7" */
+  label: string;
+  /** flat channelIds[] indices rendered in this cell */
+  channels: number[];
+};
+
+// Scientific pitch name for a roll key code (kcode 48 = C4).
+const NOTE_NAMES = ["C", "C#", "D", "D#", "E", "F", "F#", "G", "G#", "A", "A#", "B"];
+const noteName = (kcode: number) => NOTE_NAMES[kcode % 12] + Math.floor(kcode / 12);
+
+/** Paint one cell's mini piano roll filling its own canvas. `store` is the
+ *  cell's own particle store; `dt` is the cell's own frame delta (seconds). */
+export function paintCellRoll(
+  canvas: HTMLCanvasElement,
+  playerContext: PlayerContextState,
+  rangeInSec: number,
+  colorConfig: PianoRollColorConfig,
+  cell: GridCell,
+  particleType: PianoRollParticleType,
+  store: ParticleStore,
+  dt: number,
+) {
+  const ctx = canvas.getContext("2d")!;
+  const W = canvas.width;
+  const H = canvas.height;
+  ctx.clearRect(0, 0, W, H);
+  const dpr = devicePixelRatio;
+  const px = Math.max(1, Math.floor(dpr));
+
+  const state = playerContext.player.state;
+  const active = state === "playing" || state === "paused";
+  const frames = Math.round(60 * rangeInSec);
+  const nowIdx = Math.floor(frames * lpos);
+  let windowStart = 0;
+  if (active) {
+    resetCacheIfSongChanged(playerContext.player);
+    windowStart = currentNtscFrame(playerContext) - nowIdx;
+  }
+
+  const mask = playerContext.channelMask;
+  const hi = pianoRollHighlight.channels;
+  const hiActive = hi != null && hi.size > 0;
+  const labelPx = Math.max(9 * dpr, Math.min(H * 0.16, 14 * dpr));
+  const labelFont = `500 ${Math.round(labelPx)}px Roboto, system-ui, sans-serif`;
+  const labelPad = Math.round(labelPx * 0.4);
+  const cellMuted = cell.channels.every((ch) => isChannelMuted(mask, channelIds[ch]));
+
+  // chrome: octave guides + now line
+  ctx.fillStyle = "rgba(255,255,255,0.06)";
+  for (let o = 1; o < 8; o++) {
+    const gy = H * (1 - (o * 7) / N_WHITE);
+    ctx.fillRect(0, Math.round(gy), W, px);
+  }
+  ctx.fillStyle = "rgba(255,255,255,0.14)";
+  ctx.fillRect(Math.round(W * lpos), 0, px, H);
+
+  if (active) {
+    const step = W / frames;
+    type Draw = { x: number; y: number; w: number; h: number; color: string };
+    const playingDraws: Draw[] = [];
+    const noteLabels: { text: string; color: string }[] = [];
+    for (const ch of cell.channels) {
+      const chMuted = isChannelMuted(mask, channelIds[ch]);
+      const channelMode = colorConfig.mode[channelIds[ch].device] ?? "voice";
+      // pitch name at the play head (skip noise/rhythm and muted channels)
+      const now = chMuted ? null : getStatusCached(playerContext.player, ch, windowStart + nowIdx);
+      if (now?.kcode != null && now.mode == null && now.kcode >= 0 && now.kcode < 96) {
+        const baseColor: string = (colorMap[ch] as any)["A200"];
+        const color =
+          channelMode === "channel"
+            ? colorConfig.channelColors[ch] ?? baseColor
+            : now.vnum != null
+              ? colorConfig.voiceColors[now.vnum % 16] ?? baseColor
+              : baseColor;
+        noteLabels.push({ text: noteName(now.kcode), color });
+      }
+      const segments = buildSegments(playerContext.player, ch, windowStart, frames, channelMode, colorConfig);
+      for (const seg of segments) {
+        const g = seg.gap ? GAP : 0;
+        const x = seg.start * step + g;
+        const w = Math.max(1, (seg.end - seg.start + 1) * step - g);
+        const ng = noteGeomIn(H, seg.note);
+        // draw notes at ~2× slot height so small cells stay legible
+        const h = Math.max(2, ng.h * 2 - Math.min(2, ng.h * 0.25));
+        const y = ng.yTop + (ng.h - h) / 2;
+        if (chMuted) {
+          ctx.fillStyle = seg.color + "40";
+          ctx.fillRect(x, y, w, h);
+        } else if (seg.start <= nowIdx && nowIdx <= seg.end) {
+          playingDraws.push({ x, y, w, h, color: seg.color });
+          if (particleType !== "off") {
+            const noteAge = nowIdx - seg.start;
+            let count =
+              particleType === "spark"
+                ? (noteAge < 16 ? Math.round((1 - noteAge / 16) ** 2 * 1.5) : 0) + (Math.random() < 0.1 ? 1 : 0)
+                : noteAge < 4 && Math.random() < 0.06
+                  ? 1
+                  : 0;
+            if (noteAge === 0) count = Math.max(1, count); // ≥1 at attack
+            if (count > 0) spawnParticles(nowIdx * step, y + h / 2, seg.color, count, 1, particleType, H / 140, store);
+          }
+        } else {
+          ctx.fillStyle = seg.color + "99";
+          ctx.fillRect(x, y, w, h);
+        }
+      }
+    }
+    // playing segments on top, with a compact glow
+    for (const d of playingDraws) {
+      ctx.save();
+      ctx.globalCompositeOperation = "lighter";
+      ctx.shadowColor = d.color;
+      ctx.shadowBlur = 6 * dpr;
+      ctx.fillStyle = d.color + "ff";
+      ctx.fillRect(d.x, d.y, d.w, d.h);
+      ctx.restore();
+      ctx.fillStyle = d.color + "ff";
+      ctx.fillRect(d.x, d.y, d.w, d.h);
+    }
+    // sounding pitch names, right-aligned in the top-right corner
+    if (noteLabels.length > 0) {
+      ctx.font = labelFont;
+      ctx.textBaseline = "top";
+      ctx.textAlign = "right";
+      let tx = W - labelPad;
+      for (let i = noteLabels.length - 1; i >= 0; i--) {
+        ctx.fillStyle = noteLabels[i].color;
+        ctx.fillText(noteLabels[i].text, tx, labelPad);
+        tx -= ctx.measureText(noteLabels[i].text).width + labelPad * 1.5;
+      }
+      ctx.textAlign = "left";
+    }
+  }
+
+  // cell label (top-left); dimmed when the whole cell is muted
+  ctx.font = labelFont;
+  ctx.textBaseline = "top";
+  ctx.textAlign = "left";
+  ctx.fillStyle = cellMuted ? "rgba(200,200,200,0.30)" : "rgba(200,200,200,0.75)";
+  ctx.fillText(cell.label, labelPad, labelPad);
+
+  // border; spotlight (solo-button hover) replaces it with a bright frame
+  const hilite = hiActive && cell.channels.some((ch) => hi!.has(ch));
+  const rr = 4 * dpr;
+  ctx.strokeStyle = hilite ? "#ffffff" : "#3a3a3a";
+  ctx.lineWidth = hilite ? Math.max(1, Math.round(1.5 * dpr)) : px;
+  ctx.beginPath();
+  ctx.roundRect(0.5, 0.5, Math.max(1, W - 1), Math.max(1, H - 1), rr);
+  ctx.stroke();
+
+  drawParticles(ctx, dt, false, null, store);
 }

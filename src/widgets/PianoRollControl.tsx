@@ -41,9 +41,13 @@ export function PianoRollControl() {
         <AutoAwesome sx={{ fontSize: 16 }} />
       </button>
       <button
-        className={`pr-toggle${context.pianoRollShowKeyboard ? " active" : ""}`}
-        onClick={() => context.setPianoRollShowKeyboard(!context.pianoRollShowKeyboard)}
-        title="Keyboard"
+        className={`pr-toggle${context.pianoRollKeyboard !== "off" ? " active" : ""}`}
+        onClick={() =>
+          context.setPianoRollKeyboard(
+            context.pianoRollKeyboard === "off" ? "on" : context.pianoRollKeyboard === "on" ? "line" : "off"
+          )
+        }
+        title={`Keyboard: ${context.pianoRollKeyboard}`}
       >
         <Piano sx={{ fontSize: 16 }} />
       </button>

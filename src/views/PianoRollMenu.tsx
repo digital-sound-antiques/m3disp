@@ -1,15 +1,18 @@
-import { AutoAwesome, Layers, Palette, Piano, ThreeDRotation, ZoomIn } from "@mui/icons-material";
+import { AutoAwesome, Layers, Palette, Piano, ZoomIn } from "@mui/icons-material";
 import { ReactNode, useContext } from "react";
-import { AppContext } from "../contexts/AppContext";
+import { AppContext, keyboardModeCycle, type PianoRollKeyboardMode } from "../contexts/AppContext";
 import { pianoRollColorDialogId } from "../widgets/PianoRollControl";
 import { particleTypeCycle, type PianoRollParticleType } from "../widgets/piano-roll-painter";
 
 const nextParticleType = (t: PianoRollParticleType) =>
   particleTypeCycle[(particleTypeCycle.indexOf(t) + 1) % particleTypeCycle.length];
+const nextKeyboardMode = (t: PianoRollKeyboardMode) =>
+  keyboardModeCycle[(keyboardModeCycle.indexOf(t) + 1) % keyboardModeCycle.length];
 
 /** Labelled vertical menu of piano-roll settings (shown from the gear in the
- *  Piano Roll tab header). */
-export function PianoRollMenu() {
+ *  Piano Roll / Grid tab header). In grid mode only Zoom, Particles and Colors
+ *  apply (Layer / Keyboard / 3D are piano-roll only). */
+export function PianoRollMenu(props: { grid?: boolean }) {
   const ctx = useContext(AppContext);
 
   const toggle = (icon: ReactNode, label: string, on: boolean, onClick: () => void) => (
@@ -38,9 +41,10 @@ export function PianoRollMenu() {
           title={`${ctx.pianoRollRangeInSec}s`}
         />
       </div>
-      {toggle(<Layers sx={{ fontSize: 18 }} />, "Layer", ctx.pianoRollLayered, () =>
-        ctx.setPianoRollLayered(!ctx.pianoRollLayered)
-      )}
+      {!props.grid &&
+        toggle(<Layers sx={{ fontSize: 18 }} />, "Layer", ctx.pianoRollLayered, () =>
+          ctx.setPianoRollLayered(!ctx.pianoRollLayered)
+        )}
       <button
         className={`menu-item${ctx.pianoRollParticleType !== "off" ? " active" : ""}`}
         onClick={() => ctx.setPianoRollParticleType(nextParticleType(ctx.pianoRollParticleType))}
@@ -51,11 +55,17 @@ export function PianoRollMenu() {
         <span className="menu-label">Particles</span>
         <span className="menu-state">{ctx.pianoRollParticleType.toUpperCase()}</span>
       </button>
-      {toggle(<Piano sx={{ fontSize: 18 }} />, "Keyboard", ctx.pianoRollShowKeyboard, () =>
-        ctx.setPianoRollShowKeyboard(!ctx.pianoRollShowKeyboard)
-      )}
-      {toggle(<ThreeDRotation sx={{ fontSize: 18 }} />, "3D", ctx.pianoRollMode === "3d", () =>
-        ctx.setPianoRollMode(ctx.pianoRollMode === "3d" ? "2d" : "3d")
+      {!props.grid && (
+        <button
+          className={`menu-item${ctx.pianoRollKeyboard !== "off" ? " active" : ""}`}
+          onClick={() => ctx.setPianoRollKeyboard(nextKeyboardMode(ctx.pianoRollKeyboard))}
+        >
+          <span className="menu-ico">
+            <Piano sx={{ fontSize: 18 }} />
+          </span>
+          <span className="menu-label">Keyboard</span>
+          <span className="menu-state">{ctx.pianoRollKeyboard.toUpperCase()}</span>
+        </button>
       )}
       <button className="menu-item" onClick={() => ctx.openDialog(pianoRollColorDialogId)}>
         <span className="menu-ico">
