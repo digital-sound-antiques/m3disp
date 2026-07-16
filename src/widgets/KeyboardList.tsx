@@ -4,7 +4,8 @@ import { ChevronRight, ExpandMore } from "@mui/icons-material";
 import { DragDropContext, Draggable, Droppable, DropResult } from "@hello-pangea/dnd";
 import { PlayerContext } from "../contexts/PlayerContext";
 import { ChannelId } from "../kss/channel-status";
-import { KSSDeviceName } from "../kss/kss-device";
+import { KSSChannelMask, KSSDeviceName } from "../kss/kss-device";
+import { toggleSolo } from "../kss/channel-solo";
 import { Keyboard } from "./Keyboard";
 import { TrackInfoPanel, VolumeInfoPanel } from "./TrackInfo";
 import { AppContext } from "../contexts/AppContext";
@@ -35,20 +36,29 @@ function DeviceCard(props: DeviceCardProps) {
   const context = useContext(PlayerContext);
   const masks = context.channelMask[props.device];
 
+  const rowBits = (i: number) => {
+    let t = props.targets[i];
+    if (typeof t === "number") t = [t];
+    return props.device === "opll" ? t.map(opllBit) : [i];
+  };
+  const applyMask = (mask: KSSChannelMask) => {
+    context.player.setChannelMask(mask);
+    context.reducer.setChannelMaskLive(mask);
+  };
+
   // tap a row to toggle its mute; keeps the voice/meter/keyboard highlight live
   const toggleMute = (i: number) => {
     const dev = props.device;
     const cur = context.channelMask[dev];
-    let t = props.targets[i];
-    if (typeof t === "number") t = [t];
-    const bits = dev === "opll" ? t.map(opllBit) : [i];
+    const bits = rowBits(i);
     const willMute = (cur & (1 << bits[0])) === 0;
     let next = cur;
     for (const b of bits) next = willMute ? next | (1 << b) : next & ~(1 << b);
-    const mask = { ...context.channelMask, [dev]: next };
-    context.player.setChannelMask(mask);
-    context.reducer.setChannelMaskLive(mask);
+    applyMask({ ...context.channelMask, [dev]: next });
   };
+
+  // double-tap a row = solo (same as the channel list's S button)
+  const soloRow = (i: number) => applyMask(toggleSolo(context.channelMask, props.device, rowBits(i)));
 
   const cols2 = props.columns === 2;
   const res = [];
@@ -66,7 +76,8 @@ function DeviceCard(props: DeviceCardProps) {
       <div
         key={`${i}`}
         onClick={() => toggleMute(i)}
-        title={mask ? "Unmute" : "Mute"}
+        onDoubleClick={() => soloRow(i)}
+        title={mask ? "Unmute" : "Mute · Double-click: solo"}
         style={{
           // 2-column: stack info row on top of the keyboard; 1-column: side by side
           display: "flex",

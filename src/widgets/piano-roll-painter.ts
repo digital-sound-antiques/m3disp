@@ -80,7 +80,7 @@ export const defaultChannelColors: string[] = [
   "#b0a106", "#1aa9f4", "#1fbb6f", "#a388fb", "#d78c18",
 ];
 
-const colorMap = [
+export const colorMap = [
   Colors.teal, Colors.teal, Colors.teal, Colors.teal, Colors.teal,
   Colors.teal, Colors.teal, Colors.teal, Colors.teal,
   Colors.pink, Colors.pink, Colors.pink, Colors.pink, Colors.pink,

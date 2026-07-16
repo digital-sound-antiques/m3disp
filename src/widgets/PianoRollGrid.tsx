@@ -12,6 +12,7 @@ import {
   paintCellRoll,
 } from "./piano-roll-painter";
 import { DEVICE_CARDS } from "./KeyboardList";
+import { toggleSolo } from "../kss/channel-solo";
 import {
   getCollapsedSections,
   getSectionOrder,
@@ -94,17 +95,25 @@ function GridCell(props: {
     return () => cancelAnimationFrame(raf);
   }, []);
 
-  const onClick = () => {
+  const cellBits = () => (props.device === "opll" ? props.targets.map(opllBit) : [props.row]);
+  const apply = (mask: ReturnType<typeof toggleSolo>) => {
     const ctx = playerRef.current;
-    const cur = ctx.channelMask[props.device];
-    const bits = props.device === "opll" ? props.targets.map(opllBit) : [props.row];
-    const willMute = (cur & (1 << bits[0])) === 0;
-    let next = cur;
-    for (const b of bits) next = willMute ? next | (1 << b) : next & ~(1 << b);
-    const mask = { ...ctx.channelMask, [props.device]: next };
     ctx.player.setChannelMask(mask);
     ctx.reducer.setChannelMaskLive(mask);
   };
+
+  const onClick = () => {
+    const ctx = playerRef.current;
+    const cur = ctx.channelMask[props.device];
+    const bits = cellBits();
+    const willMute = (cur & (1 << bits[0])) === 0;
+    let next = cur;
+    for (const b of bits) next = willMute ? next | (1 << b) : next & ~(1 << b);
+    apply({ ...ctx.channelMask, [props.device]: next });
+  };
+
+  // double-click = solo (same as the channel list's S button)
+  const onDoubleClick = () => apply(toggleSolo(playerRef.current.channelMask, props.device, cellBits()));
 
   // fully-muted cell: dim the whole canvas via CSS opacity (no canvas scrim)
   const muted = props.channels.every((ch) => isChannelMuted(player.channelMask, channelIds[ch]));
@@ -113,7 +122,8 @@ function GridCell(props: {
       ref={boxRef}
       className={`pr-grid-cell${muted ? " muted" : ""}`}
       onClick={onClick}
-      title="Mute / unmute"
+      onDoubleClick={onDoubleClick}
+      title="Click: mute · Double-click: solo"
     >
       <canvas
         ref={canvasRef}

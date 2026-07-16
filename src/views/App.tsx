@@ -19,6 +19,7 @@ import { PianoRoll } from "../widgets/PianoRoll";
 import { PianoRollGrid } from "../widgets/PianoRollGrid";
 import { WaveGrid } from "../widgets/WaveGrid";
 import { PianoRollMenu } from "./PianoRollMenu";
+import { WaveMenu } from "./WaveMenu";
 import { KeyboardList } from "../widgets/KeyboardList";
 import { TimeSlider } from "../widgets/TimeSlider";
 import { PlayControl } from "./PlayerControl";
@@ -340,7 +341,7 @@ function Layout() {
                   className={`viz-tab${vizTab === "wave" ? " active" : ""}`}
                   onClick={() => setVizTab("wave")}
                 >
-                  Wave
+                  Scope
                 </button>
                 {vizTab === "keyboard" && (
                   <div className="viz-seg">
@@ -360,7 +361,7 @@ function Layout() {
                     </button>
                   </div>
                 )}
-                {(vizTab === "pianoroll" || vizTab === "grid") && (
+                {(vizTab === "pianoroll" || vizTab === "grid" || vizTab === "wave") && (
                   <div className="pr-menu-wrap" ref={prMenuRef}>
                     {vizTab === "pianoroll" && (
                       <button
@@ -374,13 +375,13 @@ function Layout() {
                     <button
                       className={`viz-gear${prMenuOpen ? " active" : ""}`}
                       onClick={() => setPrMenuOpen((o) => !o)}
-                      title="Piano roll settings"
+                      title={vizTab === "wave" ? "Scope settings" : "Piano roll settings"}
                     >
                       <Settings sx={{ fontSize: 16 }} />
                     </button>
                     {prMenuOpen && (
                       <div className="pr-menu">
-                        <PianoRollMenu grid={vizTab === "grid"} />
+                        {vizTab === "wave" ? <WaveMenu /> : <PianoRollMenu grid={vizTab === "grid"} />}
                       </div>
                     )}
                   </div>

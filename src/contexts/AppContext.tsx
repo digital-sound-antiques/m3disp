@@ -82,6 +82,8 @@ type AppContextData = {
   theme: Theme;
   keyHighlightColorType: KeyHighlightColorType;
   seekSliderColorType: SeekSliderColorType;
+  waveColorize: boolean;
+  waveWindowSize: number;
   channelFontScaleLevel: number;
   playlistFontScaleLevel: number;
   pianoRollRangeInSec: number;
@@ -102,6 +104,8 @@ type AppContextData = {
   setSecondaryColor: (id: string) => void;
   setKeyHighlightColorType: (id: KeyHighlightColorType) => void;
   setSeekSliderColorType: (id: SeekSliderColorType) => void;
+  setWaveColorize: (v: boolean) => void;
+  setWaveWindowSize: (value: number) => void;
   setChannelFontScaleLevel: (value: number) => void;
   setPlaylistFontScaleLevel: (value: number) => void;
   setPianoRollRangeInSec: (value: number) => void;
@@ -122,6 +126,8 @@ const defaultContextData: AppContextData = {
   theme: defaultTheme,
   keyHighlightColorType: "primary",
   seekSliderColorType: "primary",
+  waveColorize: false,
+  waveWindowSize: 512,
   channelFontScaleLevel: 1,
   playlistFontScaleLevel: 3,
   pianoRollRangeInSec: 4.0,
@@ -142,6 +148,8 @@ const defaultContextData: AppContextData = {
   setSecondaryColor: noop,
   setKeyHighlightColorType: noop,
   setSeekSliderColorType: noop,
+  setWaveColorize: noop,
+  setWaveWindowSize: noop,
   setChannelFontScaleLevel: noop,
   setPlaylistFontScaleLevel: noop,
   setPianoRollRangeInSec: noop,
@@ -160,6 +168,8 @@ const keyPrimaryColor = "m3disp.palette.primary.main";
 const keySecondaryColor = "m3disp.palette.secondary.main";
 const keyKeyHighlightColorType = "m3disp.keyHighlightColorType";
 const keySeekSliderColorType = "m3disp.seekSliderColorType";
+const keyWaveColorize = "m3disp.waveColorize";
+const keyWaveWindowSize = "m3disp.waveWindowSize";
 const keyChannelFontScaleLevel = "m3disp.channelFontScaleLevel";
 const keyPlaylistFontScaleLevel = "m3disp.playlistFontScaleLevel";
 const keyPianoRollRangeInSec = "m3disp.pianoRoll.rangeInSec";
@@ -238,6 +248,24 @@ export function AppContextProvider(props: PropsWithChildren) {
     });
     if (save) {
       localStorage.setItem(keySeekSliderColorType, type);
+    }
+  };
+
+  const setWaveColorize = (v: boolean, save: boolean = true) => {
+    setState((oldState) => {
+      return { ...oldState, waveColorize: v };
+    });
+    if (save) {
+      localStorage.setItem(keyWaveColorize, v ? "1" : "0");
+    }
+  };
+
+  const setWaveWindowSize = (value: number, save: boolean = true) => {
+    setState((oldState) => {
+      return { ...oldState, waveWindowSize: value };
+    });
+    if (save) {
+      localStorage.setItem(keyWaveWindowSize, String(value));
     }
   };
 
@@ -322,6 +350,8 @@ export function AppContextProvider(props: PropsWithChildren) {
     setSecondaryColor(defaultTheme.palette.secondary.main);
     setKeyHighlightColorType("primary");
     setSeekSliderColorType("primary");
+    setWaveColorize(false);
+    setWaveWindowSize(512);
     setChannelFontScaleLevel(1);
     setPlaylistFontScaleLevel(3);
     setPianoRollRangeInSec(4.0);
@@ -359,6 +389,14 @@ export function AppContextProvider(props: PropsWithChildren) {
         state.seekSliderColorType) as SeekSliderColorType,
       false
     );
+    {
+      const v = localStorage.getItem(keyWaveColorize);
+      setWaveColorize(v == null ? state.waveColorize : v === "1", false);
+    }
+    {
+      const s = parseInt(localStorage.getItem(keyWaveWindowSize) ?? "", 10);
+      setWaveWindowSize([128, 256, 512].includes(s) ? s : state.waveWindowSize, false);
+    }
     {
       const s = localStorage.getItem(keyChannelFontScaleLevel);
       if (s != null) setChannelFontScaleLevel(parseInt(s, 10), false);
@@ -440,6 +478,8 @@ export function AppContextProvider(props: PropsWithChildren) {
         setSecondaryColor,
         setKeyHighlightColorType,
         setSeekSliderColorType,
+        setWaveColorize,
+        setWaveWindowSize,
         setChannelFontScaleLevel,
         setPlaylistFontScaleLevel,
         setPianoRollRangeInSec,
