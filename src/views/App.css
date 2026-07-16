@@ -344,6 +344,80 @@ textarea {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* ---- about dialog ---- */
+.fdlg-about {
+  width: 300px;
+  max-width: 92vw;
+}
+.abt-body {
+  align-items: center;
+  text-align: center;
+  gap: 2px;
+}
+.abt-logo {
+  margin-bottom: 6px;
+}
+.abt-line {
+  font-size: 12px;
+  color: #8b949e;
+}
+.abt-drivers {
+  margin-top: 10px;
+}
+/* ---- text-input dialogs (Open URL / Save as ZIP) ---- */
+.fdlg-input-dlg {
+  width: 340px;
+  max-width: 92vw;
+}
+.fdlg-input {
+  width: 100%;
+  padding: 8px 10px;
+  font-size: 13px;
+  color: #e6edf3;
+  background: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+}
+.fdlg-input:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+.fdlg-txtbtn:disabled {
+  color: #4a5058;
+  cursor: default;
+  background: transparent;
+}
+/* ---- progress dialog ---- */
+.fdlg-progress {
+  width: 280px;
+  max-width: 92vw;
+  padding: 20px 18px;
+}
+.prg-track {
+  width: 100%;
+  height: 6px;
+  background: #21262d;
+  border-radius: 3px;
+  overflow: hidden;
+}
+.prg-bar {
+  height: 100%;
+  background: var(--primary);
+  border-radius: 3px;
+  transition: width 0.1s linear;
+}
+.prg-bar.indeterminate {
+  width: 40%;
+  animation: prg-indet 1.1s ease-in-out infinite;
+}
+@keyframes prg-indet {
+  0% {
+    margin-left: -40%;
+  }
+  100% {
+    margin-left: 100%;
+  }
+}
 .crd-body {
   display: flex;
   flex-direction: column;

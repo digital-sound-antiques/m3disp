@@ -1,9 +1,9 @@
-import { Box, Button, Dialog, DialogActions, DialogContent, TextField } from "@mui/material";
-import { ChangeEvent, useContext, useState } from "react";
+import { useContext, useState } from "react";
 import { AppContext } from "../contexts/AppContext";
 import { AppProgressContext } from "../contexts/AppProgressContext";
 import { PlayerContext } from "../contexts/PlayerContext";
 import { loadEntriesFromUrl } from "../utils/loader";
+import { FloatingDialog } from "./FloatingDialog";
 
 export function OpenUrlDialog() {
   const app = useContext(AppContext);
@@ -11,37 +11,39 @@ export function OpenUrlDialog() {
   const context = useContext(PlayerContext);
   const id = "open-url-dialog";
 
-  const [url, setUrl] = useState<string | null>(null);
+  const [url, setUrl] = useState("");
 
-  const onChange = (evt: ChangeEvent<HTMLInputElement>) => {
-    setUrl(evt.target.value);
-  };
   const onOk = async () => {
     app.closeDialog(id);
-    if (url != null) {
+    if (url.length > 0) {
       const entries = await loadEntriesFromUrl(url, context.storage, progress.setProgress);
       context.reducer.addEntries(entries, entries.length);
     }
   };
 
   return (
-    <Dialog open={app.isOpen(id)}>
-      <DialogContent>
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "stretch",
-            minWidth: "288px",
+    <FloatingDialog id={id} title="Open URL" className="fdlg-input-dlg">
+      <div className="crd-body">
+        <label className="crd-field-label">URL</label>
+        <input
+          className="fdlg-input"
+          type="text"
+          value={url}
+          autoFocus
+          onChange={(e) => setUrl(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onOk();
           }}
-        >
-          <TextField label="URL" variant="standard" onChange={onChange} />
-        </Box>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={() => app.closeDialog(id)}>Cancel</Button>
-        <Button onClick={onOk}>Ok</Button>
-      </DialogActions>
-    </Dialog>
+        />
+      </div>
+      <div className="fdlg-foot">
+        <button className="fdlg-txtbtn" onClick={() => app.closeDialog(id)}>
+          Cancel
+        </button>
+        <button className="fdlg-txtbtn" onClick={onOk}>
+          OK
+        </button>
+      </div>
+    </FloatingDialog>
   );
 }

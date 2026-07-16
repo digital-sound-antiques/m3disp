@@ -1,22 +1,17 @@
-import { Box, Button, Dialog, DialogActions, DialogContent, TextField } from "@mui/material";
-import { ChangeEvent, useContext, useState } from "react";
+import { useContext, useState } from "react";
 import { AppContext } from "../contexts/AppContext";
 import { AppProgressContext } from "../contexts/AppProgressContext";
 import { PlayerContext } from "../contexts/PlayerContext";
 import { saveEntriesAsZip } from "../utils/saver";
+import { FloatingDialog } from "./FloatingDialog";
 
 export function SaveAsZipDialog() {
   const app = useContext(AppContext);
   const context = useContext(PlayerContext);
   const progress = useContext(AppProgressContext);
-
   const id = "save-as-zip-dialog";
 
-  const [zipName, setZipName] = useState<string>("m3disp.zip");
-
-  const onChange = (evt: ChangeEvent<HTMLInputElement>) => {
-    setZipName(evt.target.value.trim());
-  };
+  const [zipName, setZipName] = useState("m3disp.zip");
 
   const onExport = async () => {
     if (zipName.length > 0) {
@@ -26,23 +21,28 @@ export function SaveAsZipDialog() {
   };
 
   return (
-    <Dialog open={app.isOpen(id)}>
-      <DialogContent>
-        <Box
-          sx={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "stretch",
-            minWidth: "288px",
+    <FloatingDialog id={id} title="Save as ZIP" className="fdlg-input-dlg">
+      <div className="crd-body">
+        <label className="crd-field-label">Filename</label>
+        <input
+          className="fdlg-input"
+          type="text"
+          value={zipName}
+          autoFocus
+          onChange={(e) => setZipName(e.target.value.trim())}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") onExport();
           }}
-        >
-          <TextField label="Filename" variant="standard" value={zipName} onChange={onChange} />
-        </Box>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={() => app.closeDialog(id)}>Cancel</Button>
-        <Button disabled={zipName.length == 0} onClick={onExport}>Export</Button>
-      </DialogActions>
-    </Dialog>
+        />
+      </div>
+      <div className="fdlg-foot">
+        <button className="fdlg-txtbtn" onClick={() => app.closeDialog(id)}>
+          Cancel
+        </button>
+        <button className="fdlg-txtbtn" disabled={zipName.length === 0} onClick={onExport}>
+          Export
+        </button>
+      </div>
+    </FloatingDialog>
   );
 }

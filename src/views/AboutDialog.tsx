@@ -1,48 +1,38 @@
-import {
-  Box,
-  Button,
-  Dialog,
-  DialogActions,
-  DialogContent,
-  Typography
-} from "@mui/material";
 import { useContext } from "react";
 import { AppContext } from "../contexts/AppContext";
+import { FloatingDialog } from "./FloatingDialog";
 
 import logo from "../assets/m3disp.svg";
 import packageJson from "../../package.json";
 
+const acknowledgements = [
+  "MGSDRV by GIGAMIX/Ain",
+  "KINROU5 by Keiichi Kuroda",
+  "OPLLDriver by Ring",
+  "MPK by K-KAZ",
+  "MoonBlaster by Moonsoft",
+];
+
 export function AboutDialog() {
   const app = useContext(AppContext);
-  const acknowledgements = [
-    "MGSDRV by GIGAMIX/Ain",
-    "KINROU5 by Keiichi Kuroda",
-    "OPLLDriver by Ring",
-    "MPK by K-KAZ",
-    "MoonBlaster by Moonsoft",
-  ];
   return (
-    <Dialog open={app.isOpen("about-dialog")}>
-      <DialogContent sx={{ minWidth: "288px", backgroundColor: "background.paper" }}>
-        <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 1 }}>
-          <Box sx={{ p:1 }}><img src={logo} width="128px" /></Box>
-          <Typography variant="caption">A realtime MSX sound player for the Web<br/></Typography>
-          <Typography variant="caption">v{packageJson.version}<br/></Typography>
-          <Typography variant="caption">
-            This software uses following drivers.
-          </Typography>
-          <Box sx={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
-            {acknowledgements.map((e) => (
-              <Typography key={e} variant="caption">
-                {e}
-              </Typography>
-            ))}
-          </Box>
-        </Box>
-      </DialogContent>
-      <DialogActions sx={{ backgroundColor: "background.paper" }}>
-        <Button onClick={() => app.closeDialog("about-dialog")}>Ok</Button>
-      </DialogActions>
-    </Dialog>
+    <FloatingDialog id="about-dialog" title="About" className="fdlg-about">
+      <div className="crd-body abt-body">
+        <img className="abt-logo" src={logo} width={128} alt="m3disp" />
+        <div className="abt-line">A realtime MSX sound player for the Web</div>
+        <div className="abt-line">v{packageJson.version}</div>
+        <div className="abt-line abt-drivers">This software uses the following drivers.</div>
+        {acknowledgements.map((e) => (
+          <div key={e} className="abt-line">
+            {e}
+          </div>
+        ))}
+      </div>
+      <div className="fdlg-foot">
+        <button className="fdlg-txtbtn" onClick={() => app.closeDialog("about-dialog")}>
+          OK
+        </button>
+      </div>
+    </FloatingDialog>
   );
 }
