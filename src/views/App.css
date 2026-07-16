@@ -296,6 +296,54 @@ textarea {
   width: 380px;
   max-width: 92vw;
 }
+/* ---- sample-picker dialog ---- */
+.fdlg-sample {
+  width: 360px;
+  max-width: 92vw;
+}
+.fdlg-sample .crd-body {
+  max-height: 80vh;
+  overflow-y: auto;
+}
+.smp-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  color: #e6edf3;
+  cursor: pointer;
+}
+.smp-item:hover {
+  background: #21262d;
+}
+.smp-icon {
+  flex: 0 0 auto;
+  color: var(--primary);
+}
+.smp-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.smp-title {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.smp-desc {
+  font-size: 11px;
+  color: #8b949e;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
 .crd-body {
   display: flex;
   flex-direction: column;
