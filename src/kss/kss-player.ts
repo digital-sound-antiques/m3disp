@@ -11,6 +11,8 @@ import {
 } from "./channel-status";
 
 const NTSC_FRAME = 735; // 1/60 s @ 44100
+// int16 values per sample in the per-channel wave buffer (libkss PerChLayout.stride)
+const WAVE_STRIDE = 44;
 
 export class KSSPlayer extends AudioPlayer {
   constructor(rendererType: AudioRendererType) {
@@ -21,7 +23,7 @@ export class KSSPlayer extends AudioPlayer {
           type: "module",
         });
         this._decoderWorker = w;
-        w.postMessage({ type: "config", lookaheadMs: this._lookaheadMs });
+        w.postMessage({ type: "config", lookaheadMs: this._lookaheadMs, waveEnabled: this._waveEnabled });
         return w;
       },
       rendererWorkletUrl: workletUrl,
@@ -41,6 +43,10 @@ export class KSSPlayer extends AudioPlayer {
           const index = Math.floor(snapshot.frame / NTSC_FRAME);
           this._lastIndex = index;
           this._snapshots[index] = snapshot;
+        }
+      } else if (detail.type == "wave") {
+        if (detail.token == null || detail.token === this._currentToken) {
+          this._writeWave(detail.frame | 0, detail.data as Int16Array);
         }
       } else if (detail.type == "buffered") {
         this._buffered = detail.frame | 0;
@@ -68,6 +74,14 @@ export class KSSPlayer extends AudioPlayer {
 
   _lastIndex = -1;
   _snapshots: KSSDecoderDeviceSnapshot[] = [];
+
+  // Per-channel raw waveform ring (only populated while the wave view is on).
+  // Interleaved int16, WAVE_STRIDE values per sample (see libkss PerChLayout),
+  // indexed circularly by absolute song frame.
+  _waveEnabled = false;
+  _waveRing: Int16Array | null = null;
+  _waveRingSamples = 0; // ring capacity in samples
+  _waveEnd = 0; // absolute frame just past the newest written sample
 
   outputLatencyOverride: number | null = null;
 
@@ -117,6 +131,10 @@ export class KSSPlayer extends AudioPlayer {
           this._snapshots = [];
           this._buffered = this.baseFrame;
           this._totalFrame = 0;
+          // drop stale per-channel wave data from the previous track
+          this._waveRing = null;
+          this._waveRingSamples = 0;
+          this._waveEnd = 0;
         }
         await super.play(a);
       }
@@ -171,6 +189,83 @@ export class KSSPlayer extends AudioPlayer {
   /** Apply a channel mute mask to the running decoder live (no re-decode). */
   setChannelMask(mask: KSSChannelMask): void {
     this._decoderWorker?.postMessage({ type: "setChannelMask", mask });
+  }
+
+  /** Turn per-channel waveform capture on/off in the decoder (only worth the
+   *  extra synthesis while the wave view is visible). */
+  setWaveEnabled(enabled: boolean): void {
+    if (this._waveEnabled === enabled) return;
+    this._waveEnabled = enabled;
+    this._decoderWorker?.postMessage({ type: "config", waveEnabled: enabled });
+    if (!enabled) {
+      this._waveRing = null;
+      this._waveRingSamples = 0;
+      this._waveEnd = 0;
+    }
+  }
+
+  /** Store a decoded per-channel chunk into the circular ring (keyed by frame). */
+  private _writeWave(frame: number, data: Int16Array): void {
+    const samples = (data.length / WAVE_STRIDE) | 0;
+    if (samples <= 0) return;
+    if (this._waveRing == null) {
+      const rate = this.audioContext?.sampleRate ?? 44100;
+      this._waveRingSamples = Math.ceil(rate * 1.5);
+      this._waveRing = new Int16Array(this._waveRingSamples * WAVE_STRIDE);
+    }
+    const ring = this._waveRing;
+    const cap = this._waveRingSamples;
+    for (let i = 0; i < samples; i++) {
+      const dst = ((frame + i) % cap) * WAVE_STRIDE;
+      const src = i * WAVE_STRIDE;
+      for (let k = 0; k < WAVE_STRIDE; k++) ring[dst + k] = data[src + k];
+    }
+    this._waveEnd = frame + samples;
+  }
+
+  /**
+   * Read the per-channel window of `samples` ending at absolute frame `endFrame`
+   * into `out` (length samples*WAVE_STRIDE, interleaved). Frames outside the
+   * retained ring are left as 0. Returns false if no wave data is available.
+   */
+  /**
+   * Read one channel's waveform window (its int16 at `offset` within each
+   * sample, see libkss PerChLayout) of `samples` ending at `endFrame`, adding
+   * into `out` (so callers can sum several channels of a merged cell). Frames
+   * outside the ring contribute 0. Returns false if no wave data is available.
+   */
+  readWaveChannel(endFrame: number, samples: number, offset: number, out: Int32Array): boolean {
+    const ring = this._waveRing;
+    if (ring == null) return false;
+    const cap = this._waveRingSamples;
+    const oldest = this._waveEnd - cap;
+    const start = endFrame - samples + 1;
+    for (let i = 0; i < samples; i++) {
+      const f = start + i;
+      if (f >= oldest && f < this._waveEnd && f >= 0) {
+        out[i] += ring[(f % cap) * WAVE_STRIDE + offset];
+      }
+    }
+    return true;
+  }
+
+  readWaveWindow(endFrame: number, samples: number, out: Int16Array): boolean {
+    const ring = this._waveRing;
+    if (ring == null) return false;
+    const cap = this._waveRingSamples;
+    const oldest = this._waveEnd - cap;
+    const start = endFrame - samples + 1;
+    for (let i = 0; i < samples; i++) {
+      const f = start + i;
+      const o = i * WAVE_STRIDE;
+      if (f >= oldest && f < this._waveEnd && f >= 0) {
+        const src = (f % cap) * WAVE_STRIDE;
+        for (let k = 0; k < WAVE_STRIDE; k++) out[o + k] = ring[src + k];
+      } else {
+        for (let k = 0; k < WAVE_STRIDE; k++) out[o + k] = 0;
+      }
+    }
+    return true;
   }
 
   /** Voice state at a given output frame (relative to the stream start). The

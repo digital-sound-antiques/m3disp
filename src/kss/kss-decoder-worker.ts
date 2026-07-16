@@ -72,6 +72,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
           return;
         case "config":
           if (d.lookaheadMs != null) this._lookaheadMs = d.lookaheadMs;
+          if (d.waveEnabled != null) this._waveEnabled = d.waveEnabled;
           return;
         case "setChannelMask":
           // live channel mute: apply to BOTH engines so keyframes stay consistent
@@ -117,6 +118,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
   private _playhead = 0;
   private _lookaheadMs = 500;
   private _aborted = false;
+  private _waveEnabled = false; // when true, also emit per-channel waveform data
   private _fadeInRemaining = 0; // samples of start-fade left to apply
   // current per-device channel mute mask; applied to both engines and re-applied
   // after every loadState/reset so a keyframe's mask never overrides the live one
@@ -628,7 +630,18 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     // chunk BEFORE advancing the keyframer so the first chunk after a track
     // change isn't delayed by the look-ahead scan (a slow-device glitch source).
     const step = Math.floor(this.sampleRate / 8);
-    const res = player.calc(step);
+    const chunkStart = this._playerFrames;
+    // When the wave view is active, render the mixed audio AND the raw
+    // per-channel outputs in one synthesis pass; otherwise just the mix.
+    let res: Int16Array;
+    let perCh: Int16Array | null = null;
+    if (this._waveEnabled) {
+      const r = player.calcWithPerCh(step);
+      res = r.pcm;
+      perCh = r.perCh;
+    } else {
+      res = player.calc(step);
+    }
     this._playerFrames += step;
 
     // ramp the first samples of a (re)start up from zero to avoid a click when
@@ -669,6 +682,16 @@ class KSSDecoderWorker extends AudioDecoderWorker {
       this._playhead + SCAN_AHEAD_SECONDS * this.sampleRate,
       primed ? Infinity : this.sampleRate
     );
+
+    // hand the raw per-channel window (this chunk) to the main thread, keyed by
+    // its absolute start frame; transferred so it's zero-copy. The main keeps a
+    // frame-indexed ring the wave view reads at the (latency-corrected) playhead.
+    if (perCh != null) {
+      this.worker.postMessage(
+        { type: "wave", frame: chunkStart, data: perCh, token: this._loadedToken },
+        [perCh.buffer]
+      );
+    }
 
     return [res];
   }

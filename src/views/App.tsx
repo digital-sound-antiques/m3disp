@@ -17,6 +17,7 @@ import { PlayerContext } from "../contexts/PlayerContext";
 import { ChannelMaskPanel } from "./ChannelMaskPanel";
 import { PianoRoll } from "../widgets/PianoRoll";
 import { PianoRollGrid } from "../widgets/PianoRollGrid";
+import { WaveGrid } from "../widgets/WaveGrid";
 import { PianoRollMenu } from "./PianoRollMenu";
 import { KeyboardList } from "../widgets/KeyboardList";
 import { TimeSlider } from "../widgets/TimeSlider";
@@ -129,11 +130,11 @@ function Layout() {
     const v = localStorage.getItem("m3disp.titleAlign");
     return v === "center" || v === "right" ? v : "left";
   });
-  // center view tab: "pianoroll" (default) or "keyboard"
-  // center view tab: "pianoroll" (default), "grid" (per-channel rolls), "keyboard"
-  const [vizTab, setVizTab] = useState<"pianoroll" | "grid" | "keyboard">(() => {
+  // center view tab: "pianoroll" (default), "grid" (per-channel rolls),
+  // "wave" (per-channel oscilloscopes) or "keyboard"
+  const [vizTab, setVizTab] = useState<"pianoroll" | "grid" | "wave" | "keyboard">(() => {
     const v = localStorage.getItem("m3disp.vizTab");
-    return v === "keyboard" || v === "grid" ? v : "pianoroll";
+    return v === "keyboard" || v === "grid" || v === "wave" ? v : "pianoroll";
   });
   useEffect(() => {
     localStorage.setItem("m3disp.vizTab", vizTab);
@@ -335,6 +336,12 @@ function Layout() {
                 >
                   Grid
                 </button>
+                <button
+                  className={`viz-tab${vizTab === "wave" ? " active" : ""}`}
+                  onClick={() => setVizTab("wave")}
+                >
+                  Wave
+                </button>
                 {vizTab === "keyboard" && (
                   <div className="viz-seg">
                     <button
@@ -384,6 +391,8 @@ function Layout() {
                   <PianoRoll mode={app.pianoRollMode} />
                 ) : vizTab === "grid" ? (
                   <PianoRollGrid />
+                ) : vizTab === "wave" ? (
+                  <WaveGrid />
                 ) : (
                   <div className="viz-keyboard">
                     <KeyboardList isSmall={false} columns={keyboardCols} />
