@@ -1,11 +1,14 @@
 import { ThemeProvider } from "@mui/material/styles";
 import { CssBaseline } from "@mui/material";
 import {
+  CropLandscape,
+  CropPortrait,
   FormatAlignCenter,
   FormatAlignLeft,
   FormatAlignRight,
+  MusicNote,
   Settings,
-  ThreeDRotation,
+  ShowChart,
   ViewAgenda,
 } from "@mui/icons-material";
 import { useContext, useEffect, useRef, useState } from "react";
@@ -132,10 +135,15 @@ function Layout() {
     return v === "center" || v === "right" ? v : "left";
   });
   // center view tab: "pianoroll" (default), "grid" (per-channel rolls),
-  // "wave" (per-channel oscilloscopes) or "keyboard"
-  const [vizTab, setVizTab] = useState<"pianoroll" | "grid" | "wave" | "keyboard">(() => {
+  // "scope" (per-channel oscilloscope / piano grid, chosen via Scope > Type) or
+  // "keyboard". The old "grid" tab folded into Scope (Type = ROLL) — migrate it.
+  const [vizTab, setVizTab] = useState<"pianoroll" | "wave" | "keyboard">(() => {
     const v = localStorage.getItem("m3disp.vizTab");
-    return v === "keyboard" || v === "grid" || v === "wave" ? v : "pianoroll";
+    if (v === "grid") {
+      localStorage.setItem("m3disp.scopeType", "roll");
+      return "wave";
+    }
+    return v === "keyboard" || v === "wave" ? v : "pianoroll";
   });
   useEffect(() => {
     localStorage.setItem("m3disp.vizTab", vizTab);
@@ -329,13 +337,7 @@ function Layout() {
                   className={`viz-tab${vizTab === "pianoroll" ? " active" : ""}`}
                   onClick={() => setVizTab("pianoroll")}
                 >
-                  Piano Roll
-                </button>
-                <button
-                  className={`viz-tab${vizTab === "grid" ? " active" : ""}`}
-                  onClick={() => setVizTab("grid")}
-                >
-                  Grid
+                  Roll
                 </button>
                 <button
                   className={`viz-tab${vizTab === "wave" ? " active" : ""}`}
@@ -361,16 +363,43 @@ function Layout() {
                     </button>
                   </div>
                 )}
-                {(vizTab === "pianoroll" || vizTab === "grid" || vizTab === "wave") && (
+                {(vizTab === "pianoroll" || vizTab === "wave") && (
                   <div className="pr-menu-wrap" ref={prMenuRef}>
+                    {vizTab === "wave" && (
+                      <div className="viz-seg">
+                        <button
+                          className={`viz-seg-btn${app.scopeType === "wave" ? " active" : ""}`}
+                          onClick={() => app.setScopeType("wave")}
+                          title="Waveform"
+                        >
+                          <ShowChart sx={{ fontSize: 15 }} />
+                        </button>
+                        <button
+                          className={`viz-seg-btn${app.scopeType === "roll" ? " active" : ""}`}
+                          onClick={() => app.setScopeType("roll")}
+                          title="Piano notes"
+                        >
+                          <MusicNote sx={{ fontSize: 15 }} />
+                        </button>
+                      </div>
+                    )}
                     {vizTab === "pianoroll" && (
-                      <button
-                        className={`viz-gear${app.pianoRollMode === "3d" ? " active" : ""}`}
-                        onClick={() => app.setPianoRollMode(app.pianoRollMode === "3d" ? "2d" : "3d")}
-                        title="3D"
-                      >
-                        <ThreeDRotation sx={{ fontSize: 16 }} />
-                      </button>
+                      <div className="viz-seg">
+                        <button
+                          className={`viz-seg-btn${app.pianoRollMode !== "3d" ? " active" : ""}`}
+                          onClick={() => app.setPianoRollMode("2d")}
+                          title="2D"
+                        >
+                          <CropLandscape sx={{ fontSize: 15 }} />
+                        </button>
+                        <button
+                          className={`viz-seg-btn${app.pianoRollMode === "3d" ? " active" : ""}`}
+                          onClick={() => app.setPianoRollMode("3d")}
+                          title="3D"
+                        >
+                          <CropPortrait sx={{ fontSize: 15 }} />
+                        </button>
+                      </div>
                     )}
                     <button
                       className={`viz-gear${prMenuOpen ? " active" : ""}`}
@@ -381,7 +410,15 @@ function Layout() {
                     </button>
                     {prMenuOpen && (
                       <div className="pr-menu">
-                        {vizTab === "wave" ? <WaveMenu /> : <PianoRollMenu grid={vizTab === "grid"} />}
+                        {vizTab === "wave" ? (
+                          app.scopeType === "roll" ? (
+                            <PianoRollMenu grid colorize />
+                          ) : (
+                            <WaveMenu />
+                          )
+                        ) : (
+                          <PianoRollMenu />
+                        )}
                       </div>
                     )}
                   </div>
@@ -390,10 +427,12 @@ function Layout() {
               <div className="viz-body">
                 {vizTab === "pianoroll" ? (
                   <PianoRoll mode={app.pianoRollMode} />
-                ) : vizTab === "grid" ? (
-                  <PianoRollGrid />
                 ) : vizTab === "wave" ? (
-                  <WaveGrid />
+                  app.scopeType === "roll" ? (
+                    <PianoRollGrid />
+                  ) : (
+                    <WaveGrid />
+                  )
                 ) : (
                   <div className="viz-keyboard">
                     <KeyboardList isSmall={false} columns={keyboardCols} />

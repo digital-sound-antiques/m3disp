@@ -1051,6 +1051,7 @@ textarea {
   margin-left: auto;
   position: relative;
   display: inline-flex;
+  align-items: center;
 }
 .viz-gear {
   display: inline-flex;

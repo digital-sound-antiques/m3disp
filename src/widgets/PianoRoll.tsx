@@ -248,7 +248,9 @@ export function PianoRoll(props: { mode: string }) {
       >
         <AutoSizeCanvas
           painter={(c) =>
-            paintPianoRollBg(c, appContext.theme.palette.primary.main, appContext.pianoRollKeyboard !== "off")
+            // always draw the key-lane grooves — even with the keyboard off — so a
+            // stopped/empty roll still shows the pitch grid instead of looking broken
+            paintPianoRollBg(c, appContext.theme.palette.primary.main, true)
           }
           width={size.width} height={size.height} resX={resX} resY={resY}
         />

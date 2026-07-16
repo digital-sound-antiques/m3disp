@@ -3,6 +3,7 @@ import { ReactNode, useContext } from "react";
 import { AppContext, keyboardModeCycle, type PianoRollKeyboardMode } from "../contexts/AppContext";
 import { pianoRollColorDialogId } from "../widgets/PianoRollControl";
 import { particleTypeCycle, type PianoRollParticleType } from "../widgets/piano-roll-painter";
+import { ColorizeItems } from "./WaveMenu";
 
 const nextParticleType = (t: PianoRollParticleType) =>
   particleTypeCycle[(particleTypeCycle.indexOf(t) + 1) % particleTypeCycle.length];
@@ -12,7 +13,7 @@ const nextKeyboardMode = (t: PianoRollKeyboardMode) =>
 /** Labelled vertical menu of piano-roll settings (shown from the gear in the
  *  Piano Roll / Grid tab header). In grid mode only Zoom, Particles and Colors
  *  apply (Layer / Keyboard / 3D are piano-roll only). */
-export function PianoRollMenu(props: { grid?: boolean }) {
+export function PianoRollMenu(props: { grid?: boolean; colorize?: boolean }) {
   const ctx = useContext(AppContext);
 
   const toggle = (icon: ReactNode, label: string, on: boolean, onClick: () => void) => (
@@ -67,12 +68,16 @@ export function PianoRollMenu(props: { grid?: boolean }) {
           <span className="menu-state">{ctx.pianoRollKeyboard.toUpperCase()}</span>
         </button>
       )}
-      <button className="menu-item" onClick={() => ctx.openDialog(pianoRollColorDialogId)}>
-        <span className="menu-ico">
-          <Palette sx={{ fontSize: 18 }} />
-        </span>
-        <span className="menu-label">Colors…</span>
-      </button>
+      {props.colorize ? (
+        <ColorizeItems />
+      ) : (
+        <button className="menu-item" onClick={() => ctx.openDialog(pianoRollColorDialogId)}>
+          <span className="menu-ico">
+            <Palette sx={{ fontSize: 18 }} />
+          </span>
+          <span className="menu-label">Colors…</span>
+        </button>
+      )}
     </div>
   );
 }

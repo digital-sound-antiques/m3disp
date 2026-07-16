@@ -22,6 +22,18 @@ import {
 } from "../views/channel-section-order";
 import type { KSSDeviceName } from "../kss/kss-device";
 
+// A channelColors palette that is a single color for every channel (used when
+// Colorize is off). Memoized so the array identity is stable per color.
+let monoCache = "";
+let monoArr: string[] = [];
+function monoColors(color: string): string[] {
+  if (color !== monoCache) {
+    monoCache = color;
+    monoArr = channelIds.map(() => color);
+  }
+  return monoArr;
+}
+
 // flat channelIds[] index for (device, device-local index)
 const flatIndex = (device: KSSDeviceName, index: number) =>
   channelIds.findIndex((c) => c.device === device && c.index === index);
@@ -76,15 +88,24 @@ function GridCell(props: {
       const dt = lastRef.current ? Math.min((t - lastRef.current) / 1000, 1 / 20) : 0;
       lastRef.current = t;
       const ac = appRef.current;
+      // Colorize OFF → render every note in the primary color (mode "channel"
+      // with a uniform palette); ON → the usual per-channel/voice colors.
+      const colorConfig = ac.waveColorize
+        ? {
+            mode: ac.pianoRollColorMode,
+            channelColors: ac.pianoRollChannelColors,
+            voiceColors: defaultVoiceColors,
+          }
+        : {
+            mode: { opll: "channel", psg: "channel", scc: "channel" } as const,
+            channelColors: monoColors(ac.theme.palette.primary.main),
+            voiceColors: defaultVoiceColors,
+          };
       paintCellRoll(
         c,
         playerRef.current,
         ac.pianoRollRangeInSec,
-        {
-          mode: ac.pianoRollColorMode,
-          channelColors: ac.pianoRollChannelColors,
-          voiceColors: defaultVoiceColors,
-        },
+        colorConfig,
         cellRef.current,
         ac.pianoRollParticleType,
         storeRef.current,
