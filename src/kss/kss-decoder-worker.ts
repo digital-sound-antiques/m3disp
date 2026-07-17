@@ -102,6 +102,13 @@ class KSSDecoderWorker extends AudioDecoderWorker {
   private _keyframes: Keyframe[] = [];
   private _originFrame = 0; // frame the keyframe schedule starts from (0, or post-debug-skip)
   private _nextKeyframeFrame = 0; // next scheduled capture frame
+  // Canonical keyframes captured from the AUDIBLE player during real synthesis
+  // (calc), keyed by 2s-grid index. Unlike the keyframer's states (built with
+  // calcSilent, so device DSP internals like envelopes can be stale), these have
+  // fully-synthesised internal state, so a seek into an already-heard region can
+  // restore an accurate state. Only populated up to the play head.
+  private _playerKeyframes = new Map<number, Keyframe>();
+  private _nextPlayerKeyframeFrame = 0; // next player capture frame
   private _bufferedHWM = 0; // furthest keyframer position (drives the seek buffer bar)
   private _endFrame = 0; // actual total length (intro + loops + fade), 0 until the keyframer finds it
   // whether _endFrame ends on a fade-out (loop cut-off / duration cap) rather
@@ -213,6 +220,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
       this._configureEngine(this._keyframer!, args);
       this._loadedToken = args.songToken ?? -1;
       this._keyframes = [];
+      this._playerKeyframes.clear();
       this._playerFrames = 0;
       this._keyframerFrames = 0;
       this._bufferedHWM = 0;
@@ -229,6 +237,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
       // seed the keyframe schedule at the (post-skip) origin so a rewind there is instant
       this._originFrame = this._keyframerFrames;
       this._nextKeyframeFrame = this._originFrame;
+      this._nextPlayerKeyframeFrame = this._playerFrames;
       this._captureKeyframe();
 
       if (startFrame > this._playerFrames) {
@@ -244,7 +253,17 @@ class KSSDecoderWorker extends AudioDecoderWorker {
    *  at/below it, then fast-forward the remainder. */
   private async _seekPlayerTo(target: number): Promise<void> {
     const player = this._player!;
-    const kf = this._nearestKeyframe(target);
+    // Prefer the player's own canonical state when it is at least as close as the
+    // keyframer's: player states were built with real synthesis (accurate device
+    // internals), the keyframer's with calcSilent (envelopes etc. can be stale).
+    const kk = this._nearestKeyframe(target);
+    const pk = this._nearestPlayerKeyframe(target);
+    // Use the canonical (player) state as long as it's within one grid step of
+    // the keyframer's nearest — i.e. the target is in an already-heard region so
+    // the player has coverage. The few extra fast-forwarded frames cost nothing
+    // next to loading a state with accurate (not stale) device internals. Only
+    // fall back to the keyframer when it is clearly closer (unheard / forward).
+    const kf = pk != null && (kk == null || pk.frame + this._keyframeFrames >= kk.frame) ? pk : kk;
     if (kf != null) {
       player.loadState(kf.data);
       this._playerFrames = kf.frame;
@@ -260,6 +279,10 @@ class KSSDecoderWorker extends AudioDecoderWorker {
       (f) => (this._playerFrames = f),
       target
     );
+    // Resume canonical capture at the next grid boundary. The span just fast-
+    // forwarded used calcSilent (provisional), so don't capture the landing frame.
+    this._nextPlayerKeyframeFrame =
+      (Math.floor(this._playerFrames / this._keyframeFrames) + 1) * this._keyframeFrames;
   }
 
   /** Move the keyframer to `target` (used when a forward seek jumps past the
@@ -324,6 +347,25 @@ class KSSDecoderWorker extends AudioDecoderWorker {
    *  when _keyframerFrames === _nextKeyframeFrame. */
   private _captureKeyframe() {
     this._keyframes.push({ frame: this._keyframerFrames, data: this._keyframer!.saveState() });
+  }
+
+  /** Nearest canonical (player-captured) keyframe with frame <= target, or null. */
+  private _nearestPlayerKeyframe(target: number): Keyframe | null {
+    let best: Keyframe | null = null;
+    for (const kf of this._playerKeyframes.values()) {
+      if (kf.frame <= target && (best == null || kf.frame > best.frame)) best = kf;
+    }
+    return best;
+  }
+
+  /** Capture the audible player's canonical state at its current position, keyed
+   *  by the 2s grid cell (so re-crossing a cell after a rewind just refreshes it).
+   *  Called from process() during real synthesis only — never during a calcSilent
+   *  fast-forward, so a provisional state can't overwrite a canonical one. */
+  private _capturePlayerKeyframe() {
+    const g = Math.floor(this._playerFrames / this._keyframeFrames);
+    this._playerKeyframes.set(g, { frame: this._playerFrames, data: this._player!.saveState() });
+    this._nextPlayerKeyframeFrame = (g + 1) * this._keyframeFrames;
   }
 
   _opllAdr = 0xff;
@@ -643,6 +685,10 @@ class KSSDecoderWorker extends AudioDecoderWorker {
       res = player.calc(step);
     }
     this._playerFrames += step;
+
+    // capture the player's canonical state at ~2s boundaries (real synthesis
+    // only) so a later seek into this heard region restores an accurate state
+    if (this._playerFrames >= this._nextPlayerKeyframeFrame) this._capturePlayerKeyframe();
 
     // ramp the first samples of a (re)start up from zero to avoid a click when
     // the track/seek target opens on a non-zero sample
