@@ -39,7 +39,7 @@ export function VolumeControl() {
       <input
         type="range"
         min={0.0}
-        max={6.0}
+        max={7.0}
         step={0.25}
         value={context.masterGain}
         onChange={(e) => context.reducer.setMasterGain(Number(e.target.value))}

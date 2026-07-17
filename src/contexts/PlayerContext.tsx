@@ -106,7 +106,7 @@ const createDefaultContextState = () => {
     state.entries = entries;
     // clamp against the current slider range: a value persisted under an older,
     // wider range (was 1.0–7.0) could otherwise land out of bounds
-    state.masterGain = Math.min(6.0, Math.max(0.0, json.masterGain ?? state.masterGain));
+    state.masterGain = Math.min(7.0, Math.max(0.0, json.masterGain ?? state.masterGain));
     state.gainNode.gain.value = state.masterGain;
     state.repeatMode = json.repeatMode ?? state.repeatMode;
     state.surroundMode = json.surroundMode ?? state.surroundMode;
