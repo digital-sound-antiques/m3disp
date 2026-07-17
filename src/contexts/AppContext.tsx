@@ -133,7 +133,7 @@ const defaultContextData: AppContextData = {
   waveColorize: false,
   waveWindowSize: 256,
   channelFontScaleLevel: 1,
-  playlistFontScaleLevel: 3,
+  playlistFontScaleLevel: 2,
   pianoRollRangeInSec: 4.0,
   pianoRollLayered: false,
   pianoRollMode: "2d",
@@ -369,7 +369,7 @@ export function AppContextProvider(props: PropsWithChildren) {
     setWaveColorize(false);
     setWaveWindowSize(256);
     setChannelFontScaleLevel(1);
-    setPlaylistFontScaleLevel(3);
+    setPlaylistFontScaleLevel(2);
     setPianoRollRangeInSec(4.0);
     setPianoRollLayered(false);
     setPianoRollMode("2d");
