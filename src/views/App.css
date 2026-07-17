@@ -153,6 +153,29 @@ textarea {
   font-weight: 400;
   color: #6e7681;
 }
+/* "new version available" action, shown next to the version number */
+.ab-update {
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 9px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--on-secondary, #fff);
+  background: var(--secondary, #ce93d8);
+  border: none;
+  border-radius: 2px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ab-update:hover {
+  filter: brightness(1.1);
+}
+.ab-updating {
+  margin-left: 6px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.8);
+  white-space: nowrap;
+}
 .app-bottom.compact .ab-latency {
   display: none;
 }

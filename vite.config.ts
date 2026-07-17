@@ -8,7 +8,10 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: "autoUpdate",
+      // "prompt": a new build installs but waits; the app surfaces an UPDATE
+      // button (see App.tsx) instead of silently reloading — never interrupts
+      // playback mid-song.
+      registerType: "prompt",
       includeAssets: ["apple-touch-icon-180x180.png"],
       manifest: {
         name: "M3disp",

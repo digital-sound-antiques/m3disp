@@ -12,6 +12,7 @@ import {
   ViewAgenda,
 } from "@mui/icons-material";
 import { useContext, useEffect, useRef, useState } from "react";
+import { useRegisterSW } from "virtual:pwa-register/react";
 
 import { AppContext } from "../contexts/AppContext";
 import { FileDropContext } from "../contexts/FileDropContext";
@@ -103,6 +104,33 @@ export function App() {
 function Layout() {
   const app = useContext(AppContext);
   const context = useContext(PlayerContext);
+
+  // PWA update: a new deploy installs but waits (registerType "prompt"); surface
+  // an UPDATE button next to the version instead of auto-reloading mid-playback.
+  const {
+    needRefresh: [needRefresh],
+    updateServiceWorker,
+  } = useRegisterSW({
+    onRegisteredSW(_url, r) {
+      // re-check periodically so a long-open session still sees new releases
+      if (r) setInterval(() => r.update(), 60 * 60 * 1000);
+    },
+  });
+  const [updating, setUpdating] = useState(false);
+  const updateButton = updating ? (
+    <span className="ab-updating">Updating…</span>
+  ) : needRefresh ? (
+    <button
+      className="ab-update"
+      onClick={() => {
+        setUpdating(true);
+        updateServiceWorker(true);
+      }}
+      title="A new version is available — click to update"
+    >
+      UPDATE
+    </button>
+  ) : null;
 
   const [channelsCollapsed, setChannelsCollapsed] = useState(
     () => localStorage.getItem("m3disp.channelsCollapsed") === "1"
@@ -215,6 +243,7 @@ function Layout() {
     root.setProperty("--primary", app.theme.palette.primary.main);
     root.setProperty("--on-primary", onColor(app.theme.palette.primary.main));
     root.setProperty("--secondary", app.theme.palette.secondary.main);
+    root.setProperty("--on-secondary", onColor(app.theme.palette.secondary.main));
     root.setProperty("--panel-bg", app.theme.palette.background.paper);
     root.setProperty(
       "--seek-color",
@@ -530,6 +559,7 @@ function Layout() {
             {bottomHeight < BOTTOM_COMPACT && (
               <span className="ab-title-ver">{packageJson.version}</span>
             )}
+            {bottomHeight < BOTTOM_COMPACT && updateButton}
           </div>
           <div className="ab-transport">
             <TransportButtons />
@@ -544,6 +574,7 @@ function Layout() {
                 <img src={ghlogo} width={14} height={14} alt="github" />
               </a>
               <span>{packageJson.version}</span>
+              {updateButton}
             </span>
           )}
           <span className="ab-latency">
