@@ -22,6 +22,13 @@ function PlayerPanel() {
         valueLabelFn={(value) => `${(value / 60 / 1000).toFixed(0)} min.`}
         onChange={context.setDefaultDuration}
       />
+      <NumberSelector
+        label="Track Gap"
+        values={[0, 1000, 2000, 3000, 4000, 5000]}
+        value={context.autoAdvanceGap}
+        valueLabelFn={(value) => `${(value / 1000).toFixed(0)} sec.`}
+        onChange={context.setAutoAdvanceGap}
+      />
     </div>
   );
 }
@@ -213,6 +220,7 @@ function SettingsDialogBody(props: { id: string }) {
     app.resetAllSettings();
     player.reducer.setDefaultLoopCount(2);
     player.reducer.setDefaultDuration(300 * 1000);
+    player.reducer.setAutoAdvanceGap(0);
     app.closeDialog(props.id);
   };
 

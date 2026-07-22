@@ -33,6 +33,19 @@ export function usePlaybackTime() {
     return () => context.player.removeEventListener("progress", handleProgress);
   }, [context.player, rate]);
 
+  // During an auto-advance gap the player is idle, so tick a local clock to
+  // drive the negative countdown (-0:03, -0:02, -0:01) until audio starts.
+  const gapUntil = context.gapUntil;
+  const [, tick] = useState(0);
+  useEffect(() => {
+    if (gapUntil == null) return;
+    const id = setInterval(() => tick((n) => n + 1), 200);
+    return () => clearInterval(id);
+  }, [gapUntil]);
+  const gapRemainingSec =
+    gapUntil != null ? Math.ceil((gapUntil - Date.now()) / 1000) : 0;
+  const inGap = gapUntil != null && gapRemainingSec > 0;
+
   const entry = context.currentEntry;
   const capMs =
     entry?.duration != null
@@ -42,5 +55,13 @@ export function usePlaybackTime() {
   const measuring = entry != null && reportedSec <= 0;
   const totalSec = reportedSec > 0 ? reportedSec : capMs / 1000;
 
-  return { currentSec, bufferedSec, totalSec, measuring, entry };
+  return {
+    currentSec,
+    bufferedSec,
+    totalSec,
+    measuring,
+    entry,
+    /** seconds remaining in the auto-advance gap, or null when not in a gap */
+    gapRemainingSec: inGap ? gapRemainingSec : null,
+  };
 }

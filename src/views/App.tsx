@@ -578,7 +578,7 @@ function Layout() {
             </span>
           )}
           <span className="ab-latency">
-            Output Latency: {Math.round(context.player.outputLatency * 1000)}ms
+            Output Latency: {(context.player.outputLatency * 1000).toFixed(1)}ms
           </span>
         </div>
       </div>

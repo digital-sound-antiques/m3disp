@@ -14,7 +14,9 @@ function seekBackground(current: number, buffered: number, max: number): string 
 
 export function TimeSlider() {
   const context = useContext(PlayerContext);
-  const { currentSec, bufferedSec, totalSec, measuring, entry } = usePlaybackTime();
+  const { currentSec, bufferedSec, totalSec, measuring, entry, gapRemainingSec } =
+    usePlaybackTime();
+  const inGap = gapRemainingSec != null;
   const [seekingTo, setSeekingTo] = useState<number | null>(null);
 
   // drop the seek preview once playback catches up to (near) the seek target
@@ -32,6 +34,9 @@ export function TimeSlider() {
   // rejected (mirroring KSSPlayer.seek), so snap the thumb back instead of
   // pinning the preview on a position playback will never reach.
   const commitSeek = (sec: number) => {
+    // During the auto-advance gap the new track isn't loaded yet (the player
+    // still holds the previous one), so a seek would replay the previous track.
+    if (inGap) return;
     if (measuring && sec > bufferedSec) {
       setSeekingTo(null);
       return;
@@ -54,15 +59,18 @@ export function TimeSlider() {
     commitSeek(v);
   };
 
-  const displaySec = seekingTo ?? currentSec;
+  // During the auto-advance gap, wait at the head of the next track: pin the
+  // thumb to 0 and show a negative countdown (-0:03 …) instead of the position.
+  const displaySec = inGap ? 0 : seekingTo ?? currentSec;
   // Axis extent = the real total (or the seek preview if it runs past it).
   // Don't floor it to 1s: a sub-second track would then leave the buffered
   // region stuck partway across a 1s axis after it stops.
   const maxSec = Math.max(totalSec, displaySec, 1e-6);
+  const leftLabel = inGap ? `-${toTimeString(gapRemainingSec!)}` : toTimeString(displaySec);
 
   return (
     <div className="transport-seek">
-      <span className="seek-time">{toTimeString(displaySec)}</span>
+      <span className="seek-time">{leftLabel}</span>
       <input
         className="seek"
         type="range"
@@ -71,8 +79,17 @@ export function TimeSlider() {
         step={0.05}
         value={Math.min(displaySec, maxSec)}
         disabled={entry == null}
-        style={{ background: seekBackground(displaySec, bufferedSec, maxSec) }}
+        style={{
+          background: seekBackground(displaySec, bufferedSec, maxSec),
+          opacity: inGap ? 0.5 : undefined,
+        }}
+        onPointerDown={() => {
+          // Touching the (dimmed) bar during the gap skips the rest of it and
+          // starts the next track immediately, rather than seeking.
+          if (inGap) context.skipGap();
+        }}
         onChange={(e) => {
+          if (inGap) return; // ignore drags during the gap (see onPointerDown)
           setSeekingTo(Number(e.target.value));
           lastCommitted.current = null; // re-arm the release guard for this drag
         }}

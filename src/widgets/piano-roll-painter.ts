@@ -512,8 +512,8 @@ export function paintKeyboardEdgeLine(canvas: HTMLCanvasElement) {
 function currentNtscFrame(playerContext: PlayerContextState): number {
   const audioFrame =
     playerContext.player.seekBaseFrame + (playerContext.player.progress?.renderer?.currentFrame ?? 0);
-  const latencySamples =
-    (playerContext.player.outputLatency ?? 0) * (playerContext.player.audioContext?.sampleRate ?? 44100);
+  const latency = playerContext.player.outputLatencyOverride ?? playerContext.player.outputLatency ?? 0;
+  const latencySamples = latency * (playerContext.player.audioContext?.sampleRate ?? 44100);
   let ntsc = Math.floor(Math.max(0, audioFrame - latencySamples) / 735);
   const decodedLen = playerContext.player._snapshots.length;
   if (decodedLen > 0 && ntsc >= decodedLen) ntsc = decodedLen - 1;

@@ -37,8 +37,13 @@ export interface PlayerContextState {
   currentEntry: PlayListEntry | null;
   playState: "playing" | "paused" | "stopped";
   playStateChangeCount: number;
+  /** during an auto-advance gap: Date.now() deadline when audio starts; else null.
+   *  Runtime-only (not persisted). Drives the negative countdown in the UI. */
+  gapUntil: number | null;
   defaultLoopCount: number;
   defaultDuration: number;
+  /** silence (ms) inserted before auto-advancing to the next track (0..5000) */
+  autoAdvanceGap: number;
   channelMask: KSSChannelMask;
   unmute: () => Promise<void>;
 }
@@ -59,6 +64,8 @@ export const DEFAULT_SURROUND_MODE: SurroundMode = "off";
 export const DEFAULT_REPEAT_MODE: RepeatMode = "none";
 export const DEFAULT_LOOP_COUNT = 2;
 export const DEFAULT_DURATION_MS = 300 * 1000;
+export const DEFAULT_AUTO_ADVANCE_GAP_MS = 0;
+export const MAX_AUTO_ADVANCE_GAP_MS = 5 * 1000;
 
 const createDefaultContextState = () => {
   const audioContext = new AudioContext({ sampleRate: 44100, latencyHint: "interactive" });
@@ -75,9 +82,11 @@ const createDefaultContextState = () => {
     currentEntry: null,
     playStateChangeCount: 0,
     playState: "stopped",
+    gapUntil: null,
     masterGain: DEFAULT_MASTER_GAIN,
     defaultLoopCount: DEFAULT_LOOP_COUNT,
     defaultDuration: DEFAULT_DURATION_MS,
+    autoAdvanceGap: DEFAULT_AUTO_ADVANCE_GAP_MS,
     channelMask: {
       psg: 0,
       opl: 0,
@@ -113,6 +122,10 @@ const createDefaultContextState = () => {
     state.surround.setMode(state.surroundMode);
     state.defaultLoopCount = json.defaultLoopCount ?? state.defaultLoopCount;
     state.defaultDuration = json.defaultDuration ?? state.defaultDuration;
+    state.autoAdvanceGap = Math.min(
+      MAX_AUTO_ADVANCE_GAP_MS,
+      Math.max(0, json.autoAdvanceGap ?? state.autoAdvanceGap)
+    );
   } catch (e) {
     console.error(e);
     localStorage.clear();
@@ -125,6 +138,8 @@ const defaultContextState: PlayerContextState = createDefaultContextState();
 export const PlayerContext = React.createContext({
   ...defaultContextState,
   reducer: new PlayerContextReducer(() => {}),
+  /** cut an in-progress auto-advance gap short and start the next track now */
+  skipGap: () => {},
 });
 
 function usePrevious<T>(value: T) {
@@ -137,21 +152,63 @@ function usePrevious<T>(value: T) {
 
 async function applyPlayStateChange(
   oldState: PlayerContextState | null,
-  state: PlayerContextState
+  state: PlayerContextState,
+  autoAdvanceGapMs: number = 0,
+  isCurrent: () => boolean = () => true,
+  setGapUntil: (until: number | null) => void = () => {},
+  gapSkipRef: { current: (() => void) | null } = { current: null }
 ) {
+  const ctx = state.audioContext;
+  const gain = state.gainNode.gain;
+
+  // Stop a playing stream without a click.
+  const fadeOutAndAbort = async () => {
+    const t = ctx.currentTime;
+    gain.cancelScheduledValues(t);
+    gain.setValueAtTime(gain.value, t);
+    gain.linearRampToValueAtTime(0, t + 0.05);
+    await new Promise((r) => setTimeout(r, 100));
+    await state.player.abort();
+    const tr = ctx.currentTime;
+    gain.cancelScheduledValues(tr);
+    gain.setValueAtTime(state.masterGain, tr);
+  };
+
   const play = async (entry: PlayListEntry) => {
-    const ctx = state.audioContext;
-    const gain = state.gainNode.gain;
-    // Short fade-out before switching tracks: on a manual next/prev the
-    // outgoing waveform is cut mid-sample when the renderer buffer is replaced,
-    // which clicks. Ramp the master gain to 0 over ~10ms first, then restore it
-    // as the next track starts (its pre-roll silence covers the fade-in).
+    // A switch from a playing track fades it out and aborts it first, so the new
+    // track begins from real silence with the gain steady at full -- identical
+    // to a fresh start from stopped, and click-free. A fresh start (not playing)
+    // skips this: it already begins from silence at full gain.
     if (state.player.state === "playing") {
-      const t = ctx.currentTime;
-      gain.cancelScheduledValues(t);
-      gain.setValueAtTime(gain.value, t);
-      gain.linearRampToValueAtTime(0, t + 0.01);
-      await new Promise((r) => setTimeout(r, 15));
+      await fadeOutAndAbort();
+    }
+
+    // Auto-advance gap: we've already advanced to the next track (its title is
+    // shown), so drop the player to its head (abort -> 0:00) and wait before
+    // starting audio. The pause thus reads as "waiting at the head of the next
+    // track", not "stuck at the end of the previous one". Skipped for manual
+    // next/prev/select (gap is 0 there). If the user changes tracks during the
+    // wait, playStateChangeCount moves and isCurrent() aborts this start.
+    if (autoAdvanceGapMs > 0) {
+      await state.player.abort();
+      // Wait out the remainder of the deadline armed at track-end. The wait is
+      // skippable: gapSkipRef.current, exposed as context.skipGap(), resolves it
+      // early (e.g. when the user taps the seek bar) so playback starts at once.
+      const until = state.gapUntil ?? Date.now() + autoAdvanceGapMs;
+      const remaining = until - Date.now();
+      if (remaining > 0) {
+        await new Promise<void>((resolve) => {
+          const finish = () => {
+            clearTimeout(timer);
+            gapSkipRef.current = null;
+            resolve();
+          };
+          const timer = setTimeout(finish, remaining);
+          gapSkipRef.current = finish;
+        });
+      }
+      setGapUntil(null);
+      if (!isCurrent()) return;
     }
 
     const { channelMask } = state;
@@ -167,12 +224,12 @@ async function applyPlayStateChange(
       defaultDuration: state.defaultDuration,
     };
     await state.player.play(options);
-
-    const t2 = ctx.currentTime;
-    gain.cancelScheduledValues(t2);
-    gain.setValueAtTime(gain.value, t2);
-    gain.linearRampToValueAtTime(state.masterGain, t2 + 0.02);
   };
+
+  // A non-gap transition (manual next/prev/select/stop) cancels any pending gap
+  // countdown. The gap transition itself (autoAdvanceGapMs > 0) keeps the
+  // deadline that was armed at track-end. (No-op when already clear.)
+  if (autoAdvanceGapMs === 0) setGapUntil(null);
 
   if (state.playState == "playing") {
     if (state.currentEntry != null) {
@@ -195,6 +252,10 @@ async function applyPlayStateChange(
     return state.player.pause();
   }
   if (state.playState == "stopped" && state.player.state != "aborted") {
+    // Fade out first when actually playing; otherwise (paused) just abort.
+    if (state.player.state === "playing") {
+      return fadeOutAndAbort();
+    }
     return state.player.abort();
   }
 }
@@ -204,8 +265,32 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
   const oldState = usePrevious(state);
   const p = useContext(AppProgressContext);
 
+  // Latest-value mirrors read from the (once-registered) statechange listener,
+  // which would otherwise close over stale state.
+  const autoAdvanceGapRef = useRef(state.autoAdvanceGap);
+  autoAdvanceGapRef.current = state.autoAdvanceGap;
+  const playStateChangeCountRef = useRef(state.playStateChangeCount);
+  playStateChangeCountRef.current = state.playStateChangeCount;
+  // Set when a track ends and we auto-advance; makes the *next* play() insert
+  // the gap. Consumed (cleared) on the next applyPlayStateChange so manual
+  // transitions never inherit it.
+  const pendingAutoGapRef = useRef(0);
+  // Resolver for an in-progress gap wait; calling it ends the gap immediately.
+  const gapSkipRef = useRef<(() => void) | null>(null);
+  const skipGap = () => gapSkipRef.current?.();
+
   useEffect(() => {
-    applyPlayStateChange(oldState, state);
+    const gapMs = pendingAutoGapRef.current;
+    pendingAutoGapRef.current = 0;
+    const changeCount = state.playStateChangeCount;
+    applyPlayStateChange(
+      oldState,
+      state,
+      gapMs,
+      () => playStateChangeCountRef.current === changeCount,
+      (until) => setState((s) => (s.gapUntil === until ? s : { ...s, gapUntil: until })),
+      gapSkipRef
+    );
   }, [state.playStateChangeCount]);
 
   useEffect(() => {
@@ -227,6 +312,7 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
         repeatMode: DEFAULT_REPEAT_MODE,
         defaultLoopCount: DEFAULT_LOOP_COUNT,
         defaultDuration: DEFAULT_DURATION_MS,
+        autoAdvanceGap: DEFAULT_AUTO_ADVANCE_GAP_MS,
       }));
     window.addEventListener("m3disp:reset-layout", onReset);
     return () => window.removeEventListener("m3disp:reset-layout", onReset);
@@ -284,12 +370,20 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
   };
 
   const save = () => {
-    const { defaultLoopCount, defaultDuration, channelMask, repeatMode, masterGain, surroundMode } =
-      state;
+    const {
+      defaultLoopCount,
+      defaultDuration,
+      autoAdvanceGap,
+      channelMask,
+      repeatMode,
+      masterGain,
+      surroundMode,
+    } = state;
     const data = {
       version: 1,
       defaultLoopCount,
       defaultDuration,
+      autoAdvanceGap,
       channelMask,
       masterGain,
       repeatMode,
@@ -304,6 +398,7 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
     state.masterGain,
     state.defaultLoopCount,
     state.defaultDuration,
+    state.autoAdvanceGap,
     state.channelMask,
     state.repeatMode,
     state.surroundMode,
@@ -319,6 +414,16 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
 
   const onPlayerStateChange = (ev: CustomEvent<AudioPlayerState>) => {
     if (ev.detail == "stopped") {
+      // Advance to the next track immediately (so its title shows), but arm the
+      // auto-advance gap so the resulting play() waits at the new track's head
+      // before starting audio.
+      const gap = autoAdvanceGapRef.current ?? 0;
+      pendingAutoGapRef.current = gap;
+      // Set the gap deadline NOW (same render as the advance) so the seek bar is
+      // disabled for the whole gap. Until play() actually starts the new track,
+      // the player still holds the previous track, so a seek here would replay
+      // it — disabling from the first frame avoids that window.
+      if (gap > 0) setState((s) => ({ ...s, gapUntil: Date.now() + gap }));
       reducer.onPlayerStopped();
     }
   };
@@ -340,6 +445,7 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
       value={{
         ...state,
         reducer,
+        skipGap,
       }}
     >
       {props.children}

@@ -50,8 +50,10 @@ const KEYFRAME_SECONDS = 2;
  *  roll can show up to ~12s ahead at its widest range). */
 const SCAN_AHEAD_SECONDS = 13;
 /** Short ramp applied to the first samples of every (re)start so a track that
- *  opens on a non-zero sample doesn't click at the transition. */
-const FADE_IN_SEC = 0.006;
+ *  opens on a non-zero sample doesn't click at the transition. Kept as short as
+ *  short (~5ms) so it removes the DC step without audibly softening the
+ *  attack of the track's first note. */
+const FADE_IN_SEC = 0.005;
 
 type Keyframe = { frame: number; data: Uint8Array };
 

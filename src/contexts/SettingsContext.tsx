@@ -5,9 +5,11 @@ import { PlayerContext } from "./PlayerContext";
 export type SettingsContextState = {
   defaultLoopCount: number;
   defaultDuration: number;
+  autoAdvanceGap: number;
   channelMask: KSSChannelMask;
   setDefaultLoopCount: (value: number) => void;
   setDefaultDuration: (value: number) => void;
+  setAutoAdvanceGap: (value: number) => void;
   setChannelMask: (channelMask: KSSChannelMask) => void;
   commit: () => void;
   revert: () => void;
@@ -20,9 +22,11 @@ const noop = () => {
 const defaultContextState: SettingsContextState = {
   defaultLoopCount: 2,
   defaultDuration: 300 * 1000,
+  autoAdvanceGap: 0,
   channelMask: { psg: 0, scc: 0, opll: 0, opl: 0 },
   setDefaultLoopCount: noop,
   setDefaultDuration: noop,
+  setAutoAdvanceGap: noop,
   setChannelMask: noop,
   commit: noop,
   revert: noop,
@@ -45,6 +49,12 @@ export function SettingsContextProvider(props: PropsWithChildren) {
     });
   }
 
+  function setAutoAdvanceGap(value: number) {
+    setState((oldState) => {
+      return { ...oldState, autoAdvanceGap: value };
+    });
+  }
+
   function setChannelMask(channelMask: KSSChannelMask) {
     setState((oldState) => {
       return { ...oldState, channelMask };
@@ -54,6 +64,7 @@ export function SettingsContextProvider(props: PropsWithChildren) {
   function commit() {
     context.reducer.setDefaultLoopCount(state.defaultLoopCount);
     context.reducer.setDefaultDuration(state.defaultDuration);
+    context.reducer.setAutoAdvanceGap(state.autoAdvanceGap);
     context.reducer.setChannelMask(state.channelMask);
   }
 
@@ -62,6 +73,7 @@ export function SettingsContextProvider(props: PropsWithChildren) {
       ...oldState,
       defaultLoopCount: context.defaultLoopCount,
       defaultDuration: context.defaultDuration,
+      autoAdvanceGap: context.autoAdvanceGap,
       channelMask: { ...context.channelMask },
     }));
   }
@@ -70,6 +82,7 @@ export function SettingsContextProvider(props: PropsWithChildren) {
     ...defaultContextState,
     defaultLoopCount: context.defaultLoopCount,
     defaultDuration: context.defaultDuration,
+    autoAdvanceGap: context.autoAdvanceGap,
     channelMask: { ...context.channelMask },
   });
 
@@ -79,6 +92,7 @@ export function SettingsContextProvider(props: PropsWithChildren) {
         ...state,
         setDefaultLoopCount,
         setDefaultDuration,
+        setAutoAdvanceGap,
         setChannelMask,
         commit,
         revert,

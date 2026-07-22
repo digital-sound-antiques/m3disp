@@ -1,7 +1,7 @@
 {
   "name": "m3disp",
   "private": true,
-  "version": "2.0.0",
+  "version": "2.0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -17,7 +17,7 @@
     "@mui/icons-material": "^5.14.19",
     "@mui/material": "^5.14.20",
     "@types/sha1": "^1.1.5",
-    "libkss-js": "^3.0.0-dev.2",
+    "libkss-js": "^3.0.0-dev.3",
     "md5": "^2.3.0",
     "mgsc-js": "^2.0.0",
     "mgsrc-js": "^2.0.0",

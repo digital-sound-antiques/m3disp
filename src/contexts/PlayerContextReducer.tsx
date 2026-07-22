@@ -96,6 +96,12 @@ export class PlayerContextReducer {
     });
   }
 
+  setAutoAdvanceGap(value: number) {
+    this.setState((state) => {
+      return { ...state, autoAdvanceGap: value };
+    });
+  }
+
   setChannelMask(channelMask: KSSChannelMask) {
     this.setState((state) => {
       if (
