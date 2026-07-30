@@ -413,6 +413,9 @@ export function AppContextProvider(props: PropsWithChildren) {
     // Let the layout (channel/playlist collapse, widths, section order, view
     // tab) reset itself; those states live in <Layout> and the section store.
     window.dispatchEvent(new Event("m3disp:reset-layout"));
+    // Player-side settings (volume, surround, repeat, …) reset via a SEPARATE
+    // event so the standalone "Reset Window Layout" command doesn't drag them in.
+    window.dispatchEvent(new Event("m3disp:reset-player"));
   };
 
   const [state, setState] = useState(defaultContextData);

@@ -302,7 +302,9 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
   }, [state.surroundMode]);
 
   // "Reset all settings" (dispatched from AppContext) also restores the
-  // player-side settings: volume, surround, repeat, loop count, duration
+  // player-side settings: volume, surround, repeat, loop count, duration.
+  // Listens to the player-specific event, NOT m3disp:reset-layout, so the
+  // standalone "Reset Window Layout" command leaves volume et al. untouched.
   useEffect(() => {
     const onReset = () =>
       setState((s) => ({
@@ -314,8 +316,8 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
         defaultDuration: DEFAULT_DURATION_MS,
         autoAdvanceGap: DEFAULT_AUTO_ADVANCE_GAP_MS,
       }));
-    window.addEventListener("m3disp:reset-layout", onReset);
-    return () => window.removeEventListener("m3disp:reset-layout", onReset);
+    window.addEventListener("m3disp:reset-player", onReset);
+    return () => window.removeEventListener("m3disp:reset-player", onReset);
   }, []);
 
   const reducer = new PlayerContextReducer(setState);
