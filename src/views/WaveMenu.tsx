@@ -1,8 +1,8 @@
-import { GraphicEq, InvertColors } from "@mui/icons-material";
+import { GraphicEq, InvertColors, Layers } from "@mui/icons-material";
 import { useContext } from "react";
 import { AppContext } from "../contexts/AppContext";
 
-const waveWindowCycle = [128, 256, 512];
+const waveWindowCycle = [128, 256, 512, 1024];
 const nextWaveWindow = (n: number) =>
   waveWindowCycle[(waveWindowCycle.indexOf(n) + 1) % waveWindowCycle.length] ?? 512;
 
@@ -28,8 +28,19 @@ export function ColorizeItems() {
  *  the oscilloscope window size. */
 export function WaveMenu() {
   const ctx = useContext(AppContext);
+  const waterfall = ctx.waveStyle === "waterfall";
   return (
     <div className="menu-list">
+      <button
+        className="menu-item active"
+        onClick={() => ctx.setWaveStyle(waterfall ? "line" : "waterfall")}
+      >
+        <span className="menu-ico">
+          <Layers sx={{ fontSize: 18 }} />
+        </span>
+        <span className="menu-label">Type</span>
+        <span className="menu-state">{waterfall ? "Waterfall" : "Line"}</span>
+      </button>
       <button
         className="menu-item active"
         onClick={() => ctx.setWaveWindowSize(nextWaveWindow(ctx.waveWindowSize))}

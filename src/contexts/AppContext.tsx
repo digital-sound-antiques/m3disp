@@ -39,6 +39,9 @@ const defaultTheme = createTheme({
 export type KeyHighlightColorType = "primary" | "secondary";
 export type SeekSliderColorType = "primary" | "secondary";
 export type ScopeType = "wave" | "roll";
+// Scope WAVE render style: a single locked trace, or a receding "waterfall" of
+// the last N traces (depth history kept on the display side, in WaveCell).
+export type WaveStyle = "line" | "waterfall";
 export type PianoRollMode = "2d" | "3d";
 export type PianoRollColorModeMap = {
   opll: PianoRollColorMode;
@@ -84,6 +87,7 @@ type AppContextData = {
   keyHighlightColorType: KeyHighlightColorType;
   seekSliderColorType: SeekSliderColorType;
   scopeType: ScopeType;
+  waveStyle: WaveStyle;
   waveColorize: boolean;
   waveWindowSize: number;
   channelFontScaleLevel: number;
@@ -107,6 +111,7 @@ type AppContextData = {
   setKeyHighlightColorType: (id: KeyHighlightColorType) => void;
   setSeekSliderColorType: (id: SeekSliderColorType) => void;
   setScopeType: (v: ScopeType) => void;
+  setWaveStyle: (v: WaveStyle) => void;
   setWaveColorize: (v: boolean) => void;
   setWaveWindowSize: (value: number) => void;
   setChannelFontScaleLevel: (value: number) => void;
@@ -130,6 +135,7 @@ const defaultContextData: AppContextData = {
   keyHighlightColorType: "primary",
   seekSliderColorType: "primary",
   scopeType: "wave",
+  waveStyle: "line",
   waveColorize: false,
   waveWindowSize: 256,
   channelFontScaleLevel: 1,
@@ -153,6 +159,7 @@ const defaultContextData: AppContextData = {
   setKeyHighlightColorType: noop,
   setSeekSliderColorType: noop,
   setScopeType: noop,
+  setWaveStyle: noop,
   setWaveColorize: noop,
   setWaveWindowSize: noop,
   setChannelFontScaleLevel: noop,
@@ -174,6 +181,7 @@ const keySecondaryColor = "m3disp.palette.secondary.main";
 const keyKeyHighlightColorType = "m3disp.keyHighlightColorType";
 const keySeekSliderColorType = "m3disp.seekSliderColorType";
 const keyScopeType = "m3disp.scopeType";
+const keyWaveStyle = "m3disp.waveStyle";
 const keyWaveColorize = "m3disp.waveColorize";
 const keyWaveWindowSize = "m3disp.waveWindowSize";
 const keyChannelFontScaleLevel = "m3disp.channelFontScaleLevel";
@@ -263,6 +271,15 @@ export function AppContextProvider(props: PropsWithChildren) {
     });
     if (save) {
       localStorage.setItem(keyScopeType, v);
+    }
+  };
+
+  const setWaveStyle = (v: WaveStyle, save: boolean = true) => {
+    setState((oldState) => {
+      return { ...oldState, waveStyle: v };
+    });
+    if (save) {
+      localStorage.setItem(keyWaveStyle, v);
     }
   };
 
@@ -366,6 +383,7 @@ export function AppContextProvider(props: PropsWithChildren) {
     setKeyHighlightColorType("primary");
     setSeekSliderColorType("primary");
     setScopeType("wave");
+    setWaveStyle("line");
     setWaveColorize(false);
     setWaveWindowSize(256);
     setChannelFontScaleLevel(1);
@@ -410,12 +428,16 @@ export function AppContextProvider(props: PropsWithChildren) {
       false
     );
     {
+      const s = localStorage.getItem(keyWaveStyle);
+      setWaveStyle(s === "waterfall" || s === "line" ? s : state.waveStyle, false);
+    }
+    {
       const v = localStorage.getItem(keyWaveColorize);
       setWaveColorize(v == null ? state.waveColorize : v === "1", false);
     }
     {
       const s = parseInt(localStorage.getItem(keyWaveWindowSize) ?? "", 10);
-      setWaveWindowSize([128, 256, 512].includes(s) ? s : state.waveWindowSize, false);
+      setWaveWindowSize([128, 256, 512, 1024].includes(s) ? s : state.waveWindowSize, false);
     }
     {
       const s = localStorage.getItem(keyChannelFontScaleLevel);
@@ -499,6 +521,7 @@ export function AppContextProvider(props: PropsWithChildren) {
         setKeyHighlightColorType,
         setSeekSliderColorType,
         setScopeType,
+        setWaveStyle,
         setWaveColorize,
         setWaveWindowSize,
         setChannelFontScaleLevel,

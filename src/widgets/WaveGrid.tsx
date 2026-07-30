@@ -17,9 +17,117 @@ import {
 } from "../views/channel-section-order";
 import type { KSSDeviceName } from "../kss/kss-device";
 
-// samples shown per cell is user-selectable (waveWindowSize: 128/256/512); 2×
-// that many are read so a trigger point can be found before the shown window.
-const MAX_WINDOW = 512;
+// samples shown per cell is user-selectable (waveWindowSize: 128/256/512/1024);
+// 2× that many are read so a trigger point can be found before the shown window.
+const MAX_WINDOW = 1024;
+
+// Waterfall mode: how many past traces recede into the depth, and how many
+// points each is decimated to when drawn (the stacked look needs far less
+// per-sample fidelity than the locked line, so we cap it for perf).
+const WATERFALL_DEPTH = 12;
+const WATERFALL_DRAW_PTS = 128;
+// push a new trace every Nth frame (draw stays 60fps); higher = slower flow.
+// 3 → 20 traces/s, so DEPTH (12) traces span ~0.6s of history.
+const WATERFALL_STRIDE = 4;
+
+/**
+ * Draw a receding "waterfall" of the last WATERFALL_DEPTH trigger-aligned
+ * traces. History lives entirely on the display side (the `hist` ring + its
+ * refs) — the caller just hands in this frame's aligned, DC-removed window, so
+ * the effect is agnostic to where the samples came from.
+ *
+ * Depth cues: back→front the trace grows in width (perspective), amplitude and
+ * brightness. Hidden-line removal is painter's-algorithm: draw oldest (back,
+ * top) first; each slice fills down to the floor with the opaque page bg before
+ * stroking its crest, so nearer mountains occlude farther ones — a filled-body,
+ * bright-contour "等高線" look.
+ */
+function drawWaterfall(
+  ctx: CanvasRenderingContext2D,
+  cur: Float32Array,
+  WINDOW: number,
+  W: number,
+  H: number,
+  dpr: number,
+  colors: string[],
+  curColor: string,
+  bg: string,
+  hist: Float32Array,
+  countRef: { current: number },
+  windowRef: { current: number },
+  push: boolean
+) {
+  const D = WATERFALL_DEPTH;
+  // stored slices are fixed-length; a window-size change invalidates the ring
+  if (windowRef.current !== WINDOW) {
+    windowRef.current = WINDOW;
+    countRef.current = 0;
+    hist.fill(0);
+  }
+  // advance the history only every WATERFALL_STRIDE frames (slows the flow);
+  // in-between frames just redraw the existing ring. Each slice keeps the color
+  // it had when captured (colors ring), so a voice/channel change tints only new
+  // traces and rides back through the depth instead of recoloring the whole stack.
+  if (push) {
+    const slot = countRef.current % D;
+    hist.set(cur.subarray(0, WINDOW), slot * MAX_WINDOW);
+    colors[slot] = curColor;
+    countRef.current++;
+  }
+
+  const filled = Math.min(countRef.current, D);
+  const base = countRef.current - filled; // ring index of the oldest live slice
+  const PTS = Math.min(WINDOW, WATERFALL_DRAW_PTS);
+  const yFront = H * 0.66;
+  const rise = H * 0.33; // total vertical recede, back→front (smaller = gentler slope, more head-on)
+  const baseScale = H / 2 / 3000;
+
+  ctx.lineJoin = "round";
+  ctx.lineCap = "round";
+
+  for (let s = 0; s < filled; s++) {
+    const t = filled === 1 ? 1 : s / (filled - 1); // 0 = oldest/back, 1 = newest/front
+    const depth = 1 - t; // 0 = front, 1 = back
+    const slot = (base + s) % D;
+    const off = slot * MAX_WINDOW;
+    const yBase = yFront - depth * rise;
+    const halfW = 0.5 * W * (0.55 + 0.45 * t); // perspective: back is narrower
+    const x0 = W / 2 - halfW; // centered (straight vertical stack, no tilt)
+    const amp = baseScale * (0.5 + 0.65 * t); // taller overall, punchier at the front
+    const px = (k: number) => x0 + (k / (PTS - 1)) * (2 * halfW);
+    const py = (k: number) => {
+      const src = Math.round((k * (WINDOW - 1)) / (PTS - 1));
+      let y = yBase - hist[off + src] * amp;
+      if (y < 0) y = 0;
+      else if (y > H) y = H;
+      return y;
+    };
+
+    // opaque fill from the crest down to the floor → hides farther slices below
+    ctx.beginPath();
+    for (let k = 0; k < PTS; k++) k === 0 ? ctx.moveTo(px(k), py(k)) : ctx.lineTo(px(k), py(k));
+    ctx.lineTo(x0 + 2 * halfW, H);
+    ctx.lineTo(x0, H);
+    ctx.closePath();
+    ctx.globalAlpha = 1;
+    ctx.fillStyle = bg;
+    ctx.fill();
+
+    // bright contour crest, dimmer toward the back; each slice keeps its captured color
+    ctx.globalAlpha = 0.15 + 0.85 * t;
+    ctx.strokeStyle = colors[slot] || curColor;
+    ctx.lineWidth = Math.max(1 * dpr, H / 185) * (0.6 + 0.4 * t);
+    ctx.beginPath();
+    for (let k = 0; k < PTS; k++) k === 0 ? ctx.moveTo(px(k), py(k)) : ctx.lineTo(px(k), py(k));
+    if (s === filled - 1) {
+      ctx.shadowColor = colors[slot] || curColor;
+      ctx.shadowBlur = 6 * dpr;
+    }
+    ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+  ctx.globalAlpha = 1;
+}
 
 const flatIndex = (device: KSSDeviceName, index: number) =>
   channelIds.findIndex((c) => c.device === device && c.index === index);
@@ -40,6 +148,59 @@ const waveOffset = (device: KSSDeviceName, index: number) => {
   if (device === "psg") return base + (index % 3);
   return base + index;
 };
+
+// Phase lock by correlation: within the 2×WINDOW read buffer, pick the display
+// offset o ∈ [0, WINDOW] whose window best matches the previously displayed
+// (detrended) slice `prev`. Locking to the previous frame pins the phase, so
+// the same portion of the waveform is shown every frame — the thing that stops
+// the trace / waterfall ridges from batting around. DC-invariant (each
+// candidate's mean, from `prefix`, is removed before comparing).
+//
+// Coarse-to-fine to stay cheap across every grid cell at 60fps: scan the whole
+// range at a coarse step, then refine ±1 step around the winner. That's roughly
+// (WINDOW/step + 2·step) candidates instead of WINDOW/2, yet lands on the exact
+// sample (better than the old fixed 2-step). Comparison is decimated to CMP pts.
+function correlationOffset(
+  buf: Int32Array,
+  prefix: Float64Array,
+  WINDOW: number,
+  prev: Float32Array
+): number {
+  const CMP = Math.min(WINDOW, 64); // decimated comparison points
+  const cmpStep = WINDOW / CMP;
+  const sadAt = (o: number) => {
+    const dc = (prefix[o + WINDOW] - prefix[o]) / WINDOW;
+    let sad = 0;
+    for (let c = 0; c < CMP; c++) {
+      const j = (c * cmpStep) | 0;
+      const diff = buf[o + j] - dc - prev[j];
+      sad += diff < 0 ? -diff : diff;
+    }
+    return sad;
+  };
+  const step = Math.max(2, WINDOW >> 6); // ~16 @1024, 8 @512, 4 @256, 2 @128
+  let best = 0;
+  let bestSad = Infinity;
+  for (let o = 0; o <= WINDOW; o += step) {
+    const sad = sadAt(o);
+    if (sad < bestSad) {
+      bestSad = sad;
+      best = o;
+    }
+  }
+  // refine within one coarse step either side of the winner, sample by sample
+  const lo = Math.max(0, best - step + 1);
+  const hi = Math.min(WINDOW, best + step - 1);
+  for (let o = lo; o <= hi; o++) {
+    if (o === best) continue;
+    const sad = sadAt(o);
+    if (sad < bestSad) {
+      bestSad = sad;
+      best = o;
+    }
+  }
+  return best;
+}
 
 // One channel-cell: an oscilloscope of that channel's raw output at the play
 // head. Tap to mute (same bit mapping as the other views).
@@ -65,6 +226,21 @@ function WaveCell(props: {
   const [size, setSize] = useState({ w: 0, h: 0 });
   // sized for the largest window; only the first 2×WINDOW entries are used
   const bufRef = useRef(new Int32Array(MAX_WINDOW * 2));
+  // this frame's trigger-aligned, DC-removed window (scratch, reused each frame)
+  const curRef = useRef(new Float32Array(MAX_WINDOW));
+  // waterfall depth history (display-side): D slices × MAX_WINDOW, ring-keyed,
+  // plus a parallel ring of the color each slice was captured with
+  const histRef = useRef(new Float32Array(WATERFALL_DEPTH * MAX_WINDOW));
+  const histColorRef = useRef<string[]>(new Array(WATERFALL_DEPTH).fill(""));
+  const histCountRef = useRef(0);
+  const histWindowRef = useRef(0);
+  const histTickRef = useRef(0); // frame counter that gates the push cadence
+  // phase-lock state: prefix sums (per frame), the last displayed slice used as
+  // the correlation reference, and the window size it was captured at
+  const prefixRef = useRef(new Float64Array(MAX_WINDOW * 2 + 1));
+  const prevRef = useRef(new Float32Array(MAX_WINDOW));
+  const hasPrevRef = useRef(false);
+  const prevWindowRef = useRef(0);
 
   useEffect(() => {
     const ro = new ResizeObserver(() =>
@@ -98,9 +274,11 @@ function WaveCell(props: {
       ctx.clearRect(0, 0, W, H);
       const dpr = devicePixelRatio;
 
-      // center line
-      ctx.fillStyle = "rgba(255,255,255,0.08)";
-      ctx.fillRect(0, Math.round(H / 2), W, 1);
+      // center line (line mode only; a waterfall has no single baseline)
+      if (ac.waveStyle !== "waterfall") {
+        ctx.fillStyle = "rgba(255,255,255,0.08)";
+        ctx.fillRect(0, Math.round(H / 2), W, 1);
+      }
 
       // heard position (latency-corrected), like the piano roll
       const rate = pl.audioContext?.sampleRate ?? 44100;
@@ -143,51 +321,98 @@ function WaveCell(props: {
         }
       }
       if (ok) {
-        // trigger: align the display to a rising crossing of the window's mean
-        // (DC level) so a periodic waveform stays put ("locked") instead of
-        // scrolling. Using the mean (not 0) handles unipolar signals like the PSG.
-        let sum = 0;
-        for (let i = 0; i < total; i++) sum += buf[i];
-        const mean = sum / total;
+        // prefix sums of the read buffer → any candidate window's DC in O(1)
+        const prefix = prefixRef.current;
+        prefix[0] = 0;
+        for (let i = 0; i < total; i++) prefix[i + 1] = prefix[i] + buf[i];
+
+        // Phase lock by correlation to the previously displayed slice: pins the
+        // phase directly (so the same portion of the waveform shows every frame)
+        // and self-heals. On the first frame / after a window-size change there's
+        // nothing to match yet, so start at 0 and let the next frame lock on.
+        const WINDOW_N = WINDOW;
         let trig = 0;
-        for (let i = 1; i < WINDOW; i++) {
-          if (buf[i - 1] - mean <= 0 && buf[i] - mean > 0) {
-            trig = i;
-            break;
+        if (hasPrevRef.current && prevWindowRef.current === WINDOW_N) {
+          trig = correlationOffset(buf, prefix, WINDOW_N, prevRef.current);
+        }
+
+        // Detrend the displayed window: remove the least-squares line (mean AND
+        // slope), not just the mean. The raw per-channel ch_out isn't DC-blocked
+        // like the mixed output, so after a key-on it carries a slowly-decaying
+        // offset that reads as a baseline ramp growing with time from the trigger
+        // (and, since it's not amplitude-scaled, shoves quiet channels off-centre
+        // — "small amplitude drifts up"). Subtracting the fitted line flattens
+        // both. For a tone spanning whole periods the slope is ~0, so it's inert.
+        const mean = (prefix[trig + WINDOW_N] - prefix[trig]) / WINDOW_N;
+        const mid = (WINDOW_N - 1) / 2;
+        let sxy = 0;
+        for (let i = 0; i < WINDOW_N; i++) sxy += (i - mid) * (buf[trig + i] - mean);
+        const sxx = (WINDOW_N * (WINDOW_N * WINDOW_N - 1)) / 12; // Σ(i-mid)²
+        const slope = sxx > 0 ? sxy / sxx : 0;
+        const cur = curRef.current;
+        for (let i = 0; i < WINDOW_N; i++) cur[i] = buf[trig + i] - mean - slope * (i - mid);
+
+        // this detrended slice becomes next frame's correlation reference
+        prevRef.current.set(cur.subarray(0, WINDOW_N));
+        hasPrevRef.current = true;
+        prevWindowRef.current = WINDOW_N;
+
+        if (ac.waveStyle === "waterfall") {
+          const push = histTickRef.current % WATERFALL_STRIDE === 0;
+          histTickRef.current++;
+          drawWaterfall(
+            ctx, cur, WINDOW, W, H, dpr, histColorRef.current, color,
+            ac.theme.palette.background.default,
+            histRef.current, histCountRef, histWindowRef, push
+          );
+        } else {
+          histCountRef.current = 0; // drop stale history so re-entry starts fresh
+          // fixed vertical scale; raw ch_out is well under int16 full-scale
+          const scale = (H / 2) / 3000;
+          ctx.strokeStyle = color;
+          // line thickens with the cell size (H is in backing px, so this scales
+          // with the drawn height and stays dpr-correct)
+          ctx.lineWidth = Math.max(1.5 * dpr, H / 110);
+          ctx.lineJoin = "round";
+          ctx.lineCap = "round";
+          ctx.beginPath();
+          for (let i = 0; i < WINDOW; i++) {
+            const x = (i / (WINDOW - 1)) * W;
+            let y = H / 2 - cur[i] * scale;
+            if (y < 0) y = 0;
+            else if (y > H) y = H;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
           }
+          // glow pass, then a crisp core over the same path
+          ctx.shadowColor = color;
+          ctx.shadowBlur = 6 * dpr;
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+          ctx.stroke();
         }
-        // fixed vertical scale; raw ch_out is well under int16 full-scale
-        const scale = (H / 2) / 3000;
-        ctx.strokeStyle = color;
-        // line thickens with the cell size (H is in backing px, so this scales
-        // with the drawn height and stays dpr-correct)
-        ctx.lineWidth = Math.max(1.5 * dpr, H / 90);
-        ctx.lineJoin = "round";
-        ctx.lineCap = "round";
-        ctx.beginPath();
-        for (let i = 0; i < WINDOW; i++) {
-          const x = (i / (WINDOW - 1)) * W;
-          let y = H / 2 - (buf[trig + i] - mean) * scale;
-          if (y < 0) y = 0;
-          else if (y > H) y = H;
-          if (i === 0) ctx.moveTo(x, y);
-          else ctx.lineTo(x, y);
-        }
-        // glow pass, then a crisp core over the same path
-        ctx.shadowColor = color;
-        ctx.shadowBlur = 6 * dpr;
-        ctx.stroke();
-        ctx.shadowBlur = 0;
-        ctx.stroke();
       }
 
-      // label
+      // label: CH number, plus the current voice/instrument name for OPLL
+      // (Piano/Violin/… for melody, B.D./S.D. & H.H/… for rhythm), read from the
+      // heard snapshot like the roll's colors.
       const labelPx = Math.max(9 * dpr, Math.min(H * 0.16, 14 * dpr));
+      const pad = Math.round(labelPx * 0.4);
       ctx.font = `500 ${Math.round(labelPx * 0.82)}px Roboto, system-ui, sans-serif`;
       ctx.textBaseline = "top";
       ctx.textAlign = "left";
       ctx.fillStyle = "rgba(200,200,200,0.75)";
-      ctx.fillText(cell.label, Math.round(labelPx * 0.4), Math.round(labelPx * 0.4));
+      ctx.fillText(cell.label, pad, pad);
+      if (cell.device === "opll") {
+        const ntsc = Math.floor(Math.max(0, heard) / 735);
+        const snap = pl._snapshots[ntsc];
+        const voice = snap ? getStatusFromSnapshot(snap, channelIds[ch0])?.voice : null;
+        if (typeof voice === "string") {
+          const w = ctx.measureText(cell.label + "  ").width;
+          ctx.fillStyle = "rgba(200,200,200,0.5)";
+          ctx.fillText(voice, pad + w, pad);
+        }
+      }
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);

@@ -896,6 +896,17 @@ export function paintCellRoll(
   ctx.textAlign = "left";
   ctx.fillStyle = "rgba(200,200,200,0.75)";
   ctx.fillText(cell.label, labelPad, labelPad);
+  // OPLL: current voice/instrument name after the CH label (dimmer), same as the
+  // wave scope. Read at the heard NTSC frame so it tracks the roll's play head.
+  const ch0 = cell.channels[0];
+  if (active && channelIds[ch0]?.device === "opll") {
+    const voice = getStatusCached(playerContext.player, ch0, currentNtscFrame(playerContext))?.voice;
+    if (typeof voice === "string") {
+      const w = ctx.measureText(cell.label + "  ").width;
+      ctx.fillStyle = "rgba(200,200,200,0.5)";
+      ctx.fillText(voice, labelPad + w, labelPad);
+    }
+  }
 
   // (a fully-muted cell is dimmed via the canvas element's CSS opacity, not a
   // scrim — see PianoRollGrid)
