@@ -687,25 +687,16 @@ export function paintPianoRoll(
     }
   }
 
-  // Pass 2: draw playing segments on top, with a glow + particles
+  // Pass 2: draw playing segments on top (no blur) + particles
   for (const d of playingDraws) {
-    ctx.save();
-    // Outer halo: a wide, additive bloom around the note.
+    // Solid body so the note color stays true at its center.
+    ctx.fillStyle = d.color + "ff";
+    ctx.fillRect(d.x, d.y, d.w, d.h);
+    // Brightness lift the old glow used to give, but cheap: one additive pass
+    // over the body (no shadowBlur) pushes the note toward its bright core.
     ctx.globalCompositeOperation = "lighter";
-    ctx.shadowColor = d.color;
-    ctx.shadowBlur = 10 * devicePixelRatio;
-    ctx.fillStyle = d.color + "ff";
     ctx.fillRect(d.x, d.y, d.w, d.h);
-    // Second additive pass tightens the glow into a brighter core.
-    ctx.shadowBlur = 3 * devicePixelRatio;
-    ctx.fillRect(d.x, d.y, d.w, d.h);
-    ctx.restore();
-
-    // Solid body on top so the note color stays true at its center.
-    ctx.save();
-    ctx.fillStyle = d.color + "ff";
-    ctx.fillRect(d.x, d.y, d.w, d.h);
-    ctx.restore();
+    ctx.globalCompositeOperation = "source-over";
 
     if (particleType !== "off") {
       let count: number;
@@ -863,17 +854,14 @@ export function paintCellRoll(
         }
       }
     }
-    // playing segments on top, with a compact glow
+    // playing segments on top (no shadowBlur — the grid's heaviest op). A single
+    // additive pass restores the glow's brightness lift cheaply.
     for (const d of playingDraws) {
-      ctx.save();
+      ctx.fillStyle = d.color + "ff";
+      ctx.fillRect(d.x, d.y, d.w, d.h);
       ctx.globalCompositeOperation = "lighter";
-      ctx.shadowColor = d.color;
-      ctx.shadowBlur = 6 * dpr;
-      ctx.fillStyle = d.color + "ff";
       ctx.fillRect(d.x, d.y, d.w, d.h);
-      ctx.restore();
-      ctx.fillStyle = d.color + "ff";
-      ctx.fillRect(d.x, d.y, d.w, d.h);
+      ctx.globalCompositeOperation = "source-over";
     }
     // sounding pitch names, right-aligned in the top-right corner
     if (noteLabels.length > 0) {
