@@ -90,6 +90,7 @@ type AppContextData = {
   waveStyle: WaveStyle;
   waveColorize: boolean;
   waveWindowSize: number;
+  scopeFps: number; // 0 = auto (adaptive), else forced target fps (30/60)
   channelFontScaleLevel: number;
   playlistFontScaleLevel: number;
   pianoRollRangeInSec: number;
@@ -114,6 +115,7 @@ type AppContextData = {
   setWaveStyle: (v: WaveStyle) => void;
   setWaveColorize: (v: boolean) => void;
   setWaveWindowSize: (value: number) => void;
+  setScopeFps: (value: number) => void;
   setChannelFontScaleLevel: (value: number) => void;
   setPlaylistFontScaleLevel: (value: number) => void;
   setPianoRollRangeInSec: (value: number) => void;
@@ -138,6 +140,7 @@ const defaultContextData: AppContextData = {
   waveStyle: "line",
   waveColorize: false,
   waveWindowSize: 256,
+  scopeFps: 0,
   channelFontScaleLevel: 1,
   playlistFontScaleLevel: 2,
   pianoRollRangeInSec: 4.0,
@@ -162,6 +165,7 @@ const defaultContextData: AppContextData = {
   setWaveStyle: noop,
   setWaveColorize: noop,
   setWaveWindowSize: noop,
+  setScopeFps: noop,
   setChannelFontScaleLevel: noop,
   setPlaylistFontScaleLevel: noop,
   setPianoRollRangeInSec: noop,
@@ -184,6 +188,7 @@ const keyScopeType = "m3disp.scopeType";
 const keyWaveStyle = "m3disp.waveStyle";
 const keyWaveColorize = "m3disp.waveColorize";
 const keyWaveWindowSize = "m3disp.waveWindowSize";
+const keyScopeFps = "m3disp.scopeFps";
 const keyChannelFontScaleLevel = "m3disp.channelFontScaleLevel";
 const keyPlaylistFontScaleLevel = "m3disp.playlistFontScaleLevel";
 const keyPianoRollRangeInSec = "m3disp.pianoRoll.rangeInSec";
@@ -301,6 +306,15 @@ export function AppContextProvider(props: PropsWithChildren) {
     }
   };
 
+  const setScopeFps = (value: number, save: boolean = true) => {
+    setState((oldState) => {
+      return { ...oldState, scopeFps: value };
+    });
+    if (save) {
+      localStorage.setItem(keyScopeFps, String(value));
+    }
+  };
+
   const setChannelFontScaleLevel = (value: number, save: boolean = true) => {
     const level = Math.min(5, Math.max(1, Math.round(value)));
     setState((oldState) => {
@@ -386,6 +400,7 @@ export function AppContextProvider(props: PropsWithChildren) {
     setWaveStyle("line");
     setWaveColorize(false);
     setWaveWindowSize(256);
+    setScopeFps(0);
     setChannelFontScaleLevel(1);
     setPlaylistFontScaleLevel(2);
     setPianoRollRangeInSec(4.0);
@@ -438,6 +453,10 @@ export function AppContextProvider(props: PropsWithChildren) {
     {
       const s = parseInt(localStorage.getItem(keyWaveWindowSize) ?? "", 10);
       setWaveWindowSize([128, 256, 512, 1024].includes(s) ? s : state.waveWindowSize, false);
+    }
+    {
+      const s = parseInt(localStorage.getItem(keyScopeFps) ?? "", 10);
+      setScopeFps([0, 30, 60].includes(s) ? s : state.scopeFps, false);
     }
     {
       const s = localStorage.getItem(keyChannelFontScaleLevel);
@@ -524,6 +543,7 @@ export function AppContextProvider(props: PropsWithChildren) {
         setWaveStyle,
         setWaveColorize,
         setWaveWindowSize,
+        setScopeFps,
         setChannelFontScaleLevel,
         setPlaylistFontScaleLevel,
         setPianoRollRangeInSec,

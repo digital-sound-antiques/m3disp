@@ -1,10 +1,33 @@
-import { GraphicEq, InvertColors, Layers } from "@mui/icons-material";
+import { GraphicEq, InvertColors, Layers, Speed } from "@mui/icons-material";
 import { useContext } from "react";
 import { AppContext } from "../contexts/AppContext";
 
 const waveWindowCycle = [128, 256, 512, 1024];
 const nextWaveWindow = (n: number) =>
   waveWindowCycle[(waveWindowCycle.indexOf(n) + 1) % waveWindowCycle.length] ?? 512;
+
+// Scope render rate: Auto (adaptive; drops to 30/20fps only on slow machines)
+// or a pinned target. Shared by both scope tabs and the main roll.
+const scopeFpsCycle = [0, 60, 30];
+const nextScopeFps = (n: number) =>
+  scopeFpsCycle[(scopeFpsCycle.indexOf(n) + 1) % scopeFpsCycle.length] ?? 0;
+
+/** FPS control shared by the Scope menus: Auto / 60 / 30. */
+export function ScopeFpsItem() {
+  const ctx = useContext(AppContext);
+  return (
+    <button
+      className={`menu-item${ctx.scopeFps !== 0 ? " active" : ""}`}
+      onClick={() => ctx.setScopeFps(nextScopeFps(ctx.scopeFps))}
+    >
+      <span className="menu-ico">
+        <Speed sx={{ fontSize: 18 }} />
+      </span>
+      <span className="menu-label">FPS</span>
+      <span className="menu-state">{ctx.scopeFps === 0 ? "Auto" : ctx.scopeFps}</span>
+    </button>
+  );
+}
 
 /** Colorize toggle shared by both Scope modes: OFF = single primary color,
  *  ON = per-channel/voice colors. */
@@ -51,6 +74,7 @@ export function WaveMenu() {
         <span className="menu-label">Samples</span>
         <span className="menu-state">{ctx.waveWindowSize}</span>
       </button>
+      <ScopeFpsItem />
       <ColorizeItems />
     </div>
   );

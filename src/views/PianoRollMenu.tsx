@@ -3,7 +3,7 @@ import { ReactNode, useContext } from "react";
 import { AppContext, keyboardModeCycle, type PianoRollKeyboardMode } from "../contexts/AppContext";
 import { pianoRollColorDialogId } from "../widgets/PianoRollControl";
 import { particleTypeCycle, type PianoRollParticleType } from "../widgets/piano-roll-painter";
-import { ColorizeItems } from "./WaveMenu";
+import { ColorizeItems, ScopeFpsItem } from "./WaveMenu";
 
 const nextParticleType = (t: PianoRollParticleType) =>
   particleTypeCycle[(particleTypeCycle.indexOf(t) + 1) % particleTypeCycle.length];
@@ -68,6 +68,7 @@ export function PianoRollMenu(props: { grid?: boolean; colorize?: boolean }) {
           <span className="menu-state">{ctx.pianoRollKeyboard.toUpperCase()}</span>
         </button>
       )}
+      <ScopeFpsItem />
       {props.colorize ? (
         <ColorizeItems />
       ) : (

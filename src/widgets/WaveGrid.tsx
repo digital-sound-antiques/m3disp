@@ -8,6 +8,7 @@ import { channelIds, colorMap, defaultChannelColors, defaultVoiceColors, isChann
 import { getStatusFromSnapshot } from "../kss/channel-status";
 import { toggleSolo } from "../kss/channel-solo";
 import { DEVICE_CARDS } from "./KeyboardList";
+import { fpsToStride, rollFrameGov } from "./frame-governor";
 import {
   getCollapsedSections,
   getSectionOrder,
@@ -260,10 +261,15 @@ function WaveCell(props: {
 
   useEffect(() => {
     let raf = 0;
-    const frame = () => {
+    const frame = (t: number) => {
       raf = requestAnimationFrame(frame);
       const canvas = canvasRef.current;
       if (canvas == null) return;
+      // adaptive frame governor (shared with the roll grids); a non-auto FPS
+      // setting pins the stride
+      rollFrameGov.forcedStride = fpsToStride(appRef.current.scopeFps);
+      if (!rollFrameGov.frame(t)) return;
+      const t0 = performance.now();
       const p = playerRef.current;
       const pl = p.player;
       const ac = appRef.current;
@@ -413,6 +419,7 @@ function WaveCell(props: {
           ctx.fillText(voice, pad + w, pad);
         }
       }
+      rollFrameGov.addCost(performance.now() - t0);
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);

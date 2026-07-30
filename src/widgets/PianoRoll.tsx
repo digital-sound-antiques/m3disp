@@ -14,6 +14,7 @@ import {
   paintKeyboardEdgeLine,
   defaultVoiceColors,
 } from "./piano-roll-painter";
+import { fpsToStride, rollFrameGov } from "./frame-governor";
 
 // ---- Canvas utility components ----
 
@@ -122,28 +123,33 @@ function PianoRollCanvas(props: { width: number; height: number; resX?: number; 
 
   // rAF render loop
   useEffect(() => {
-    const renderFrame = () => {
+    const renderFrame = (t: number) => {
       const canvas = canvasRef.current;
-      if (canvas != null) {
-        requestAnimationFrame(renderFrame);
-        const ac = appContextRef.current;
-        paintPianoRoll(
-          canvas,
-          playerContextRef.current,
-          ac.pianoRollRangeInSec,
-          ac.pianoRollLayered,
-          ac.pianoRollParticleType,
-          {
-            mode: ac.pianoRollColorMode,
-            channelColors: ac.pianoRollChannelColors,
-            voiceColors: defaultVoiceColors,
-          },
-          ac.pianoRollMode,
-          shape3dRef.current
-        );
-      }
+      if (canvas == null) return; // unmounted → let the loop die
+      requestAnimationFrame(renderFrame);
+      const ac = appContextRef.current;
+      // adaptive frame governor (shared with the scope grids); a non-auto FPS
+      // setting pins the stride
+      rollFrameGov.forcedStride = fpsToStride(ac.scopeFps);
+      if (!rollFrameGov.frame(t)) return;
+      const t0 = performance.now();
+      paintPianoRoll(
+        canvas,
+        playerContextRef.current,
+        ac.pianoRollRangeInSec,
+        ac.pianoRollLayered,
+        ac.pianoRollParticleType,
+        {
+          mode: ac.pianoRollColorMode,
+          channelColors: ac.pianoRollChannelColors,
+          voiceColors: defaultVoiceColors,
+        },
+        ac.pianoRollMode,
+        shape3dRef.current
+      );
+      rollFrameGov.addCost(performance.now() - t0);
     };
-    renderFrame();
+    requestAnimationFrame(renderFrame);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

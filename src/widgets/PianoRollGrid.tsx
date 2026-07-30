@@ -12,6 +12,7 @@ import {
   paintCellRoll,
 } from "./piano-roll-painter";
 import { DEVICE_CARDS } from "./KeyboardList";
+import { fpsToStride, rollFrameGov } from "./frame-governor";
 import { toggleSolo } from "../kss/channel-solo";
 import {
   getCollapsedSections,
@@ -85,6 +86,11 @@ function GridCell(props: {
       raf = requestAnimationFrame(frame);
       const c = canvasRef.current;
       if (c == null) return;
+      // adaptive: on slow machines the governor skips frames (steady 30/20fps);
+      // a non-auto FPS setting pins the stride instead
+      rollFrameGov.forcedStride = fpsToStride(appRef.current.scopeFps);
+      if (!rollFrameGov.frame(t)) return;
+      const t0 = performance.now();
       const dt = lastRef.current ? Math.min((t - lastRef.current) / 1000, 1 / 20) : 0;
       lastRef.current = t;
       const ac = appRef.current;
@@ -111,6 +117,7 @@ function GridCell(props: {
         storeRef.current,
         dt
       );
+      rollFrameGov.addCost(performance.now() - t0);
     };
     raf = requestAnimationFrame(frame);
     return () => cancelAnimationFrame(raf);
