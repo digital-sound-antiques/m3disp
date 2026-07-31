@@ -1,27 +1,26 @@
 import { GraphicEq, InvertColors, Layers, Speed } from "@mui/icons-material";
 import { useContext } from "react";
-import { AppContext, type WaveStyle } from "../contexts/AppContext";
+import { AppContext } from "../contexts/AppContext";
 import { MenuSelect } from "./MenuSelect";
 import { MenuToggle } from "./MenuToggle";
 
-const waveStyleOptions: { value: WaveStyle; label: string }[] = [
-  { value: "line", label: "Line" },
-  { value: "waterfall", label: "Waterfall" },
-];
 const waveWindowOptions = [128, 256, 512, 1024].map((n) => ({ value: n, label: String(n) }));
 
-// Scope render rate: Auto (adaptive; drops to 30/20fps only on slow machines)
-// or a pinned absolute target. Shared by both scope tabs and the main roll.
-// 120 is honored on a 120Hz+ display (capped at the refresh rate otherwise).
+// Scope render rate: Auto (adaptive; 60fps at best, dropping to 30/20 only on
+// slow machines) or a pinned absolute target, capped at the display refresh rate.
+// Shared by both scope tabs and the main roll.
 const scopeFpsOptions = [
   { value: 0, label: "Auto" },
+  { value: 12, label: "12" },
   { value: 15, label: "15" },
+  { value: 20, label: "20" },
+  { value: 24, label: "24" },
   { value: 30, label: "30" },
+  { value: 48, label: "48" },
   { value: 60, label: "60" },
-  { value: 120, label: "120" },
 ];
 
-/** FPS control shared by the Scope menus: Auto / 30 / 60 / 120. */
+/** FPS control shared by the Scope menus: Auto / 12 / 15 / 20 / 24 / 30 / 48 / 60. */
 export function ScopeFpsItem() {
   const ctx = useContext(AppContext);
   return (
@@ -66,19 +65,19 @@ export function ColorizeItems() {
   );
 }
 
-/** Settings menu for the Scope tab in WAVE mode: Type, colorize options, and
- *  the oscilloscope window size. */
+/** Settings menu for the Scope tab in WAVE mode: Waterfall, colorize options,
+ *  and the oscilloscope window size. */
 export function WaveMenu() {
   const ctx = useContext(AppContext);
   return (
     <div className="menu-list">
-      <MenuSelect
+      {/* the only two styles are Line and Waterfall, so a switch reads better
+          than a pick-a-value list: OFF = Line, ON = Waterfall */}
+      <MenuToggle
         icon={<Layers sx={{ fontSize: 18 }} />}
-        label="Type"
-        value={ctx.waveStyle}
-        options={waveStyleOptions}
-        active={ctx.waveStyle === "waterfall"}
-        onChange={(v) => ctx.setWaveStyle(v)}
+        label="Waterfall"
+        on={ctx.waveStyle === "waterfall"}
+        onToggle={() => ctx.setWaveStyle(ctx.waveStyle === "waterfall" ? "line" : "waterfall")}
       />
       <WaveSamplesItem />
       <ScopeFpsItem />

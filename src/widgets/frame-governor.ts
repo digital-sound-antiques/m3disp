@@ -10,10 +10,10 @@
 // same frame get the cached answer.
 //
 // `forcedFps` overrides the adaptive target: 0 = auto, else an absolute target
-// (30 / 60 / 120). Auto measures the total paint cost and steps the target down
+// (12..60). Auto measures the total paint cost and steps the target down
 // (60 → 30 → 20) when the machine can't keep up, so slow machines get a steady
-// low fps instead of stutter while fast machines stay at 60. Auto caps at 60 —
-// rolls gain little from 120fps; pick it explicitly for a 120Hz panel.
+// low fps instead of stutter while fast machines stay at 60. Auto caps at 60 by
+// AUTO_FPS[0] — rolls gain nothing from a 120Hz panel's full rate.
 const AUTO_FPS = [60, 30, 20];
 
 export const rollFrameGov = {

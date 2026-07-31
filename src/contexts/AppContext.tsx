@@ -94,7 +94,7 @@ type AppContextData = {
   waveStyle: WaveStyle;
   waveColorize: boolean;
   waveWindowSize: number;
-  scopeFps: number; // 0 = auto (adaptive), else forced target fps (30/60)
+  scopeFps: number; // 0 = auto (adaptive, 60fps max), else forced target fps (12..60)
   keyboardScope: KeyboardScopeType; // per-keyboard side visualizer (none/wave/roll)
   channelFontScaleLevel: number;
   playlistFontScaleLevel: number;
@@ -480,7 +480,8 @@ export function AppContextProvider(props: PropsWithChildren) {
     }
     {
       const s = parseInt(localStorage.getItem(keyScopeFps) ?? "", 10);
-      setScopeFps([0, 15, 30, 60, 120].includes(s) ? s : state.scopeFps, false);
+      // a stored 120 (no longer offered) falls back to Auto
+      setScopeFps([0, 12, 15, 20, 24, 30, 48, 60].includes(s) ? s : state.scopeFps, false);
     }
     {
       const v = localStorage.getItem(keyKeyboardScope);
