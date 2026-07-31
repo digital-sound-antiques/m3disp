@@ -15,7 +15,7 @@ export type ChannelStatus = {
 
 function createPSGVoiceName(ton: boolean, non: boolean) {
   if (ton && non) {
-    return "Tone & Noise";
+    return "Tone Noise";
   } else if (ton) {
     return "Tone";
   } else if (non) {
@@ -33,26 +33,35 @@ function createPSGStatus(
   keyKeepFrames: ArrayLike<number>
 ): ChannelStatus {
   const ch = id.index;
+
+  const pch = ch % 3;
+  const ton = (regs[7] & (1 << pch)) == 0;
+  const non = (regs[7] & (8 << pch)) == 0;
+  const eon = (regs[8 + pch] & 0x10) != 0;
+  const ediv = ((regs[12] << 8) | regs[11]);
+  const eshape = regs[13] & 0xf;
+  const eloop = (eshape == 8 || eshape == 10 || eshape == 12 || eshape == 14);
+  const vol = Math.min(15, regs[8 + pch]);
+  const voice = createPSGVoiceName(ton, non);
+
   if (ch < 3) {
     const fdiv = ((regs[ch * 2 + 1] & 0xff) << 8) | regs[ch * 2];
-    const vol = Math.min(15, regs[8 + ch]);
     const A4 = 440.0;
-    const ton = (regs[7] & (1 << ch)) == 0;
-    const non = (regs[7] & (8 << ch)) == 0;
-    const voice = createPSGVoiceName(ton, non);
-    const freq = fdiv > 0 ? 3579545 / 2 / 16 / 2 / fdiv : 0;
+    const freq = fdiv > 0 ? 3579545 / 64 / fdiv : 0;
+
     if (ton && vol > 0 && freq != 0) {
       const kcode = 57 + Math.round(Math.log2(freq / A4) * 12);
       return { id, freq, kcode, vol, voice, keyKeepFrames: keyKeepFrames[ch] };
+    } else if ((!ton && !non) && eon && eloop) {
+      const div = (ediv == 0 ? 1 : ediv) * ((eshape == 10 || eshape == 14) ? 2 : 1);
+      const efreq = 3579545 / 1024 / div;
+      const kcode = 57 + Math.round(Math.log2(efreq / A4) * 12);
+      return { id, freq: efreq, kcode, vol, voice, keyKeepFrames: keyKeepFrames[ch] };
     } else {
       return { id, freq, vol, voice };
     }
   } else {
     const freq = 95 - regs[6];
-    const vol = Math.min(15, regs[8 + (ch - 3)]);
-    const ton = (regs[7] & (1 << (ch - 3))) == 0;
-    const non = (regs[7] & (8 << (ch - 3))) == 0;
-    const voice = createPSGVoiceName(ton, non);
     if (non && vol > 0) {
       return { id, freq, kcode: freq, vol, mode: "noise", voice, vnum: 8, keyKeepFrames: keyKeepFrames[ch] };
     } else {
@@ -257,10 +266,10 @@ export function getStatusFromSnapshot(
   if (snapshot == null) return null;
   try {
     switch (id.device) {
-      case "psg":  return snapshot.psg  ? createPSGStatus(snapshot.psg,  id, snapshot.psgKeyKeepFrames  ?? []) : null;
-      case "scc":  return snapshot.scc  ? createSCCStatus(snapshot.scc,  id, snapshot.sccKeyKeepFrames  ?? []) : null;
+      case "psg": return snapshot.psg ? createPSGStatus(snapshot.psg, id, snapshot.psgKeyKeepFrames ?? []) : null;
+      case "scc": return snapshot.scc ? createSCCStatus(snapshot.scc, id, snapshot.sccKeyKeepFrames ?? []) : null;
       case "opll": return snapshot.opll ? createOPLLStatus(snapshot.opll, id, snapshot.opllKeyKeepFrames ?? []) : null;
-      default:     return null;
+      default: return null;
     }
   } catch { return null; }
 }
@@ -273,10 +282,10 @@ export function getKcodeAt(
   if (snapshot == null) return null;
   try {
     switch (id.device) {
-      case "psg":  return snapshot.psg  ? createPSGStatus(snapshot.psg,  id, snapshot.psgKeyKeepFrames  ?? [])?.kcode ?? null : null;
-      case "scc":  return snapshot.scc  ? createSCCStatus(snapshot.scc,  id, snapshot.sccKeyKeepFrames  ?? [])?.kcode ?? null : null;
+      case "psg": return snapshot.psg ? createPSGStatus(snapshot.psg, id, snapshot.psgKeyKeepFrames ?? [])?.kcode ?? null : null;
+      case "scc": return snapshot.scc ? createSCCStatus(snapshot.scc, id, snapshot.sccKeyKeepFrames ?? [])?.kcode ?? null : null;
       case "opll": return snapshot.opll ? createOPLLStatus(snapshot.opll, id, snapshot.opllKeyKeepFrames ?? [])?.kcode ?? null : null;
-      default:     return null;
+      default: return null;
     }
   } catch { return null; }
 }
