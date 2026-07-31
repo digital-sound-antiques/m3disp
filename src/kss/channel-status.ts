@@ -13,15 +13,17 @@ export type ChannelStatus = {
   vnum?: number | null; // voice number
 };
 
-function createPSGVoiceName(ton: boolean, non: boolean) {
+function createPSGVoiceName(ton: boolean, non: boolean, env: number | null) {
   if (ton && non) {
     return "Tone Noise";
   } else if (ton) {
     return "Tone";
   } else if (non) {
     return "Noise";
+  } else if (env) {
+    return `Envelope`;
   } else {
-    return "Mute";
+    return "";
   }
 }
 
@@ -42,7 +44,7 @@ function createPSGStatus(
   const eshape = regs[13] & 0xf;
   const eloop = (eshape == 8 || eshape == 10 || eshape == 12 || eshape == 14);
   const vol = Math.min(15, regs[8 + pch]);
-  const voice = createPSGVoiceName(ton, non);
+  const voice = createPSGVoiceName(ton, non, (eon && eloop) ? eshape : null);
 
   if (ch < 3) {
     const fdiv = ((regs[ch * 2 + 1] & 0xff) << 8) | regs[ch * 2];
