@@ -10,6 +10,11 @@ import { toggleSolo } from "../kss/channel-solo";
 import { DEVICE_CARDS } from "./KeyboardList";
 import { rollFrameGov } from "./frame-governor";
 import {
+  areChannelsHidden,
+  getHiddenChannels,
+  subscribeChannelVisibility,
+} from "../views/channel-visibility";
+import {
   getCollapsedSections,
   getSectionOrder,
   setSectionOrder,
@@ -134,6 +139,12 @@ function drawWaterfall(
 
 const flatIndex = (device: KSSDeviceName, index: number) =>
   channelIds.findIndex((c) => c.device === device && c.index === index);
+
+// a category cell's flat channelIds indices; the cell is hidden when all are
+const cellChannels = (device: KSSDeviceName, t: number[] | number) =>
+  (typeof t === "number" ? [t] : t).map((e) => flatIndex(device, e));
+const isCardHidden = (device: KSSDeviceName, targets: Array<number[] | number>) =>
+  targets.every((t) => areChannelsHidden(cellChannels(device, t)));
 
 // OPLL rhythm channels are ordered differently in emu2413's ch_out (the per-ch
 // wave buffer) than in m3disp's channelIds convention. Map channelIds rhythm
@@ -482,6 +493,7 @@ export function WaveGrid() {
   const player = useContext(PlayerContext);
   const order = useSyncExternalStore(subscribeSectionOrder, getSectionOrder);
   const collapsed = useSyncExternalStore(subscribeSectionOrder, getCollapsedSections);
+  const hiddenSnapshot = useSyncExternalStore(subscribeChannelVisibility, getHiddenChannels);
 
   // enable capture only while mounted. Depend on the stable player instance (not
   // the context value, which changes on every volume/state update and would
@@ -492,16 +504,31 @@ export function WaveGrid() {
     return () => playerInst.setWaveEnabled(false);
   }, [playerInst]);
 
+  // categories with at least one visible cell; fully-hidden ones drop out
+  // (header + body). Filtering keeps the Draggable indices contiguous.
+  const visibleKeys = useMemo(
+    () =>
+      order.filter((key) => {
+        const card = DEVICE_CARDS[key];
+        return card != null && !isCardHidden(card.device, card.targets);
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [order, hiddenSnapshot]
+  );
+
+  // reorder by key (indices are into the filtered list, so map back through the
+  // full order and drop the moved key next to the destination category)
   const onDragEnd = (result: DropResult) => {
     const { source, destination } = result;
     if (!destination || destination.index === source.index) return;
+    const movedKey = visibleKeys[source.index];
+    const destKey = visibleKeys[destination.index];
     const next = [...getSectionOrder()];
-    const [moved] = next.splice(source.index, 1);
-    next.splice(destination.index, 0, moved);
+    next.splice(next.indexOf(movedKey), 1);
+    const at = next.indexOf(destKey);
+    next.splice(destination.index > source.index ? at + 1 : at, 0, movedKey);
     setSectionOrder(next);
   };
-
-  const sections = useMemo(() => order, [order]);
 
   return (
     <div className="pr-grid">
@@ -509,9 +536,8 @@ export function WaveGrid() {
         <Droppable droppableId="wave-sections">
           {(dp) => (
             <div className="pr-grid-list" ref={dp.innerRef} {...dp.droppableProps}>
-              {sections.map((key, index) => {
-                const card = DEVICE_CARDS[key];
-                if (card == null) return null;
+              {visibleKeys.map((key, index) => {
+                const card = DEVICE_CARDS[key]!;
                 const isCollapsed = collapsed.includes(key);
                 const rows = Math.ceil(card.targets.length / 3);
                 return (
@@ -543,11 +569,13 @@ export function WaveGrid() {
                           <div className="pr-grid-body">
                             {card.targets.map((t, i) => {
                               const targets = typeof t === "number" ? [t] : t;
+                              const channels = targets.map((e) => flatIndex(card.device, e));
+                              if (areChannelsHidden(channels)) return null; // hidden cell
                               return (
                                 <WaveCell
                                   key={i}
                                   label={`CH${i + 1}`}
-                                  channels={targets.map((e) => flatIndex(card.device, e))}
+                                  channels={channels}
                                   offsets={[...new Set(targets.map((e) => waveOffset(card.device, e)))]}
                                   device={card.device}
                                   targets={targets}

@@ -1,5 +1,10 @@
 import { useContext, useSyncExternalStore } from "react";
-import { ChevronRight, ExpandMore } from "@mui/icons-material";
+import {
+  ChevronRight,
+  ExpandMore,
+  VisibilityOffOutlined,
+  VisibilityOutlined,
+} from "@mui/icons-material";
 import { DragDropContext, Draggable, Droppable, DropResult } from "@hello-pangea/dnd";
 import { PlayerContext } from "../contexts/PlayerContext";
 import {
@@ -9,6 +14,13 @@ import {
   subscribeSectionOrder,
   toggleSectionCollapsed,
 } from "./channel-section-order";
+import {
+  areChannelsHidden,
+  getHiddenChannels,
+  isChannelHidden,
+  setChannelsHidden,
+  subscribeChannelVisibility,
+} from "./channel-visibility";
 import { KSSChannelMask } from "../kss/kss-device";
 import { ChannelId } from "../kss/channel-status";
 import { IconVolume, IconVolumeOff } from "../widgets/icons";
@@ -78,20 +90,32 @@ const maskEq = (a: KSSChannelMask, b: KSSChannelMask) =>
 const soloMask = (dev: Dev, bits: number): KSSChannelMask => ({ ...ALL, [dev]: ALL[dev] & ~bits });
 const bitsOf = (arr: number[]) => arr.reduce((m, b) => m | (1 << b), 0);
 
-/** A channel row: track name (e.g. "OPLL1") + mute/solo. */
+/** A channel row: track name (e.g. "OPLL1") + visibility (eye) + mute/solo. */
 function ChannelRow(props: {
   name: string;
   hi: number[];
   muted: boolean;
   soloed: boolean;
+  visible: boolean;
+  onToggleVisible: () => void;
   onMute: () => void;
   onSolo: () => void;
 }) {
   return (
-    <div className={`ch-row${props.muted ? " muted" : ""}`}>
+    <div className={`ch-row${props.muted ? " muted" : ""}${props.visible ? "" : " hidden"}`}>
       <div className="ch-voice">
         <span className="ch-voice-name">{props.name}</span>
       </div>
+      <button
+        className="ch-btn vis"
+        onClick={(e) => {
+          e.stopPropagation();
+          props.onToggleVisible();
+        }}
+        title={props.visible ? "Hide from Keyboard / Roll / Scope" : "Show in Keyboard / Roll / Scope"}
+      >
+        {props.visible ? <VisibilityOutlined /> : <VisibilityOffOutlined />}
+      </button>
       <button
         className={`ch-btn mute${props.muted ? " on" : ""}`}
         onClick={(e) => {
@@ -126,6 +150,8 @@ export function ChannelMaskPanel() {
   // (drag-to-reorder, collapse, persisted)
   const order = useSyncExternalStore(subscribeSectionOrder, getSectionOrder);
   const collapsed = useSyncExternalStore(subscribeSectionOrder, getCollapsedSections);
+  // re-render checkboxes when any channel's visibility changes
+  useSyncExternalStore(subscribeChannelVisibility, getHiddenChannels);
 
   const orderedSections = order
     .map((k) => SECTIONS.find((s) => s.key === k))
@@ -183,12 +209,16 @@ export function ChannelMaskPanel() {
                 const on = (dmask & s.bits) === s.bits;
                 const partial = !on && (dmask & s.bits) !== 0;
                 const isCollapsed = collapsed.includes(s.key);
+                // section-wide visibility: all its channels' flat indices
+                const secHi = s.rows.flatMap((r) => r.hi);
+                const secAllHidden = areChannelsHidden(secHi);
+                const secAnyHidden = secHi.some((i) => isChannelHidden(i));
                 return (
                   <Draggable key={s.key} draggableId={s.key} index={index}>
                     {(p) => (
                       <div className="ch-group" ref={p.innerRef} {...p.draggableProps}>
                         <div
-                          className="ch-sec"
+                          className={`ch-sec${secAllHidden ? " hidden" : ""}`}
                           onClick={() => toggleCollapse(s.key)}
                           title={isCollapsed ? "Expand" : "Collapse"}
                           {...p.dragHandleProps}
@@ -201,6 +231,16 @@ export function ChannelMaskPanel() {
                             )}
                           </button>
                           <span className="ch-sec-label">{s.label}</span>
+                          <button
+                            className={`ch-btn vis${secAnyHidden && !secAllHidden ? " partial" : ""}`}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setChannelsHidden(secHi, !secAnyHidden);
+                            }}
+                            title={secAnyHidden ? "Show all in views" : "Hide all from views"}
+                          >
+                            {secAllHidden ? <VisibilityOffOutlined /> : <VisibilityOutlined />}
+                          </button>
                           <button
                             className={`ch-btn mute${on ? " on" : partial ? " partial" : ""}`}
                             onClick={(e) => {
@@ -230,6 +270,7 @@ export function ChannelMaskPanel() {
                           s.rows.map((r) => {
                             const rowBits = bitsOf(r.maskBits);
                             const muted = (dmask & (1 << r.maskBits[0])) !== 0;
+                            const visible = !areChannelsHidden(r.hi);
                             return (
                               <ChannelRow
                                 key={r.label}
@@ -237,6 +278,8 @@ export function ChannelMaskPanel() {
                                 hi={r.hi}
                                 muted={muted}
                                 soloed={isSoloed(s.dev, rowBits)}
+                                visible={visible}
+                                onToggleVisible={() => setChannelsHidden(r.hi, visible)}
                                 onMute={() => toggleRow(s.dev, r.maskBits)}
                                 onSolo={() => solo(s.dev, rowBits)}
                               />

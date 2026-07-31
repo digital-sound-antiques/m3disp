@@ -3,6 +3,7 @@ import { teal } from "@mui/material/colors";
 import { PropsWithChildren, createContext, useEffect, useState } from "react";
 import AppGlobal from "./AppGlobal";
 import { defaultChannelColors, type PianoRollColorMode, type PianoRollParticleType } from "../widgets/piano-roll-painter";
+import { resetChannelVisibility } from "../views/channel-visibility";
 
 // Keyboard overlay on the roll: "on" full keyboard, "line" just the now-line,
 // "off" nothing. Cycled OFF → ON → LINE.
@@ -416,6 +417,8 @@ export function AppContextProvider(props: PropsWithChildren) {
     // Player-side settings (volume, surround, repeat, …) reset via a SEPARATE
     // event so the standalone "Reset Window Layout" command doesn't drag them in.
     window.dispatchEvent(new Event("m3disp:reset-player"));
+    // channel visibility: everything back to visible
+    resetChannelVisibility();
   };
 
   const [state, setState] = useState(defaultContextData);

@@ -1,4 +1,4 @@
-import { useContext, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { ChevronRight, ExpandMore } from "@mui/icons-material";
 import { DragDropContext, Draggable, Droppable, DropResult } from "@hello-pangea/dnd";
 import { PlayerContext } from "../contexts/PlayerContext";
@@ -21,6 +21,11 @@ import {
   subscribeSectionOrder,
   toggleSectionCollapsed,
 } from "../views/channel-section-order";
+import {
+  areChannelsHidden,
+  getHiddenChannels,
+  subscribeChannelVisibility,
+} from "../views/channel-visibility";
 import type { KSSDeviceName } from "../kss/kss-device";
 
 // A channelColors palette that is a single color for every channel (used when
@@ -38,6 +43,12 @@ function monoColors(color: string): string[] {
 // flat channelIds[] index for (device, device-local index)
 const flatIndex = (device: KSSDeviceName, index: number) =>
   channelIds.findIndex((c) => c.device === device && c.index === index);
+
+// a category is hidden when every one of its cells (all their channels) is hidden
+const isCardHidden = (device: KSSDeviceName, targets: Array<number[] | number>) =>
+  targets.every((t) =>
+    areChannelsHidden((typeof t === "number" ? [t] : t).map((e) => flatIndex(device, e)))
+  );
 
 // One channel-cell: its own canvas piano roll + tap-to-mute (same bit mapping as
 // the keyboard/channel views). Its own particle store & frame clock so many
@@ -169,13 +180,30 @@ function GridCell(props: {
 export function PianoRollGrid() {
   const order = useSyncExternalStore(subscribeSectionOrder, getSectionOrder);
   const collapsed = useSyncExternalStore(subscribeSectionOrder, getCollapsedSections);
+  const hiddenSnapshot = useSyncExternalStore(subscribeChannelVisibility, getHiddenChannels);
 
+  // categories with at least one visible cell (fully-hidden ones drop out,
+  // header + body); filtering keeps the Draggable indices contiguous
+  const visibleKeys = useMemo(
+    () =>
+      order.filter((key) => {
+        const card = DEVICE_CARDS[key];
+        return card != null && !isCardHidden(card.device, card.targets);
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [order, hiddenSnapshot]
+  );
+
+  // reorder by key (indices are into the filtered list)
   const onDragEnd = (result: DropResult) => {
     const { source, destination } = result;
     if (!destination || destination.index === source.index) return;
+    const movedKey = visibleKeys[source.index];
+    const destKey = visibleKeys[destination.index];
     const next = [...getSectionOrder()];
-    const [moved] = next.splice(source.index, 1);
-    next.splice(destination.index, 0, moved);
+    next.splice(next.indexOf(movedKey), 1);
+    const at = next.indexOf(destKey);
+    next.splice(destination.index > source.index ? at + 1 : at, 0, movedKey);
     setSectionOrder(next);
   };
 
@@ -185,9 +213,8 @@ export function PianoRollGrid() {
         <Droppable droppableId="grid-sections">
           {(dp) => (
             <div className="pr-grid-list" ref={dp.innerRef} {...dp.droppableProps}>
-              {order.map((key, index) => {
-                const card = DEVICE_CARDS[key];
-                if (card == null) return null;
+              {visibleKeys.map((key, index) => {
+                const card = DEVICE_CARDS[key]!;
                 const isCollapsed = collapsed.includes(key);
                 // section grows in proportion to its number of cell rows so all
                 // cells end up ~equal height and the whole grid fits (no scroll)
@@ -224,11 +251,13 @@ export function PianoRollGrid() {
                           <div className="pr-grid-body">
                             {card.targets.map((t, i) => {
                               const targets = typeof t === "number" ? [t] : t;
+                              const channels = targets.map((e) => flatIndex(card.device, e));
+                              if (areChannelsHidden(channels)) return null; // hidden cell
                               return (
                                 <GridCell
                                   key={i}
                                   label={`CH${i + 1}`}
-                                  channels={targets.map((e) => flatIndex(card.device, e))}
+                                  channels={channels}
                                   device={card.device}
                                   targets={targets}
                                   row={i}

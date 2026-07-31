@@ -1,4 +1,4 @@
-import { useContext, useSyncExternalStore } from "react";
+import { useContext, useMemo, useSyncExternalStore } from "react";
 import { useTheme } from "@mui/material/styles";
 import { ChevronRight, ExpandMore } from "@mui/icons-material";
 import { DragDropContext, Draggable, Droppable, DropResult } from "@hello-pangea/dnd";
@@ -16,6 +16,12 @@ import {
   subscribeSectionOrder,
   toggleSectionCollapsed,
 } from "../views/channel-section-order";
+import {
+  areChannelsHidden,
+  getHiddenChannels,
+  subscribeChannelVisibility,
+} from "../views/channel-visibility";
+import { channelIds } from "./piano-roll-painter";
 
 type DeviceCardProps = {
   name: string;
@@ -29,6 +35,15 @@ type DeviceCardProps = {
 // OPLL rhythm channels (index 9-13) use reversed mute bits (BD=13 … HH=9);
 // melody channels and other devices use the row index as the bit.
 const opllBit = (ch: number) => (ch < 9 ? ch : 22 - ch);
+
+// flat channelIds[] index for (device, device-local index), and per-cell/card
+// visibility (a card is hidden when every cell's channels are all hidden)
+const flatIndex = (device: KSSDeviceName, index: number) =>
+  channelIds.findIndex((c) => c.device === device && c.index === index);
+const cellChannels = (device: KSSDeviceName, t: number[] | number) =>
+  (typeof t === "number" ? [t] : t).map((e) => flatIndex(device, e));
+const isCardHidden = (device: KSSDeviceName, targets: Array<number[] | number>) =>
+  targets.every((t) => areChannelsHidden(cellChannels(device, t)));
 
 function DeviceCard(props: DeviceCardProps) {
   const theme = useTheme();
@@ -63,13 +78,15 @@ function DeviceCard(props: DeviceCardProps) {
   const cols2 = props.columns === 2;
   const res = [];
   for (let i = 0; i < props.targets.length; i++) {
-    const mask = (masks & (1 << i)) != 0;
-
     let target = props.targets[i];
     if (typeof target == "number") {
       target = [target];
     }
 
+    // hidden channel: drop the cell from the keyboard view
+    if (areChannelsHidden(target.map((e) => flatIndex(props.device, e)))) continue;
+
+    const mask = (masks & (1 << i)) != 0;
     const channels: ChannelId[] = target.map((e) => ({ device: props.device, index: e }));
 
     res.push(
@@ -168,13 +185,30 @@ export function KeyboardList(props: {
     props.aspect ?? (isSmall ? "640/22" : props.columns === 2 ? "640/36" : "640/24");
   const order = useSyncExternalStore(subscribeSectionOrder, getSectionOrder);
   const collapsed = useSyncExternalStore(subscribeSectionOrder, getCollapsedSections);
+  const hiddenSnapshot = useSyncExternalStore(subscribeChannelVisibility, getHiddenChannels);
 
+  // categories with at least one visible channel; filtering keeps the Draggable
+  // indices contiguous (a fully-hidden category drops out, header + all)
+  const visibleKeys = useMemo(
+    () =>
+      order.filter((key) => {
+        const c = DEVICE_CARDS[key];
+        return c != null && !isCardHidden(c.device, c.targets);
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [order, hiddenSnapshot]
+  );
+
+  // reorder by key (indices are into the filtered list)
   const onDragEnd = (result: DropResult) => {
     const { source, destination } = result;
     if (!destination || destination.index === source.index) return;
+    const movedKey = visibleKeys[source.index];
+    const destKey = visibleKeys[destination.index];
     const next = [...getSectionOrder()];
-    const [moved] = next.splice(source.index, 1);
-    next.splice(destination.index, 0, moved);
+    next.splice(next.indexOf(movedKey), 1);
+    const at = next.indexOf(destKey);
+    next.splice(destination.index > source.index ? at + 1 : at, 0, movedKey);
     setSectionOrder(next);
   };
 
@@ -188,9 +222,8 @@ export function KeyboardList(props: {
             {...dp.droppableProps}
             style={{ gap: "6px" }}
           >
-            {order.map((key, index) => {
-              const c = DEVICE_CARDS[key];
-              if (c == null) return null;
+            {visibleKeys.map((key, index) => {
+              const c = DEVICE_CARDS[key]!;
               const isCollapsed = collapsed.includes(key);
               return (
                 <Draggable key={key} draggableId={key} index={index}>

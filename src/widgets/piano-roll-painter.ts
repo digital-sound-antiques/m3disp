@@ -2,6 +2,7 @@ import * as Colors from "@mui/material/colors";
 import type { PlayerContextState } from "../contexts/PlayerContext";
 import { type ChannelId, type ChannelStatus, getStatusFromSnapshot } from "../kss/channel-status";
 import { pianoRollHighlight } from "./piano-roll-highlight";
+import { isChannelHidden } from "../views/channel-visibility";
 import type { KSSDecoderDeviceSnapshot } from "../kss/kss-decoder-worker";
 import type { KSSChannelMask, KSSDeviceName } from "../kss/kss-device";
 
@@ -609,6 +610,8 @@ export function paintPianoRoll(
   // Pass 1: build segments per channel, draw non-playing ones immediately
   const mask = playerContext.channelMask;
   for (let ch = 0; ch < channelIds.length; ch++) {
+    // channels hidden via the Channels list are dropped from the roll entirely
+    if (isChannelHidden(ch)) continue;
     const hilite = hiActive && hi!.has(ch);
     // Muted channels are hidden from the roll — unless the channel is spotlighted,
     // in which case its note frames are still drawn (no fill).

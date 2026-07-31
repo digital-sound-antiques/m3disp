@@ -711,7 +711,7 @@ textarea {
 .ch-sec:active {
   cursor: grabbing;
 }
-/* left-edge collapse chevron */
+/* collapse chevron (sits just after the device name) */
 .ch-collapse {
   flex: 0 0 auto;
   display: inline-flex;
@@ -751,14 +751,19 @@ textarea {
   gap: 4px;
   padding: calc(3px * var(--ch-font-scale, 1)) 8px calc(4px * var(--ch-font-scale, 1)) 4px;
 }
-/* keep the mute/solo buttons right-aligned in both rows and section headings */
-.ch-row .ch-btn.mute,
-.ch-sec .ch-btn.mute {
+/* right-align the button cluster (visibility · mute · solo) in rows & headings */
+.ch-row .ch-btn.vis,
+.ch-sec .ch-btn.vis {
   margin-left: auto;
 }
 /* dim the track name for muted channels */
 .ch-row.muted .ch-voice {
   opacity: 0.5;
+}
+/* a hidden channel/section (eye off): dim its name so the list shows it's off-view */
+.ch-row.hidden .ch-voice-name,
+.ch-sec.hidden .ch-sec-label {
+  opacity: 0.4;
 }
 /* voice name / waveform, fixed width, before the mute button */
 .ch-voice {
@@ -814,7 +819,13 @@ textarea {
   width: 15px;
   height: 15px;
 }
-.ch-btn.mute.partial {
+/* the visibility eye reads heavier than the volume glyph — nudge it smaller */
+.ch-btn.vis svg {
+  width: 14px;
+  height: 14px;
+}
+.ch-btn.mute.partial,
+.ch-btn.vis.partial {
   color: #656d78;
 }
 /* solo: a lettered box, lit blue when this channel/section is isolated or hovered */

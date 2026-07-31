@@ -15,6 +15,7 @@ import {
   defaultVoiceColors,
 } from "./piano-roll-painter";
 import { rollFrameGov } from "./frame-governor";
+import { isChannelHidden } from "../views/channel-visibility";
 
 // ---- Canvas utility components ----
 
@@ -76,8 +77,9 @@ function HighlightCanvas(props: {
       if (canvas != null) {
         requestAnimationFrame(renderFrame);
         const keys: number[] = [];
-        for (const id of channelIds) {
-          if (isChannelMuted(maskRef.current, id)) continue;
+        for (let ch = 0; ch < channelIds.length; ch++) {
+          const id = channelIds[ch];
+          if (isChannelHidden(ch) || isChannelMuted(maskRef.current, id)) continue;
           const status = player.getChannelStatus(id);
           if (status?.kcode != null) keys.push(status.kcode);
         }
