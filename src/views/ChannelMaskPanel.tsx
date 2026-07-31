@@ -192,12 +192,12 @@ export function ChannelMaskPanel() {
       <div className="ch-head">
         <span className="ch-title">Channels</span>
         <button
-          className="ch-reset"
+          className="ch-btn"
           onClick={reset}
           disabled={maskEq(mask, NONE)}
           title="Unmute all channels"
         >
-          RESET
+          <IconVolume />
         </button>
       </div>
       <DragDropContext onDragEnd={onSecDragEnd}>
@@ -237,7 +237,11 @@ export function ChannelMaskPanel() {
                               e.stopPropagation();
                               setChannelsHidden(secHi, !secAnyHidden);
                             }}
-                            title={secAnyHidden ? "Show all in views" : "Hide all from views"}
+                            title={
+                              secAnyHidden
+                                ? "Show in Keyboard / Roll / Scope"
+                                : "Hide from Keyboard / Roll / Scope"
+                            }
                           >
                             {secAllHidden ? <VisibilityOffOutlined /> : <VisibilityOutlined />}
                           </button>
