@@ -1,9 +1,17 @@
 import React, { useContext, useEffect, useRef, useState } from "react";
 import { AppContext, KeyHighlightColorType, SeekSliderColorType } from "../contexts/AppContext";
-import { PlayerContext } from "../contexts/PlayerContext";
+import {
+  CPU_SPEED_VALUES,
+  DEFAULT_CPU_SPEED,
+  PlayerContext,
+} from "../contexts/PlayerContext";
 import { SettingsContext, SettingsContextProvider } from "../contexts/SettingsContext";
 import { ColorBall, ColorSelector } from "../widgets/ColorSelector";
 import { NumberSelector } from "../widgets/NumberSelector";
+
+/** 0 = auto; otherwise a multiple of the MSX base clock (3.579545MHz). */
+const cpuSpeedLabel = (value: number) =>
+  value === 0 ? "Auto" : `${(3.579545 * value).toFixed(2)}MHz (${value}x)`;
 
 function PlayerPanel() {
   const context = useContext(SettingsContext);
@@ -28,6 +36,22 @@ function PlayerPanel() {
         value={context.autoAdvanceGap}
         valueLabelFn={(value) => `${(value / 1000).toFixed(0)} sec.`}
         onChange={context.setAutoAdvanceGap}
+      />
+    </div>
+  );
+}
+
+function EmulationPanel() {
+  const context = useContext(SettingsContext);
+  return (
+    <div className="crd-fields">
+      <NumberSelector
+        label="CPU Speed"
+        values={CPU_SPEED_VALUES}
+        value={context.cpuSpeed}
+        valueLabelFn={cpuSpeedLabel}
+        hint="Z80 clock of the emulated MSX. Auto uses 7.16MHz for FMPAC / MSX-AUDIO songs and 3.58MHz otherwise. Applied the next time a song starts."
+        onChange={context.setCpuSpeed}
       />
     </div>
   );
@@ -186,7 +210,7 @@ function OtherPanel(props: { onReset: () => void }) {
   );
 }
 
-const TABS = ["Player", "Theme", "Font", "Other"];
+const TABS = ["Player", "Emulation", "Theme", "Font", "Other"];
 
 function SettingsDialogBody(props: { id: string }) {
   const app = useContext(AppContext);
@@ -221,6 +245,7 @@ function SettingsDialogBody(props: { id: string }) {
     player.reducer.setDefaultLoopCount(2);
     player.reducer.setDefaultDuration(300 * 1000);
     player.reducer.setAutoAdvanceGap(0);
+    player.reducer.setCpuSpeed(DEFAULT_CPU_SPEED);
     app.closeDialog(props.id);
   };
 
@@ -245,12 +270,15 @@ function SettingsDialogBody(props: { id: string }) {
             <PlayerPanel />
           </div>
           <div className={`crd-panel${tab === 1 ? " active" : ""}`}>
-            <ThemePanel />
+            <EmulationPanel />
           </div>
           <div className={`crd-panel${tab === 2 ? " active" : ""}`}>
-            <FontPanel />
+            <ThemePanel />
           </div>
           <div className={`crd-panel${tab === 3 ? " active" : ""}`}>
+            <FontPanel />
+          </div>
+          <div className={`crd-panel${tab === 4 ? " active" : ""}`}>
             <OtherPanel onReset={onResetAll} />
           </div>
         </div>

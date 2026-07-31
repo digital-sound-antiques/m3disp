@@ -44,6 +44,9 @@ export interface PlayerContextState {
   defaultDuration: number;
   /** silence (ms) inserted before auto-advancing to the next track (0..5000) */
   autoAdvanceGap: number;
+  /** Z80 clock passed to KSSPLAY_reset as a multiple of 3.58MHz; 0 = auto
+   *  (libkss picks 7.16MHz for FMPAC/MSX-AUDIO songs, else 3.58MHz) */
+  cpuSpeed: number;
   channelMask: KSSChannelMask;
   unmute: () => Promise<void>;
 }
@@ -66,6 +69,10 @@ export const DEFAULT_LOOP_COUNT = 2;
 export const DEFAULT_DURATION_MS = 300 * 1000;
 export const DEFAULT_AUTO_ADVANCE_GAP_MS = 0;
 export const MAX_AUTO_ADVANCE_GAP_MS = 5 * 1000;
+/** Selectable Z80 clocks (multiples of MSX_CLK; 0 = auto). libkss accepts 1..8,
+ *  but anything past 4x is far outside what real hardware and drivers expect. */
+export const CPU_SPEED_VALUES = [0, 1, 2, 3, 4];
+export const DEFAULT_CPU_SPEED = 0;
 
 const createDefaultContextState = () => {
   const audioContext = new AudioContext({ sampleRate: 44100, latencyHint: "interactive" });
@@ -87,6 +94,7 @@ const createDefaultContextState = () => {
     defaultLoopCount: DEFAULT_LOOP_COUNT,
     defaultDuration: DEFAULT_DURATION_MS,
     autoAdvanceGap: DEFAULT_AUTO_ADVANCE_GAP_MS,
+    cpuSpeed: DEFAULT_CPU_SPEED,
     channelMask: {
       psg: 0,
       opl: 0,
@@ -126,6 +134,7 @@ const createDefaultContextState = () => {
       MAX_AUTO_ADVANCE_GAP_MS,
       Math.max(0, json.autoAdvanceGap ?? state.autoAdvanceGap)
     );
+    state.cpuSpeed = CPU_SPEED_VALUES.includes(json.cpuSpeed) ? json.cpuSpeed : state.cpuSpeed;
   } catch (e) {
     console.error(e);
     localStorage.clear();
@@ -222,6 +231,7 @@ async function applyPlayStateChange(
       fadeDuration,
       loop: state.defaultLoopCount,
       defaultDuration: state.defaultDuration,
+      cpu: state.cpuSpeed,
     };
     await state.player.play(options);
   };
@@ -315,6 +325,7 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
         defaultLoopCount: DEFAULT_LOOP_COUNT,
         defaultDuration: DEFAULT_DURATION_MS,
         autoAdvanceGap: DEFAULT_AUTO_ADVANCE_GAP_MS,
+        cpuSpeed: DEFAULT_CPU_SPEED,
       }));
     window.addEventListener("m3disp:reset-player", onReset);
     return () => window.removeEventListener("m3disp:reset-player", onReset);
@@ -376,6 +387,7 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
       defaultLoopCount,
       defaultDuration,
       autoAdvanceGap,
+      cpuSpeed,
       channelMask,
       repeatMode,
       masterGain,
@@ -386,6 +398,7 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
       defaultLoopCount,
       defaultDuration,
       autoAdvanceGap,
+      cpuSpeed,
       channelMask,
       masterGain,
       repeatMode,
@@ -401,6 +414,7 @@ export function PlayerContextProvider(props: React.PropsWithChildren) {
     state.defaultLoopCount,
     state.defaultDuration,
     state.autoAdvanceGap,
+    state.cpuSpeed,
     state.channelMask,
     state.repeatMode,
     state.surroundMode,

@@ -3,6 +3,8 @@ export function NumberSelector(props: {
   values: number[];
   value: number;
   valueLabelFn?: (value: number) => string;
+  /** optional explanation, rendered under the select and attached to this field */
+  hint?: string;
   onChange: (value: number) => void;
 }) {
   const { value, values, onChange } = props;
@@ -22,6 +24,7 @@ export function NumberSelector(props: {
           </option>
         ))}
       </select>
+      {props.hint != null && <div className="crd-hint">{props.hint}</div>}
     </div>
   );
 }

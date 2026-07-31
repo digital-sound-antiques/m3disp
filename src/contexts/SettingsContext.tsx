@@ -6,10 +6,12 @@ export type SettingsContextState = {
   defaultLoopCount: number;
   defaultDuration: number;
   autoAdvanceGap: number;
+  cpuSpeed: number;
   channelMask: KSSChannelMask;
   setDefaultLoopCount: (value: number) => void;
   setDefaultDuration: (value: number) => void;
   setAutoAdvanceGap: (value: number) => void;
+  setCpuSpeed: (value: number) => void;
   setChannelMask: (channelMask: KSSChannelMask) => void;
   commit: () => void;
   revert: () => void;
@@ -23,10 +25,12 @@ const defaultContextState: SettingsContextState = {
   defaultLoopCount: 2,
   defaultDuration: 300 * 1000,
   autoAdvanceGap: 0,
+  cpuSpeed: 0,
   channelMask: { psg: 0, scc: 0, opll: 0, opl: 0 },
   setDefaultLoopCount: noop,
   setDefaultDuration: noop,
   setAutoAdvanceGap: noop,
+  setCpuSpeed: noop,
   setChannelMask: noop,
   commit: noop,
   revert: noop,
@@ -55,6 +59,12 @@ export function SettingsContextProvider(props: PropsWithChildren) {
     });
   }
 
+  function setCpuSpeed(value: number) {
+    setState((oldState) => {
+      return { ...oldState, cpuSpeed: value };
+    });
+  }
+
   function setChannelMask(channelMask: KSSChannelMask) {
     setState((oldState) => {
       return { ...oldState, channelMask };
@@ -65,6 +75,7 @@ export function SettingsContextProvider(props: PropsWithChildren) {
     context.reducer.setDefaultLoopCount(state.defaultLoopCount);
     context.reducer.setDefaultDuration(state.defaultDuration);
     context.reducer.setAutoAdvanceGap(state.autoAdvanceGap);
+    context.reducer.setCpuSpeed(state.cpuSpeed);
     context.reducer.setChannelMask(state.channelMask);
   }
 
@@ -74,6 +85,7 @@ export function SettingsContextProvider(props: PropsWithChildren) {
       defaultLoopCount: context.defaultLoopCount,
       defaultDuration: context.defaultDuration,
       autoAdvanceGap: context.autoAdvanceGap,
+      cpuSpeed: context.cpuSpeed,
       channelMask: { ...context.channelMask },
     }));
   }
@@ -83,6 +95,7 @@ export function SettingsContextProvider(props: PropsWithChildren) {
     defaultLoopCount: context.defaultLoopCount,
     defaultDuration: context.defaultDuration,
     autoAdvanceGap: context.autoAdvanceGap,
+    cpuSpeed: context.cpuSpeed,
     channelMask: { ...context.channelMask },
   });
 
@@ -93,6 +106,7 @@ export function SettingsContextProvider(props: PropsWithChildren) {
         setDefaultLoopCount,
         setDefaultDuration,
         setAutoAdvanceGap,
+        setCpuSpeed,
         setChannelMask,
         commit,
         revert,

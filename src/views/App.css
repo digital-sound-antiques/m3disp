@@ -455,9 +455,17 @@ textarea {
   display: flex;
   gap: 4px;
   border-bottom: 1px solid #21262d;
+  /* five tabs don't fit a narrow (92vw) dialog: scroll the row rather than let
+     .fdlg's overflow:hidden clip the last tab. Scrollbar stays hidden. */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.crd-tabs::-webkit-scrollbar {
+  display: none;
 }
 .crd-tab {
-  padding: 4px 12px;
+  flex: 0 0 auto;
+  padding: 4px 9px;
   font-size: 13px;
   font-weight: 600;
   color: #8b949e;

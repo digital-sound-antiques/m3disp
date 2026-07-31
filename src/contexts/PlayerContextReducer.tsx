@@ -102,6 +102,15 @@ export class PlayerContextReducer {
     });
   }
 
+  /** The clock is applied by KSSPLAY_reset, so it can't change mid-stream. Unlike
+   *  setChannelMask this leaves playback alone: the value is picked up by the next
+   *  start (track change / replay). */
+  setCpuSpeed(value: number) {
+    this.setState((state) => {
+      return { ...state, cpuSpeed: value };
+    });
+  }
+
   setChannelMask(channelMask: KSSChannelMask) {
     this.setState((state) => {
       if (
