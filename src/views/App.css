@@ -1192,6 +1192,25 @@ textarea {
   /* lighter than the menu (panel-bg ≈ #303030) so it's actually visible */
   background: rgba(255, 255, 255, 0.15);
 }
+/* the caret at the end of an expandable (MenuSelect) row */
+.menu-caret {
+  display: inline-flex;
+  align-items: center;
+  color: #6e7681;
+}
+/* inline expanded sub-list of a MenuSelect: indented, grouped by a rule */
+.menu-sublist {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  margin: 1px 0 2px 21px;
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+  padding-left: 3px;
+}
+.menu-subitem {
+  height: 34px;
+  font-size: 13px;
+}
 .viz-tab {
   padding: 4px 12px;
   font-size: 12px;

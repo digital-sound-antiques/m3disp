@@ -4,11 +4,19 @@ import { AppContext, keyboardModeCycle, type PianoRollKeyboardMode } from "../co
 import { pianoRollColorDialogId } from "../widgets/PianoRollControl";
 import { particleTypeCycle, type PianoRollParticleType } from "../widgets/piano-roll-painter";
 import { ColorizeItems, ScopeFpsItem } from "./WaveMenu";
+import { MenuSelect } from "./MenuSelect";
 
-const nextParticleType = (t: PianoRollParticleType) =>
-  particleTypeCycle[(particleTypeCycle.indexOf(t) + 1) % particleTypeCycle.length];
 const nextKeyboardMode = (t: PianoRollKeyboardMode) =>
   keyboardModeCycle[(keyboardModeCycle.indexOf(t) + 1) % keyboardModeCycle.length];
+
+// Capitalised labels for the particle sub-list, in the cycle's order.
+const particleLabels: Record<PianoRollParticleType, string> = {
+  off: "Off",
+  spark: "Spark",
+  star: "Star",
+  heart: "Heart",
+};
+const particleOptions = particleTypeCycle.map((t) => ({ value: t, label: particleLabels[t] }));
 
 /** Labelled vertical menu of piano-roll settings (shown from the gear in the
  *  Piano Roll / Grid tab header). In grid mode only Zoom, Particles and Colors
@@ -46,16 +54,14 @@ export function PianoRollMenu(props: { grid?: boolean; colorize?: boolean }) {
         toggle(<Layers sx={{ fontSize: 18 }} />, "Layer", ctx.pianoRollLayered, () =>
           ctx.setPianoRollLayered(!ctx.pianoRollLayered)
         )}
-      <button
-        className={`menu-item${ctx.pianoRollParticleType !== "off" ? " active" : ""}`}
-        onClick={() => ctx.setPianoRollParticleType(nextParticleType(ctx.pianoRollParticleType))}
-      >
-        <span className="menu-ico">
-          <AutoAwesome sx={{ fontSize: 18 }} />
-        </span>
-        <span className="menu-label">Particles</span>
-        <span className="menu-state">{ctx.pianoRollParticleType.toUpperCase()}</span>
-      </button>
+      <MenuSelect
+        icon={<AutoAwesome sx={{ fontSize: 18 }} />}
+        label="Particles"
+        value={ctx.pianoRollParticleType}
+        options={particleOptions}
+        active={ctx.pianoRollParticleType !== "off"}
+        onChange={(v) => ctx.setPianoRollParticleType(v)}
+      />
       {!props.grid && (
         <button
           className={`menu-item${ctx.pianoRollKeyboard !== "off" ? " active" : ""}`}

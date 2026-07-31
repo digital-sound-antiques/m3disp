@@ -459,7 +459,7 @@ export function AppContextProvider(props: PropsWithChildren) {
     }
     {
       const s = parseInt(localStorage.getItem(keyScopeFps) ?? "", 10);
-      setScopeFps([0, 30, 60, 120].includes(s) ? s : state.scopeFps, false);
+      setScopeFps([0, 15, 30, 60, 120].includes(s) ? s : state.scopeFps, false);
     }
     {
       const s = localStorage.getItem(keyChannelFontScaleLevel);
