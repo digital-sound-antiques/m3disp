@@ -14,7 +14,7 @@ import {
   paintKeyboardEdgeLine,
   defaultVoiceColors,
 } from "./piano-roll-painter";
-import { fpsToStride, rollFrameGov } from "./frame-governor";
+import { rollFrameGov } from "./frame-governor";
 
 // ---- Canvas utility components ----
 
@@ -129,8 +129,8 @@ function PianoRollCanvas(props: { width: number; height: number; resX?: number; 
       requestAnimationFrame(renderFrame);
       const ac = appContextRef.current;
       // adaptive frame governor (shared with the scope grids); a non-auto FPS
-      // setting pins the stride
-      rollFrameGov.forcedStride = fpsToStride(ac.scopeFps);
+      // setting pins an absolute target
+      rollFrameGov.forcedFps = ac.scopeFps;
       if (!rollFrameGov.frame(t)) return;
       const t0 = performance.now();
       paintPianoRoll(

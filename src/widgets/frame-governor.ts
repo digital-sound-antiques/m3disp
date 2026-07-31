@@ -1,25 +1,30 @@
 // Adaptive frame governor, shared by every animated roll/scope canvas (the main
-// piano roll, the per-channel roll grid, and the wave grid). It measures the
-// total paint cost per animation frame and, when the machine can't hold 60fps,
-// renders every 2nd (or 3rd) frame instead of stuttering — a steady 30/20fps
-// beats erratic drops. Fast machines stay at stride 1 (full 60fps, full quality)
-// so capture quality is untouched.
+// piano roll, the per-channel roll grid, and the wave grid). It paces rendering
+// by WALL-CLOCK time, not by counting animation frames, so the effective fps is
+// the same whatever the display refresh rate (60 / 120 / 144Hz) — a stride-count
+// scheme would render 120fps on a 120Hz panel and turn "force 30fps" into 60fps.
 //
 // A single shared instance is correct: these views share one frame budget, and
-// when several animate at once their costs sum into one estimate and they skip
+// when several animate at once their costs sum into one estimate and they render
 // in lockstep. The decision is made once per rAF timestamp; later callers in the
-// same frame get the cached answer. Hysteresis on the stride avoids oscillation
-// (raising the stride lowers work but not the intrinsic per-render cost we key on).
+// same frame get the cached answer.
 //
-// `forcedStride` overrides the adaptive logic: 0 = auto, 1 = force 60fps (never
-// skip), 2 = force 30fps, 3 = force 20fps. Set it from the UI each frame.
+// `forcedFps` overrides the adaptive target: 0 = auto, else an absolute target
+// (30 / 60 / 120). Auto measures the total paint cost and steps the target down
+// (60 → 30 → 20) when the machine can't keep up, so slow machines get a steady
+// low fps instead of stutter while fast machines stay at 60. Auto caps at 60 —
+// rolls gain little from 120fps; pick it explicitly for a 120Hz panel.
+const AUTO_FPS = [60, 30, 20];
+
 export const rollFrameGov = {
-  ts: -1,
+  ts: -1, // last decided rAF timestamp (dedup within a frame)
+  prevTs: -1, // previous rAF timestamp (for the refresh-rate estimate)
+  lastRenderT: 0, // timestamp of the last frame we actually rendered
+  refreshMs: 1000 / 60, // EMA of the display's rAF interval
   costAccum: 0, // summed paint time (ms) of the views in the current frame
   emaCost: 0, // EMA of a full render's total cost
-  stride: 1, // adaptive stride: render every `stride`-th frame
-  forcedStride: 0, // 0 = auto; else pin the stride
-  tick: 0,
+  autoIdx: 0, // index into AUTO_FPS for adaptive mode
+  forcedFps: 0, // 0 = auto; else an absolute target fps
   render: true,
   prevRendered: false,
 
@@ -27,20 +32,35 @@ export const rollFrameGov = {
   // this view should paint this frame. Only the first caller per timestamp decides.
   frame(ts: number): boolean {
     if (ts === this.ts) return this.render;
-    // fold in the previous frame's cost — but only if it was a render frame (so
-    // skipped, near-zero-cost frames don't drag the estimate down) and only in
-    // auto mode (a pinned stride shouldn't chase the estimate)
-    if (this.ts >= 0 && this.prevRendered && !this.forcedStride) {
+
+    // estimate the display's refresh interval from consecutive rAF timestamps
+    // (ignore stalls / tab-switches outside a sane range)
+    if (this.prevTs >= 0) {
+      const rdt = ts - this.prevTs;
+      if (rdt > 3 && rdt < 40) this.refreshMs = this.refreshMs * 0.9 + rdt * 0.1;
+    }
+    this.prevTs = ts;
+
+    // fold the previous render's cost into the estimate and pick the auto tier
+    // (only after a render frame, so skipped near-zero-cost frames don't drag it
+    // down, and only in auto mode — a pinned target shouldn't chase the estimate)
+    if (this.ts >= 0 && this.prevRendered && !this.forcedFps) {
       this.emaCost = this.emaCost ? this.emaCost * 0.85 + this.costAccum * 0.15 : this.costAccum;
-      const b = 13; // ~ms budget share per render at 60fps
-      if (this.stride < 3 && this.emaCost > b * this.stride) this.stride++;
-      else if (this.stride > 1 && this.emaCost < b * (this.stride - 1) - 3) this.stride--;
+      const curBudget = 1000 / AUTO_FPS[this.autoIdx];
+      const fasterBudget = this.autoIdx > 0 ? 1000 / AUTO_FPS[this.autoIdx - 1] : 0;
+      if (this.autoIdx < AUTO_FPS.length - 1 && this.emaCost > curBudget * 0.9) this.autoIdx++;
+      else if (this.autoIdx > 0 && this.emaCost < fasterBudget * 0.8) this.autoIdx--;
     }
     this.ts = ts;
     this.costAccum = 0;
-    this.tick++;
-    const stride = this.forcedStride || this.stride;
-    this.render = this.tick % stride === 0;
+
+    const targetFps = this.forcedFps || AUTO_FPS[this.autoIdx];
+    const interval = 1000 / targetFps;
+    // render once the target interval has (nearly) elapsed. The half-refresh
+    // tolerance keeps vsync quantization from halving the rate — e.g. a 16.7ms
+    // (60fps) target must still fire every frame on a 60Hz panel despite jitter.
+    this.render = ts - this.lastRenderT >= interval - this.refreshMs * 0.5;
+    if (this.render) this.lastRenderT = ts;
     this.prevRendered = this.render;
     return this.render;
   },
@@ -49,11 +69,3 @@ export const rollFrameGov = {
     this.costAccum += ms;
   },
 };
-
-// Map a scope FPS setting (0 = auto, or a target fps) to a governor stride.
-export function fpsToStride(fps: number): number {
-  if (fps === 60) return 1;
-  if (fps === 30) return 2;
-  if (fps === 20) return 3;
-  return 0; // auto
-}

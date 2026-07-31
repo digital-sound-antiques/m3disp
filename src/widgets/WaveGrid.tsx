@@ -8,7 +8,7 @@ import { channelIds, colorMap, defaultChannelColors, defaultVoiceColors, isChann
 import { getStatusFromSnapshot } from "../kss/channel-status";
 import { toggleSolo } from "../kss/channel-solo";
 import { DEVICE_CARDS } from "./KeyboardList";
-import { fpsToStride, rollFrameGov } from "./frame-governor";
+import { rollFrameGov } from "./frame-governor";
 import {
   getCollapsedSections,
   getSectionOrder,
@@ -27,9 +27,11 @@ const MAX_WINDOW = 1024;
 // per-sample fidelity than the locked line, so we cap it for perf).
 const WATERFALL_DEPTH = 12;
 const WATERFALL_DRAW_PTS = 128;
-// push a new trace every Nth frame (draw stays 60fps); higher = slower flow.
-// 3 → 20 traces/s, so DEPTH (12) traces span ~0.6s of history.
-const WATERFALL_STRIDE = 4;
+// Trace cadence, expressed as a frame count at 60fps (higher = slower flow), but
+// applied as a wall-clock interval so the flow speed is the SAME at 30/60fps
+// (the FPS setting must not halve it). 4 → 15 traces/s → DEPTH (12) ≈ 0.8s.
+const WATERFALL_STRIDE = 3;
+const WATERFALL_PUSH_MS = (WATERFALL_STRIDE * 1000) / 60;
 
 /**
  * Draw a receding "waterfall" of the last WATERFALL_DEPTH trigger-aligned
@@ -65,10 +67,10 @@ function drawWaterfall(
     countRef.current = 0;
     hist.fill(0);
   }
-  // advance the history only every WATERFALL_STRIDE frames (slows the flow);
-  // in-between frames just redraw the existing ring. Each slice keeps the color
-  // it had when captured (colors ring), so a voice/channel change tints only new
-  // traces and rides back through the depth instead of recoloring the whole stack.
+  // advance the history only when the caller says a push is due (wall-clock
+  // cadence); in-between frames just redraw the existing ring. Each slice keeps
+  // the color it had when captured (colors ring), so a voice/channel change tints
+  // only new traces and rides back through the depth, not the whole stack.
   if (push) {
     const slot = countRef.current % D;
     hist.set(cur.subarray(0, WINDOW), slot * MAX_WINDOW);
@@ -80,7 +82,7 @@ function drawWaterfall(
   const base = countRef.current - filled; // ring index of the oldest live slice
   const PTS = Math.min(WINDOW, WATERFALL_DRAW_PTS);
   const yFront = H * 0.66;
-  const rise = H * 0.33; // total vertical recede, back→front (smaller = gentler slope, more head-on)
+  const rise = H * .5; // total vertical recede, back→front (smaller = gentler slope, more head-on)
   const baseScale = H / 2 / 3000;
 
   ctx.lineJoin = "round";
@@ -235,7 +237,10 @@ function WaveCell(props: {
   const histColorRef = useRef<string[]>(new Array(WATERFALL_DEPTH).fill(""));
   const histCountRef = useRef(0);
   const histWindowRef = useRef(0);
-  const histTickRef = useRef(0); // frame counter that gates the push cadence
+  // wall-clock push cadence (fps-independent): accumulate elapsed ms, push one
+  // trace per WATERFALL_PUSH_MS. lastT is the previous rendered-frame timestamp.
+  const histAccRef = useRef(0);
+  const histLastTRef = useRef(0);
   // phase-lock state: prefix sums (per frame), the last displayed slice used as
   // the correlation reference, and the window size it was captured at
   const prefixRef = useRef(new Float64Array(MAX_WINDOW * 2 + 1));
@@ -266,8 +271,8 @@ function WaveCell(props: {
       const canvas = canvasRef.current;
       if (canvas == null) return;
       // adaptive frame governor (shared with the roll grids); a non-auto FPS
-      // setting pins the stride
-      rollFrameGov.forcedStride = fpsToStride(appRef.current.scopeFps);
+      // setting pins an absolute target
+      rollFrameGov.forcedFps = appRef.current.scopeFps;
       if (!rollFrameGov.frame(t)) return;
       const t0 = performance.now();
       const p = playerRef.current;
@@ -364,8 +369,18 @@ function WaveCell(props: {
         prevWindowRef.current = WINDOW_N;
 
         if (ac.waveStyle === "waterfall") {
-          const push = histTickRef.current % WATERFALL_STRIDE === 0;
-          histTickRef.current++;
+          // wall-clock push cadence: seed a push on the first frame, then one
+          // trace per WATERFALL_PUSH_MS regardless of render fps (so 30fps flows
+          // at the same speed as 60fps). Clamp dt so a stall/tab-switch can't
+          // dump a burst of identical traces.
+          const dt = histLastTRef.current ? Math.min(t - histLastTRef.current, 100) : WATERFALL_PUSH_MS;
+          histLastTRef.current = t;
+          histAccRef.current += dt;
+          let push = false;
+          if (histAccRef.current >= WATERFALL_PUSH_MS) {
+            push = true;
+            histAccRef.current = Math.min(histAccRef.current - WATERFALL_PUSH_MS, WATERFALL_PUSH_MS);
+          }
           drawWaterfall(
             ctx, cur, WINDOW, W, H, dpr, histColorRef.current, color,
             ac.theme.palette.background.default,
@@ -373,6 +388,8 @@ function WaveCell(props: {
           );
         } else {
           histCountRef.current = 0; // drop stale history so re-entry starts fresh
+          histLastTRef.current = 0; // reset cadence so re-entry to waterfall seeds
+          histAccRef.current = 0;
           // fixed vertical scale; raw ch_out is well under int16 full-scale
           const scale = (H / 2) / 3000;
           ctx.strokeStyle = color;
