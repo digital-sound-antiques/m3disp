@@ -1953,7 +1953,8 @@ textarea {
     flex: 1 1 0;
     height: auto;
     min-height: 0;
-    gap: 8px;
+    /* space between the transport buttons and the playlist below */
+    gap: 4px;
   }
   .app-title {
     font-size: 16px;
@@ -1968,7 +1969,8 @@ textarea {
   }
   .main {
     flex: 1 1 auto;
-    gap: 6px;
+    /* seek bar sits flush against the visualizer (no gap) on phones */
+    gap: 0;
     overflow: visible;
     min-height: 0;
   }
@@ -1981,15 +1983,48 @@ textarea {
     aspect-ratio: auto;
     min-height: 0;
   }
+  /* Keyboard / Roll / Scope views: trim the desktop breathing room around the
+     content so the short phone viewport isn't wasted */
+  .viz-keyboard,
+  .pianoroll-wrap,
+  .pr-grid {
+    padding-bottom: 4px;
+  }
+  /* the roll also has 16px above it on desktop */
+  .pianoroll-wrap {
+    padding-top: 4px;
+  }
   /* only the title lived in the transport row; hide it on phones */
   .transport-row {
     display: none;
   }
   .transport {
-    padding: 4px 8px 0;
+    /* no padding/gap: the seek bar hugs the visualizer and buttons with no margin */
+    padding: 0;
+    gap: 0;
+  }
+  /* seek bar: flush to the visualizer, full-bleed left/right (break the app's 8px
+     side padding like the viz), no thumb, no time labels */
+  .transport-seek {
+    margin: 0 -8px;
+    gap: 0;
+  }
+  .seek-time {
+    display: none;
+  }
+  /* full-bleed bar: square track corners, no thumb */
+  .seek {
+    border-radius: 0;
+  }
+  .seek::-webkit-slider-thumb,
+  .seek:hover::-webkit-slider-thumb {
+    background: transparent;
+  }
+  .seek::-moz-range-thumb {
+    background: transparent;
   }
   /* transport buttons move below the seek bar (out of the piano-roll overlay),
-     spread evenly across the width */
+     spread evenly across the width, one size smaller to save height */
   .transport-buttons-bar {
     display: flex;
   }
@@ -1997,6 +2032,13 @@ textarea {
     flex: 1 1 auto;
     gap: 0;
     justify-content: space-evenly;
+  }
+  .transport-buttons-bar .tbtn {
+    width: 32px;
+    height: 32px;
+  }
+  .transport-buttons-bar .tbtn svg {
+    font-size: 20px;
   }
   /* phones: transport lives in the seek row, and version/latency are dropped;
      the bottom bar keeps only the title and volume/options, at natural height
