@@ -1189,7 +1189,8 @@ textarea {
   width: 26px;
   height: 15px;
   border-radius: 8px;
-  background: #30363d;
+  /* darker than the menu bg (panel-bg ≈ #303030) so the off track is visible */
+  background: #14171b;
   transition: background 0.15s ease;
 }
 .menu-switch.on {

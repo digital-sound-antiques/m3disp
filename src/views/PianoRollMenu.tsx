@@ -7,9 +7,6 @@ import { ColorizeItems, ScopeFpsItem } from "./WaveMenu";
 import { MenuSelect } from "./MenuSelect";
 import { MenuToggle } from "./MenuToggle";
 
-const nextKeyboardMode = (t: PianoRollKeyboardMode) =>
-  keyboardModeCycle[(keyboardModeCycle.indexOf(t) + 1) % keyboardModeCycle.length];
-
 // Capitalised labels for the particle sub-list, in the cycle's order.
 const particleLabels: Record<PianoRollParticleType, string> = {
   off: "Off",
@@ -18,6 +15,13 @@ const particleLabels: Record<PianoRollParticleType, string> = {
   heart: "Heart",
 };
 const particleOptions = particleTypeCycle.map((t) => ({ value: t, label: particleLabels[t] }));
+
+const keyboardLabels: Record<PianoRollKeyboardMode, string> = {
+  off: "Off",
+  on: "On",
+  line: "Line",
+};
+const keyboardOptions = keyboardModeCycle.map((t) => ({ value: t, label: keyboardLabels[t] }));
 
 /** Labelled vertical menu of piano-roll settings (shown from the gear in the
  *  Piano Roll / Grid tab header). In grid mode only Zoom, Particles and Colors
@@ -60,16 +64,14 @@ export function PianoRollMenu(props: { grid?: boolean; colorize?: boolean }) {
         onChange={(v) => ctx.setPianoRollParticleType(v)}
       />
       {!props.grid && (
-        <button
-          className={`menu-item${ctx.pianoRollKeyboard !== "off" ? " active" : ""}`}
-          onClick={() => ctx.setPianoRollKeyboard(nextKeyboardMode(ctx.pianoRollKeyboard))}
-        >
-          <span className="menu-ico">
-            <Piano sx={{ fontSize: 18 }} />
-          </span>
-          <span className="menu-label">Keyboard</span>
-          <span className="menu-state">{ctx.pianoRollKeyboard.toUpperCase()}</span>
-        </button>
+        <MenuSelect
+          icon={<Piano sx={{ fontSize: 18 }} />}
+          label="Keyboard"
+          value={ctx.pianoRollKeyboard}
+          options={keyboardOptions}
+          active={ctx.pianoRollKeyboard !== "off"}
+          onChange={(v) => ctx.setPianoRollKeyboard(v)}
+        />
       )}
       <ScopeFpsItem />
       {props.colorize ? (

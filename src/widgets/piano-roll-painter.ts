@@ -440,16 +440,65 @@ function noteGeom(canvas: HTMLCanvasElement, kcode: number) {
   return noteGeomIn(canvas.height, kcode);
 }
 
-export function paintWhiteKeyboard(canvas: HTMLCanvasElement) {
+// The roll keyboard is a side view; the key's front (play head) is the rounded
+// "tip". In 2D (horizontal scroll) the front is the RIGHT end; in 3D the surface
+// is flipped over, so the front — and the rounding — moves to the LEFT.
+function keyPath(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number,
+  flip: boolean
+) {
+  r = Math.max(0, Math.min(r, w / 2, h / 2));
+  ctx.beginPath();
+  if (flip) {
+    // rounded left end
+    ctx.moveTo(x + w, y);
+    ctx.lineTo(x + r, y);
+    ctx.arcTo(x, y, x, y + r, r);
+    ctx.lineTo(x, y + h - r);
+    ctx.arcTo(x, y + h, x + r, y + h, r);
+    ctx.lineTo(x + w, y + h);
+  } else {
+    // rounded right end
+    ctx.moveTo(x, y);
+    ctx.lineTo(x + w - r, y);
+    ctx.arcTo(x + w, y, x + w, y + r, r);
+    ctx.lineTo(x + w, y + h - r);
+    ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+    ctx.lineTo(x, y + h);
+  }
+  ctx.closePath();
+}
+
+export function paintWhiteKeyboard(canvas: HTMLCanvasElement, flip: boolean) {
   const ctx = canvas.getContext("2d")!;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const { kw, dx } = kbGeom(canvas);
   const slot = canvas.height / N_WHITE;
   const gap = Math.max(1, Math.round(slot * 0.12));
   const kh = Math.max(1, Math.ceil(slot) - gap);
-  ctx.fillStyle = "#f0f0f060";
+  // lengthen the white keys a touch, extending the front (play-head/rounded) end:
+  // right in 2D, left in 3D (the flipped surface swaps which side that is)
+  const ext = Math.round(kw * 0.1);
+  const kx = flip ? dx - ext : dx;
+  const klen = kw + ext;
+  const r = Math.max(1, Math.min(klen * 0.06, kh * 0.15));
+  // shading along the key: shadow at the back, sheen toward the play-head front
+  const shade = ctx.createLinearGradient(flip ? kx + klen : kx, 0, flip ? kx : kx + klen, 0);
+  shade.addColorStop(0, "rgba(0,0,0,0.14)");
+  shade.addColorStop(0.22, "rgba(0,0,0,0)");
+  shade.addColorStop(1, "rgba(255,255,255,0.07)");
   for (let i = 0; i < N_WHITE; i++) {
-    ctx.fillRect(dx, canvas.height * (1.0 - (i + 1) / N_WHITE), kw, kh);
+    const y = canvas.height * (1.0 - (i + 1) / N_WHITE);
+    keyPath(ctx, kx, y, klen, kh, r, flip);
+    ctx.fillStyle = "#f0f0f060";
+    ctx.fill();
+    ctx.fillStyle = shade;
+    ctx.fill();
   }
 }
 
@@ -460,25 +509,37 @@ export function paintBlackKeyboard(canvas: HTMLCanvasElement, flip: boolean) {
   const dx = g.dx + (flip ? g.flip : 0);
   const slot = canvas.height / N_WHITE;
   const bkh = Math.max(1, Math.round(slot * 0.6));
-  ctx.fillStyle = "#121212";
+  const r = Math.max(1, Math.min(g.bw * 0.12, bkh * 0.25));
+  // glossy at the play-head front → black at the back tip
+  const body = ctx.createLinearGradient(flip ? dx + g.bw : dx, 0, flip ? dx : dx + g.bw, 0);
+  body.addColorStop(0, "#000000");
+  body.addColorStop(0.5, "#161616");
+  body.addColorStop(1, "#333333");
   // A black key sits centered on the boundary above each white key, except after
   // E (i%7===2) and B (i%7===6) where two white keys are adjacent.
   for (let i = 0; i < N_WHITE; i++) {
     if (i % 7 === 2 || i % 7 === 6) continue;
     const boundary = canvas.height * (1.0 - (i + 1) / N_WHITE);
-    ctx.fillRect(dx, boundary - bkh / 2, g.bw, bkh);
+    keyPath(ctx, dx, boundary - bkh / 2, g.bw, bkh, r, flip);
+    ctx.fillStyle = body;
+    ctx.fill();
   }
 }
 
-export function paintWhiteHighlight(canvas: HTMLCanvasElement, keys: number[]) {
+export function paintWhiteHighlight(canvas: HTMLCanvasElement, keys: number[], flip: boolean) {
   const ctx = canvas.getContext("2d")!;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const { kw, dx } = kbGeom(canvas);
+  const ext = Math.round(kw * 0.1); // match paintWhiteKeyboard's lengthened keys
+  const kx = flip ? dx - ext : dx;
+  const klen = kw + ext;
+  const r = Math.max(1, Math.min(klen * 0.06, (canvas.height / N_WHITE) * 0.15));
   ctx.fillStyle = "#f0f0f0f0";
   for (const kc of keys) {
     const ng = noteGeom(canvas, kc);
     if (ng.black) continue;
-    ctx.fillRect(dx, ng.yTop, kw, ng.h);
+    keyPath(ctx, kx, ng.yTop, klen, ng.h, r, flip);
+    ctx.fill();
   }
 }
 
@@ -487,11 +548,13 @@ export function paintBlackHighlight(canvas: HTMLCanvasElement, keys: number[], f
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const g = kbGeom(canvas);
   const dx = g.dx + (flip ? g.flip : 0);
+  const r = Math.max(1, Math.min(g.bw * 0.12, (canvas.height / N_WHITE) * 0.25));
   ctx.fillStyle = "#f0f0f0f0";
   for (const kc of keys) {
     const ng = noteGeom(canvas, kc);
     if (!ng.black) continue;
-    ctx.fillRect(dx, ng.yTop, g.bw, ng.h);
+    keyPath(ctx, dx, ng.yTop, g.bw, ng.h, r, flip);
+    ctx.fill();
   }
 }
 

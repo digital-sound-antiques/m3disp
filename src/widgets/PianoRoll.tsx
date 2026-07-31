@@ -269,8 +269,14 @@ export function PianoRoll(props: { mode: string }) {
         <PianoRollCanvas width={size.width} height={size.height} resX={resX} resY={resY} shape3d={shape3d} />
 
         {appContext.pianoRollKeyboard === "on" && <>
-          <AutoSizeCanvas painter={paintWhiteKeyboard} width={size.width} height={size.height} resX={resX} resY={resY} />
-          <HighlightCanvas painter={paintWhiteHighlight} width={size.width} height={size.height} resX={resX} resY={resY} />
+          <AutoSizeCanvas
+            painter={(c) => paintWhiteKeyboard(c, props.mode === "3d")}
+            width={size.width} height={size.height} resX={resX} resY={resY}
+          />
+          <HighlightCanvas
+            painter={(c, keys) => paintWhiteHighlight(c, keys, props.mode === "3d")}
+            width={size.width} height={size.height} resX={resX} resY={resY}
+          />
           <AutoSizeCanvas
             painter={(c) => paintBlackKeyboard(c, props.mode === "3d")}
             width={size.width} height={size.height} resX={resX} resY={resY}
