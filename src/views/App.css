@@ -147,6 +147,16 @@ textarea {
 .app-bottom.compact .ab-title {
   font-size: 15px;
 }
+/* version + UPDATE inline beside the logo: used by the compact bar and by the
+   phone layout (which hides the .ab-version row); the full-height desktop bar
+   shows them in .ab-version instead */
+.ab-title-inline {
+  display: none;
+  align-items: center;
+}
+.app-bottom.compact .ab-title-inline {
+  display: inline-flex;
+}
 .ab-title-ver {
   margin-left: 8px;
   font-size: 12px;
@@ -2049,15 +2059,28 @@ textarea {
   .app-bottom-resize {
     display: none;
   }
+  /* ...so the version and UPDATE button ride next to the footer logo instead */
+  .ab-title-inline {
+    display: inline-flex;
+  }
   .app-bottom {
     height: auto !important;
     /* match the 8px side padding of .app on phones */
     margin-left: -8px;
     margin-right: -8px;
-    padding-left: 8px;
-    padding-right: 8px;
+    /* single row: the version rides in the title and latency is hidden, so drop
+       the empty second row (and its row-gap) and pad evenly top/bottom — the
+       base bar's 8px/0 padding left the contents sitting low */
+    grid-template-areas: "title transport actions";
+    row-gap: 0;
+    padding: 6px 8px;
     /* sit flush against the playlist above and the screen bottom below */
     margin-top: 0;
+  }
+  /* .compact sticks around from a desktop drag (it keys off the stored bar
+     height); its 2px top padding would push the row off-centre again */
+  .app-bottom.compact {
+    padding-top: 6px;
   }
   .side {
     width: auto !important;

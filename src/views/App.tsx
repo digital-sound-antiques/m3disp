@@ -565,10 +565,12 @@ function Layout() {
           />
           <div className="ab-title app-title">
             M<sup>3</sup>disp
-            {bottomHeight < BOTTOM_COMPACT && (
+            {/* version/UPDATE inline beside the logo; CSS shows it when the bar is
+                compact and on phones, where the .ab-version row is hidden */}
+            <span className="ab-title-inline">
               <span className="ab-title-ver">{packageJson.version}</span>
-            )}
-            {bottomHeight < BOTTOM_COMPACT && updateButton}
+              {updateButton}
+            </span>
           </div>
           <div className="ab-transport">
             <TransportButtons />
