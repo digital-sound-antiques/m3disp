@@ -359,7 +359,7 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
         alignItems: "stretch",
         flex: "0 0 auto",
         width: "12.75cqw",
-        fontSize: "clamp(4px, 34cqh, 27px)",
+        fontSize: "clamp(4px, 29cqh, 23px)",
         lineHeight: 1,
       }}
     >
