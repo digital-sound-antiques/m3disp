@@ -765,6 +765,7 @@ export function paintCellRoll(
   particleType: PianoRollParticleType,
   store: ParticleStore,
   dt: number,
+  showVoice: boolean = true,
 ) {
   const ctx = canvas.getContext("2d")!;
   const W = canvas.width;
@@ -890,7 +891,7 @@ export function paintCellRoll(
   // OPLL: current voice/instrument name after the CH label (dimmer), same as the
   // wave scope. Read at the heard NTSC frame so it tracks the roll's play head.
   const ch0 = cell.channels[0];
-  if (active && channelIds[ch0]?.device === "opll") {
+  if (showVoice && active && channelIds[ch0]?.device === "opll") {
     const voice = getStatusCached(playerContext.player, ch0, currentNtscFrame(playerContext))?.voice;
     if (typeof voice === "string") {
       const w = ctx.measureText(cell.label + "  ").width;

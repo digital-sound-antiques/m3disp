@@ -43,6 +43,9 @@ export type ScopeType = "wave" | "roll";
 // Scope WAVE render style: a single locked trace, or a receding "waterfall" of
 // the last N traces (depth history kept on the display side, in WaveCell).
 export type WaveStyle = "line" | "waterfall";
+// per-keyboard side visualizer in the Keyboard view: nothing, an oscilloscope,
+// or a mini piano roll
+export type KeyboardScopeType = "none" | "wave" | "roll";
 export type PianoRollMode = "2d" | "3d";
 export type PianoRollColorModeMap = {
   opll: PianoRollColorMode;
@@ -92,6 +95,7 @@ type AppContextData = {
   waveColorize: boolean;
   waveWindowSize: number;
   scopeFps: number; // 0 = auto (adaptive), else forced target fps (30/60)
+  keyboardScope: KeyboardScopeType; // per-keyboard side visualizer (none/wave/roll)
   channelFontScaleLevel: number;
   playlistFontScaleLevel: number;
   pianoRollRangeInSec: number;
@@ -117,6 +121,7 @@ type AppContextData = {
   setWaveColorize: (v: boolean) => void;
   setWaveWindowSize: (value: number) => void;
   setScopeFps: (value: number) => void;
+  setKeyboardScope: (v: KeyboardScopeType) => void;
   setChannelFontScaleLevel: (value: number) => void;
   setPlaylistFontScaleLevel: (value: number) => void;
   setPianoRollRangeInSec: (value: number) => void;
@@ -142,6 +147,7 @@ const defaultContextData: AppContextData = {
   waveColorize: false,
   waveWindowSize: 256,
   scopeFps: 0,
+  keyboardScope: "none",
   channelFontScaleLevel: 1,
   playlistFontScaleLevel: 2,
   pianoRollRangeInSec: 4.0,
@@ -167,6 +173,7 @@ const defaultContextData: AppContextData = {
   setWaveColorize: noop,
   setWaveWindowSize: noop,
   setScopeFps: noop,
+  setKeyboardScope: noop,
   setChannelFontScaleLevel: noop,
   setPlaylistFontScaleLevel: noop,
   setPianoRollRangeInSec: noop,
@@ -190,6 +197,7 @@ const keyWaveStyle = "m3disp.waveStyle";
 const keyWaveColorize = "m3disp.waveColorize";
 const keyWaveWindowSize = "m3disp.waveWindowSize";
 const keyScopeFps = "m3disp.scopeFps";
+const keyKeyboardScope = "m3disp.keyboardScope";
 const keyChannelFontScaleLevel = "m3disp.channelFontScaleLevel";
 const keyPlaylistFontScaleLevel = "m3disp.playlistFontScaleLevel";
 const keyPianoRollRangeInSec = "m3disp.pianoRoll.rangeInSec";
@@ -316,6 +324,15 @@ export function AppContextProvider(props: PropsWithChildren) {
     }
   };
 
+  const setKeyboardScope = (v: KeyboardScopeType, save: boolean = true) => {
+    setState((oldState) => {
+      return { ...oldState, keyboardScope: v };
+    });
+    if (save) {
+      localStorage.setItem(keyKeyboardScope, v);
+    }
+  };
+
   const setChannelFontScaleLevel = (value: number, save: boolean = true) => {
     const level = Math.min(5, Math.max(1, Math.round(value)));
     setState((oldState) => {
@@ -402,6 +419,7 @@ export function AppContextProvider(props: PropsWithChildren) {
     setWaveColorize(false);
     setWaveWindowSize(256);
     setScopeFps(0);
+    setKeyboardScope("none");
     setChannelFontScaleLevel(1);
     setPlaylistFontScaleLevel(2);
     setPianoRollRangeInSec(4.0);
@@ -463,6 +481,13 @@ export function AppContextProvider(props: PropsWithChildren) {
     {
       const s = parseInt(localStorage.getItem(keyScopeFps) ?? "", 10);
       setScopeFps([0, 15, 30, 60, 120].includes(s) ? s : state.scopeFps, false);
+    }
+    {
+      const v = localStorage.getItem(keyKeyboardScope);
+      // migrate the old boolean ("1"/"0") to the 3-way setting
+      const mapped =
+        v === "wave" || v === "roll" || v === "none" ? v : v === "1" ? "wave" : "none";
+      setKeyboardScope(mapped, false);
     }
     {
       const s = localStorage.getItem(keyChannelFontScaleLevel);
@@ -550,6 +575,7 @@ export function AppContextProvider(props: PropsWithChildren) {
         setWaveColorize,
         setWaveWindowSize,
         setScopeFps,
+        setKeyboardScope,
         setChannelFontScaleLevel,
         setPlaylistFontScaleLevel,
         setPianoRollRangeInSec,

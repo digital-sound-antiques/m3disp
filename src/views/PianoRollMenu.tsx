@@ -5,6 +5,7 @@ import { pianoRollColorDialogId } from "../widgets/PianoRollControl";
 import { particleTypeCycle, type PianoRollParticleType } from "../widgets/piano-roll-painter";
 import { ColorizeItems, ScopeFpsItem } from "./WaveMenu";
 import { MenuSelect } from "./MenuSelect";
+import { MenuToggle } from "./MenuToggle";
 
 const nextKeyboardMode = (t: PianoRollKeyboardMode) =>
   keyboardModeCycle[(keyboardModeCycle.indexOf(t) + 1) % keyboardModeCycle.length];
@@ -25,11 +26,7 @@ export function PianoRollMenu(props: { grid?: boolean; colorize?: boolean }) {
   const ctx = useContext(AppContext);
 
   const toggle = (icon: ReactNode, label: string, on: boolean, onClick: () => void) => (
-    <button className={`menu-item${on ? " active" : ""}`} onClick={onClick}>
-      <span className="menu-ico">{icon}</span>
-      <span className="menu-label">{label}</span>
-      <span className="menu-state">{on ? "ON" : "OFF"}</span>
-    </button>
+    <MenuToggle icon={icon} label={label} on={on} onToggle={onClick} />
   );
 
   return (

@@ -2,6 +2,7 @@ import { GraphicEq, InvertColors, Layers, Speed } from "@mui/icons-material";
 import { useContext } from "react";
 import { AppContext, type WaveStyle } from "../contexts/AppContext";
 import { MenuSelect } from "./MenuSelect";
+import { MenuToggle } from "./MenuToggle";
 
 const waveStyleOptions: { value: WaveStyle; label: string }[] = [
   { value: "line", label: "Line" },
@@ -35,21 +36,33 @@ export function ScopeFpsItem() {
   );
 }
 
+/** Oscilloscope window size (samples). Shared by the Scope wave view and the
+ *  Keyboard-view mini scopes (they read the same waveWindowSize). */
+export function WaveSamplesItem() {
+  const ctx = useContext(AppContext);
+  return (
+    <MenuSelect
+      icon={<GraphicEq sx={{ fontSize: 18 }} />}
+      label="Samples"
+      value={ctx.waveWindowSize}
+      options={waveWindowOptions}
+      active
+      onChange={(v) => ctx.setWaveWindowSize(v)}
+    />
+  );
+}
+
 /** Colorize toggle shared by both Scope modes: OFF = single primary color,
  *  ON = per-channel/voice colors. */
 export function ColorizeItems() {
   const ctx = useContext(AppContext);
   return (
-    <button
-      className={`menu-item${ctx.waveColorize ? " active" : ""}`}
-      onClick={() => ctx.setWaveColorize(!ctx.waveColorize)}
-    >
-      <span className="menu-ico">
-        <InvertColors sx={{ fontSize: 18 }} />
-      </span>
-      <span className="menu-label">Colorize</span>
-      <span className="menu-state">{ctx.waveColorize ? "ON" : "OFF"}</span>
-    </button>
+    <MenuToggle
+      icon={<InvertColors sx={{ fontSize: 18 }} />}
+      label="Colorize"
+      on={ctx.waveColorize}
+      onToggle={() => ctx.setWaveColorize(!ctx.waveColorize)}
+    />
   );
 }
 
@@ -67,14 +80,7 @@ export function WaveMenu() {
         active={ctx.waveStyle === "waterfall"}
         onChange={(v) => ctx.setWaveStyle(v)}
       />
-      <MenuSelect
-        icon={<GraphicEq sx={{ fontSize: 18 }} />}
-        label="Samples"
-        value={ctx.waveWindowSize}
-        options={waveWindowOptions}
-        active
-        onChange={(v) => ctx.setWaveWindowSize(v)}
-      />
+      <WaveSamplesItem />
       <ScopeFpsItem />
       <ColorizeItems />
     </div>

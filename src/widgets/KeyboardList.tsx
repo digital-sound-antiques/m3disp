@@ -1,4 +1,4 @@
-import { useContext, useMemo, useSyncExternalStore } from "react";
+import { useContext, useEffect, useMemo, useSyncExternalStore } from "react";
 import { useTheme } from "@mui/material/styles";
 import { ChevronRight, ExpandMore } from "@mui/icons-material";
 import { DragDropContext, Draggable, Droppable, DropResult } from "@hello-pangea/dnd";
@@ -22,6 +22,9 @@ import {
   subscribeChannelVisibility,
 } from "../views/channel-visibility";
 import { channelIds } from "./piano-roll-painter";
+import { waveOffset } from "./scope-dsp";
+import { KeyboardScope } from "./KeyboardScope";
+import { KeyboardRoll } from "./KeyboardRoll";
 
 type DeviceCardProps = {
   name: string;
@@ -50,6 +53,11 @@ function DeviceCard(props: DeviceCardProps) {
   const app = useContext(AppContext);
   const context = useContext(PlayerContext);
   const masks = context.channelMask[props.device];
+  const highlightColor =
+    app.keyHighlightColorType == "primary"
+      ? theme.palette.primary.main
+      : theme.palette.secondary.main;
+  const sideMode = app.keyboardScope; // "none" | "wave" | "roll"
 
   const rowBits = (i: number) => {
     let t = props.targets[i];
@@ -88,6 +96,30 @@ function DeviceCard(props: DeviceCardProps) {
 
     const mask = (masks & (1 << i)) != 0;
     const channels: ChannelId[] = target.map((e) => ({ device: props.device, index: e }));
+    // the per-keyboard side visualizer: waveform, mini roll, or nothing
+    const flats = target.map((e) => flatIndex(props.device, e));
+    const sideEl =
+      sideMode === "wave" ? (
+        <KeyboardScope
+          offsets={[...new Set(target.map((e) => waveOffset(props.device, e)))]}
+          color={highlightColor}
+        />
+      ) : sideMode === "roll" ? (
+        <KeyboardRoll channels={flats} color={highlightColor} />
+      ) : null;
+
+    const keyboard = (
+      <Keyboard
+        targets={channels}
+        highlightColor={highlightColor}
+        whiteKeyColor={theme.palette.text.primary}
+      />
+    );
+    const info = props.small ? (
+      <VolumeInfoPanel variant="horizontal" targets={channels} disabled={false} sx={{ width: "72px" }} />
+    ) : (
+      <TrackInfoPanel title={`CH${i + 1}`} targets={channels} disabled={false} top={cols2} />
+    );
 
     res.push(
       <div
@@ -96,18 +128,18 @@ function DeviceCard(props: DeviceCardProps) {
         onDoubleClick={() => soloRow(i)}
         title={mask ? "Unmute" : "Mute · Double-click: solo"}
         style={{
-          // 2-column: stack info row on top of the keyboard; 1-column: side by side
+          // always a row: [info+keyboard] then the full-height side visualizer.
+          // 1-column stacks info beside the keyboard; 2-column stacks it above.
           display: "flex",
-          flexDirection: cols2 ? "column" : "row",
+          flexDirection: "row",
           position: "relative",
-          // 1-column: aspect on the whole row. 2-column: no cell aspect (height is
-          // auto = info row + keyboard), the aspect goes on the keyboard box below.
+          // 1-column: aspect on the whole row. 2-column: height is content-driven
+          // (info row + keyboard), so no cell aspect.
           aspectRatio: cols2 ? undefined : props.keyboardAspectRatio ?? "640 / 22",
-          width: cols2 ? "calc(50% - 1cqw)" : "100%",
+          width: cols2 ? "calc(50% - 0.5cqw)" : "100%",
           overflow: "hidden",
-          // channel spacing scales with the keyboard width (% vertical margin is
-          // relative to the containing block's width); tighter in 1-column
-          marginBottom: cols2 ? "0.5%" : "0.3%",
+          // channel spacing scales with the keyboard width; tighter in 1-column
+          marginBottom: cols2 ? "1%" : "0.6%",
           // size container so the track info can scale via cqw/cqh (1-column needs
           // a definite height → size; 2-column height is content-driven → inline-size)
           containerType: cols2 ? "inline-size" : "size",
@@ -116,34 +148,48 @@ function DeviceCard(props: DeviceCardProps) {
           opacity: mask ? 0.5 : 1.0,
         }}
       >
-        {props.small ? (
-          <VolumeInfoPanel
-            variant="horizontal"
-            targets={channels}
-            disabled={false}
-            sx={{ width: "72px" }}
-          />
+        {cols2 ? (
+          // 2-column: info row above the keyboard; the meter's right edge lines up
+          // with the keyboard's right edge (both padded 1.5cqw)
+          <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column" }}>
+            {info}
+            <div
+              style={{
+                width: "100%",
+                aspectRatio: props.keyboardAspectRatio ?? "640 / 48",
+                boxSizing: "border-box",
+                paddingLeft: "1.5cqw",
+                paddingRight: "1.5cqw",
+                position: "relative",
+              }}
+            >
+              {keyboard}
+            </div>
+          </div>
         ) : (
-          <TrackInfoPanel title={`CH${i + 1}`} targets={channels} disabled={false} top={cols2} />
+          // 1-column: track-info column beside the keyboard
+          <>
+            {info}
+            <div style={{ flex: 1, minWidth: 0, minHeight: 0, position: "relative" }}>{keyboard}</div>
+          </>
         )}
-
-        <div
-          style={
-            cols2
-              ? { width: "100%", aspectRatio: props.keyboardAspectRatio ?? "640 / 48", position: "relative" }
-              : { flex: 1, minWidth: 0, minHeight: 0, position: "relative" }
-          }
-        >
-          <Keyboard
-            targets={channels}
-            highlightColor={
-              app.keyHighlightColorType == "primary"
-                ? theme.palette.primary.main
-                : theme.palette.secondary.main
-            }
-            whiteKeyColor={theme.palette.text.primary}
-          />
-        </div>
+        {sideEl && (
+          // full-height side visualizer at the right. 2-column: spans the info row
+          // + keyboard; 1-column: matches the track-info column width.
+          <div
+            style={{
+              flex: cols2 ? "0 0 17cqw" : "0 0 12.75cqw",
+              minWidth: 0,
+              marginLeft: cols2 ? "0.375%" : "0.75%",
+              position: "relative",
+              // 2-column: drop the top so the waveform lines up with the level
+              // meter (not the very top of the info row)
+              ...(cols2 ? { boxSizing: "border-box" as const, paddingTop: "1.5cqw" } : {}),
+            }}
+          >
+            {sideEl}
+          </div>
+        )}
       </div>
     );
   }
@@ -151,7 +197,7 @@ function DeviceCard(props: DeviceCardProps) {
   return (
     <div
       className="kbd-device"
-      style={cols2 ? { flexDirection: "row", flexWrap: "wrap", columnGap: "2cqw" } : undefined}
+      style={cols2 ? { flexDirection: "row", flexWrap: "wrap", columnGap: "1cqw" } : undefined}
     >
       {res}
     </div>
@@ -186,6 +232,16 @@ export function KeyboardList(props: {
   const order = useSyncExternalStore(subscribeSectionOrder, getSectionOrder);
   const collapsed = useSyncExternalStore(subscribeSectionOrder, getCollapsedSections);
   const hiddenSnapshot = useSyncExternalStore(subscribeChannelVisibility, getHiddenChannels);
+
+  // enable per-channel wave capture only for the "wave" side visualizer (the
+  // mini roll uses snapshots, which are always captured)
+  const app = useContext(AppContext);
+  const playerInst = useContext(PlayerContext).player;
+  useEffect(() => {
+    if (app.keyboardScope !== "wave") return;
+    playerInst.setWaveEnabled(true);
+    return () => playerInst.setWaveEnabled(false);
+  }, [app.keyboardScope, playerInst]);
 
   // categories with at least one visible channel; filtering keeps the Draggable
   // indices contiguous (a fully-hidden category drops out, header + all)

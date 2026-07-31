@@ -24,6 +24,7 @@ import { PianoRollGrid } from "../widgets/PianoRollGrid";
 import { WaveGrid } from "../widgets/WaveGrid";
 import { PianoRollMenu } from "./PianoRollMenu";
 import { WaveMenu } from "./WaveMenu";
+import { KeyboardMenu } from "./KeyboardMenu";
 import { KeyboardList } from "../widgets/KeyboardList";
 import { TimeSlider } from "../widgets/TimeSlider";
 import { PlayControl } from "./PlayerControl";
@@ -374,26 +375,26 @@ function Layout() {
                 >
                   Scope
                 </button>
-                {vizTab === "keyboard" && (
-                  <div className="viz-seg">
-                    <button
-                      className={`viz-seg-btn${keyboardCols === 1 ? " active" : ""}`}
-                      onClick={() => setKeyboardCols(1)}
-                      title="1 column"
-                    >
-                      <ViewAgenda sx={{ fontSize: 15 }} />
-                    </button>
-                    <button
-                      className={`viz-seg-btn${keyboardCols === 2 ? " active" : ""}`}
-                      onClick={() => setKeyboardCols(2)}
-                      title="2 columns"
-                    >
-                      <ViewAgenda sx={{ fontSize: 15, transform: "rotate(90deg)" }} />
-                    </button>
-                  </div>
-                )}
-                {(vizTab === "pianoroll" || vizTab === "wave") && (
+                {(vizTab === "pianoroll" || vizTab === "wave" || vizTab === "keyboard") && (
                   <div className="pr-menu-wrap" ref={prMenuRef}>
+                    {vizTab === "keyboard" && (
+                      <div className="viz-seg">
+                        <button
+                          className={`viz-seg-btn${keyboardCols === 1 ? " active" : ""}`}
+                          onClick={() => setKeyboardCols(1)}
+                          title="1 column"
+                        >
+                          <ViewAgenda sx={{ fontSize: 15 }} />
+                        </button>
+                        <button
+                          className={`viz-seg-btn${keyboardCols === 2 ? " active" : ""}`}
+                          onClick={() => setKeyboardCols(2)}
+                          title="2 columns"
+                        >
+                          <ViewAgenda sx={{ fontSize: 15, transform: "rotate(90deg)" }} />
+                        </button>
+                      </div>
+                    )}
                     {vizTab === "wave" && (
                       <div className="viz-seg">
                         <button
@@ -433,7 +434,13 @@ function Layout() {
                     <button
                       className={`viz-gear${prMenuOpen ? " active" : ""}`}
                       onClick={() => setPrMenuOpen((o) => !o)}
-                      title={vizTab === "wave" ? "Scope settings" : "Piano roll settings"}
+                      title={
+                        vizTab === "wave"
+                          ? "Scope settings"
+                          : vizTab === "keyboard"
+                            ? "Keyboard settings"
+                            : "Piano roll settings"
+                      }
                     >
                       <Settings sx={{ fontSize: 16 }} />
                     </button>
@@ -445,6 +452,8 @@ function Layout() {
                           ) : (
                             <WaveMenu />
                           )
+                        ) : vizTab === "keyboard" ? (
+                          <KeyboardMenu />
                         ) : (
                           <PianoRollMenu />
                         )}

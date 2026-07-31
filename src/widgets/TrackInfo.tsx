@@ -358,8 +358,8 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
         justifyContent: "start",
         alignItems: "stretch",
         flex: "0 0 auto",
-        width: "17cqw",
-        fontSize: "clamp(4px, 40cqh, 32px)",
+        width: "12.75cqw",
+        fontSize: "clamp(4px, 34cqh, 27px)",
         lineHeight: 1,
       }}
     >
