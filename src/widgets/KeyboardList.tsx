@@ -228,7 +228,7 @@ export function KeyboardList(props: {
   // 1-column: applied to the whole row; 2-column: applied to the keyboard box
   // (the cell height is then auto = info row + keyboard, so it can't stretch)
   const aspect =
-    props.aspect ?? (isSmall ? "640/22" : props.columns === 2 ? "640/36" : "640/24");
+    props.aspect ?? (isSmall ? "640/22" : props.columns === 2 ? "640/36" : "640/28");
   const order = useSyncExternalStore(subscribeSectionOrder, getSectionOrder);
   const collapsed = useSyncExternalStore(subscribeSectionOrder, getCollapsedSections);
   const hiddenSnapshot = useSyncExternalStore(subscribeChannelVisibility, getHiddenChannels);
