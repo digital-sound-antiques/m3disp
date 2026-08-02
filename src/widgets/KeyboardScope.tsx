@@ -125,7 +125,7 @@ export function KeyboardScope(props: { offsets: number[]; color: string }) {
         prevRef.current.set(cur.subarray(0, WINDOW));
         hasPrevRef.current = true;
 
-        const scale = (H / 2) / 3000;
+        const scale = ((H / 2) / 3000) * (appRef.current.waveYScale || 1);
         ctx.strokeStyle = propsRef.current.color;
         ctx.lineWidth = Math.max(1 * dpr, H / 60);
         ctx.lineJoin = "round";

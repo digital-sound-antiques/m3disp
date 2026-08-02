@@ -1,7 +1,7 @@
 import { ShowChart } from "@mui/icons-material";
 import { useContext } from "react";
 import { AppContext, type KeyboardScopeType } from "../contexts/AppContext";
-import { ScopeFpsItem, WaveSamplesItem } from "./WaveMenu";
+import { ScopeFpsItem, WaveSamplesItem, WaveYScaleItem } from "./WaveMenu";
 import { MenuSelect } from "./MenuSelect";
 
 const scopeOptions: { value: KeyboardScopeType; label: string }[] = [
@@ -25,7 +25,12 @@ export function KeyboardMenu() {
         active={ctx.keyboardScope !== "none"}
         onChange={(v) => ctx.setKeyboardScope(v)}
       />
-      {ctx.keyboardScope === "wave" && <WaveSamplesItem />}
+      {ctx.keyboardScope === "wave" && (
+        <>
+          <WaveSamplesItem />
+          <WaveYScaleItem />
+        </>
+      )}
       {ctx.keyboardScope !== "none" && <ScopeFpsItem />}
     </div>
   );

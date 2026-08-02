@@ -1,4 +1,12 @@
-import { useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  CSSProperties,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { ChevronRight, ExpandMore } from "@mui/icons-material";
 import { DragDropContext, Draggable, Droppable, DropResult } from "@hello-pangea/dnd";
 import { PlayerContext } from "../contexts/PlayerContext";
@@ -178,6 +186,8 @@ function GridCell(props: {
  * mirroring the Keyboard view (shared section order & collapsed state).
  */
 export function PianoRollGrid() {
+  const app = useContext(AppContext);
+  const cols = Math.min(5, Math.max(1, app.scopeColumns || 3));
   const order = useSyncExternalStore(subscribeSectionOrder, getSectionOrder);
   const collapsed = useSyncExternalStore(subscribeSectionOrder, getCollapsedSections);
   const hiddenSnapshot = useSyncExternalStore(subscribeChannelVisibility, getHiddenChannels);
@@ -208,7 +218,7 @@ export function PianoRollGrid() {
   };
 
   return (
-    <div className="pr-grid">
+    <div className="pr-grid" style={{ "--pr-grid-cols": cols } as CSSProperties}>
       <DragDropContext onDragEnd={onDragEnd}>
         <Droppable droppableId="grid-sections">
           {(dp) => (
@@ -218,7 +228,7 @@ export function PianoRollGrid() {
                 const isCollapsed = collapsed.includes(key);
                 // section grows in proportion to its number of cell rows so all
                 // cells end up ~equal height and the whole grid fits (no scroll)
-                const rows = Math.ceil(card.targets.length / 3);
+                const rows = Math.ceil(card.targets.length / cols);
                 return (
                   <Draggable key={key} draggableId={key} index={index}>
                     {(p) => (

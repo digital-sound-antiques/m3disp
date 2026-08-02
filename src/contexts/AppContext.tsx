@@ -94,6 +94,8 @@ type AppContextData = {
   waveStyle: WaveStyle;
   waveColorize: boolean;
   waveWindowSize: number;
+  waveYScale: number; // oscilloscope amplitude scale (1.0 .. 4.0, 0.5 steps)
+  scopeColumns: number; // cells per row in the Scope grids (1..5)
   scopeFps: number; // 0 = auto (adaptive, 60fps max), else forced target fps (12..60)
   keyboardScope: KeyboardScopeType; // per-keyboard side visualizer (none/wave/roll)
   channelFontScaleLevel: number;
@@ -120,6 +122,8 @@ type AppContextData = {
   setWaveStyle: (v: WaveStyle) => void;
   setWaveColorize: (v: boolean) => void;
   setWaveWindowSize: (value: number) => void;
+  setWaveYScale: (value: number) => void;
+  setScopeColumns: (value: number) => void;
   setScopeFps: (value: number) => void;
   setKeyboardScope: (v: KeyboardScopeType) => void;
   setChannelFontScaleLevel: (value: number) => void;
@@ -146,6 +150,8 @@ const defaultContextData: AppContextData = {
   waveStyle: "line",
   waveColorize: false,
   waveWindowSize: 256,
+  waveYScale: 1.0,
+  scopeColumns: 3,
   scopeFps: 0,
   keyboardScope: "none",
   channelFontScaleLevel: 1,
@@ -172,6 +178,8 @@ const defaultContextData: AppContextData = {
   setWaveStyle: noop,
   setWaveColorize: noop,
   setWaveWindowSize: noop,
+  setWaveYScale: noop,
+  setScopeColumns: noop,
   setScopeFps: noop,
   setKeyboardScope: noop,
   setChannelFontScaleLevel: noop,
@@ -196,6 +204,8 @@ const keyScopeType = "m3disp.scopeType";
 const keyWaveStyle = "m3disp.waveStyle";
 const keyWaveColorize = "m3disp.waveColorize";
 const keyWaveWindowSize = "m3disp.waveWindowSize";
+const keyWaveYScale = "m3disp.waveYScale";
+const keyScopeColumns = "m3disp.scopeColumns";
 const keyScopeFps = "m3disp.scopeFps";
 const keyKeyboardScope = "m3disp.keyboardScope";
 const keyChannelFontScaleLevel = "m3disp.channelFontScaleLevel";
@@ -315,6 +325,24 @@ export function AppContextProvider(props: PropsWithChildren) {
     }
   };
 
+  const setWaveYScale = (value: number, save: boolean = true) => {
+    setState((oldState) => {
+      return { ...oldState, waveYScale: value };
+    });
+    if (save) {
+      localStorage.setItem(keyWaveYScale, String(value));
+    }
+  };
+
+  const setScopeColumns = (value: number, save: boolean = true) => {
+    setState((oldState) => {
+      return { ...oldState, scopeColumns: value };
+    });
+    if (save) {
+      localStorage.setItem(keyScopeColumns, String(value));
+    }
+  };
+
   const setScopeFps = (value: number, save: boolean = true) => {
     setState((oldState) => {
       return { ...oldState, scopeFps: value };
@@ -418,6 +446,8 @@ export function AppContextProvider(props: PropsWithChildren) {
     setWaveStyle("line");
     setWaveColorize(false);
     setWaveWindowSize(256);
+    setWaveYScale(1.0);
+    setScopeColumns(3);
     setScopeFps(0);
     setKeyboardScope("none");
     setChannelFontScaleLevel(1);
@@ -477,6 +507,17 @@ export function AppContextProvider(props: PropsWithChildren) {
     {
       const s = parseInt(localStorage.getItem(keyWaveWindowSize) ?? "", 10);
       setWaveWindowSize([128, 256, 512, 1024].includes(s) ? s : state.waveWindowSize, false);
+    }
+    {
+      // snap to the slider's 0.5 grid and clamp to its 1.0..4.0 range
+      const v = parseFloat(localStorage.getItem(keyWaveYScale) ?? "");
+      if (Number.isFinite(v)) {
+        setWaveYScale(Math.min(4, Math.max(1, Math.round(v * 2) / 2)), false);
+      }
+    }
+    {
+      const s = parseInt(localStorage.getItem(keyScopeColumns) ?? "", 10);
+      setScopeColumns([1, 2, 3, 4, 5].includes(s) ? s : state.scopeColumns, false);
     }
     {
       const s = parseInt(localStorage.getItem(keyScopeFps) ?? "", 10);
@@ -575,6 +616,8 @@ export function AppContextProvider(props: PropsWithChildren) {
         setWaveStyle,
         setWaveColorize,
         setWaveWindowSize,
+        setWaveYScale,
+        setScopeColumns,
         setScopeFps,
         setKeyboardScope,
         setChannelFontScaleLevel,

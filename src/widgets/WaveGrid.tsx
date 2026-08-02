@@ -1,4 +1,12 @@
-import { useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import {
+  CSSProperties,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  useSyncExternalStore,
+} from "react";
 import { ChevronRight, ExpandMore } from "@mui/icons-material";
 import { DragDropContext, Draggable, Droppable, DropResult } from "@hello-pangea/dnd";
 import { PlayerContext } from "../contexts/PlayerContext";
@@ -63,7 +71,8 @@ function drawWaterfall(
   hist: Float32Array,
   countRef: { current: number },
   windowRef: { current: number },
-  push: boolean
+  push: boolean,
+  yScale: number
 ) {
   const D = WATERFALL_DEPTH;
   // stored slices are fixed-length; a window-size change invalidates the ring
@@ -88,7 +97,7 @@ function drawWaterfall(
   const PTS = Math.min(WINDOW, WATERFALL_DRAW_PTS);
   const yFront = H * 0.66;
   const rise = H * .5; // total vertical recede, back→front (smaller = gentler slope, more head-on)
-  const baseScale = H / 2 / 3000;
+  const baseScale = (H / 2 / 3000) * yScale;
 
   ctx.lineJoin = "round";
   ctx.lineCap = "round";
@@ -124,18 +133,24 @@ function drawWaterfall(
     // bright contour crest, dimmer toward the back; each slice keeps its captured color
     ctx.globalAlpha = 0.15 + 0.85 * t;
     ctx.strokeStyle = colors[slot] || curColor;
-    ctx.lineWidth = Math.max(1 * dpr, H / 185) * (0.6 + 0.4 * t);
+    const lw = Math.max(1 * dpr, H / 185) * (0.6 + 0.4 * t);
+    ctx.lineWidth = lw;
     ctx.beginPath();
     for (let k = 0; k < PTS; k++) k === 0 ? ctx.moveTo(px(k), py(k)) : ctx.lineTo(px(k), py(k));
     if (s === filled - 1) {
       ctx.shadowColor = colors[slot] || curColor;
-      ctx.shadowBlur = 6 * dpr;
+      ctx.shadowBlur = glowFor(lw, dpr);
     }
     ctx.stroke();
     ctx.shadowBlur = 0;
   }
   ctx.globalAlpha = 1;
 }
+
+// Trace glow, tied to the line width so it scales with the cell like the stroke
+// does (4× reads the same at any size). Capped because shadowBlur cost grows
+// with the radius and a 1-column grid can make the cells very tall.
+const glowFor = (lineWidth: number, dpr: number) => Math.min(14 * dpr, lineWidth * 4);
 
 const flatIndex = (device: KSSDeviceName, index: number) =>
   channelIds.findIndex((c) => c.device === device && c.index === index);
@@ -338,18 +353,20 @@ function WaveCell(props: {
           drawWaterfall(
             ctx, cur, WINDOW, W, H, dpr, histColorRef.current, color,
             ac.theme.palette.background.default,
-            histRef.current, histCountRef, histWindowRef, push
+            histRef.current, histCountRef, histWindowRef, push, ac.waveYScale || 1
           );
         } else {
           histCountRef.current = 0; // drop stale history so re-entry starts fresh
           histLastTRef.current = 0; // reset cadence so re-entry to waterfall seeds
           histAccRef.current = 0;
-          // fixed vertical scale; raw ch_out is well under int16 full-scale
-          const scale = (H / 2) / 3000;
+          // raw ch_out is well under int16 full-scale; the user Y-Scale (1..3x)
+          // boosts it further for quiet channels
+          const scale = ((H / 2) / 3000) * (ac.waveYScale || 1);
           ctx.strokeStyle = color;
           // line thickens with the cell size (H is in backing px, so this scales
           // with the drawn height and stays dpr-correct)
-          ctx.lineWidth = Math.max(1.5 * dpr, H / 110);
+          const lw = Math.max(1 * dpr, H / 110);
+          ctx.lineWidth = lw;
           ctx.lineJoin = "round";
           ctx.lineCap = "round";
           ctx.beginPath();
@@ -363,7 +380,7 @@ function WaveCell(props: {
           }
           // glow pass, then a crisp core over the same path
           ctx.shadowColor = color;
-          ctx.shadowBlur = 6 * dpr;
+          ctx.shadowBlur = glowFor(lw, dpr);
           ctx.stroke();
           ctx.shadowBlur = 0;
           ctx.stroke();
@@ -434,6 +451,8 @@ function WaveCell(props: {
  *  Grid). Enables per-channel wave capture in the decoder while mounted. */
 export function WaveGrid() {
   const player = useContext(PlayerContext);
+  const app = useContext(AppContext);
+  const cols = Math.min(5, Math.max(1, app.scopeColumns || 3));
   const order = useSyncExternalStore(subscribeSectionOrder, getSectionOrder);
   const collapsed = useSyncExternalStore(subscribeSectionOrder, getCollapsedSections);
   const hiddenSnapshot = useSyncExternalStore(subscribeChannelVisibility, getHiddenChannels);
@@ -474,7 +493,7 @@ export function WaveGrid() {
   };
 
   return (
-    <div className="pr-grid">
+    <div className="pr-grid" style={{ "--pr-grid-cols": cols } as CSSProperties}>
       <DragDropContext onDragEnd={onDragEnd}>
         <Droppable droppableId="wave-sections">
           {(dp) => (
@@ -482,7 +501,7 @@ export function WaveGrid() {
               {visibleKeys.map((key, index) => {
                 const card = DEVICE_CARDS[key]!;
                 const isCollapsed = collapsed.includes(key);
-                const rows = Math.ceil(card.targets.length / 3);
+                const rows = Math.ceil(card.targets.length / cols);
                 return (
                   <Draggable key={key} draggableId={key} index={index}>
                     {(p) => (

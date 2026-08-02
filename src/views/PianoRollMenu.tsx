@@ -3,7 +3,7 @@ import { ReactNode, useContext } from "react";
 import { AppContext, keyboardModeCycle, type PianoRollKeyboardMode } from "../contexts/AppContext";
 import { pianoRollColorDialogId } from "../widgets/PianoRollControl";
 import { particleTypeCycle, type PianoRollParticleType } from "../widgets/piano-roll-painter";
-import { ColorizeItems, ScopeFpsItem } from "./WaveMenu";
+import { ColorizeItems, ScopeColumnsItem, ScopeFpsItem } from "./WaveMenu";
 import { MenuSelect } from "./MenuSelect";
 import { MenuToggle } from "./MenuToggle";
 
@@ -73,6 +73,7 @@ export function PianoRollMenu(props: { grid?: boolean; colorize?: boolean }) {
           onChange={(v) => ctx.setPianoRollKeyboard(v)}
         />
       )}
+      {props.grid && <ScopeColumnsItem />}
       <ScopeFpsItem />
       {props.colorize ? (
         <ColorizeItems />
