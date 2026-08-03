@@ -134,7 +134,9 @@ function GridCell(props: {
         cellRef.current,
         ac.pianoRollParticleType,
         storeRef.current,
-        dt
+        dt,
+        true, // voice/instrument name in the cell label
+        ac.pianoRollPress
       );
       rollFrameGov.addCost(performance.now() - t0);
     };

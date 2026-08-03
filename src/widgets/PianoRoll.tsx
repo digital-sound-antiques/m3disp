@@ -12,6 +12,7 @@ import {
   paintWhiteHighlight,
   paintBlackHighlight,
   paintKeyboardEdgeLine,
+  pressKeyboardOffset,
   defaultVoiceColors,
 } from "./piano-roll-painter";
 import { rollFrameGov } from "./frame-governor";
@@ -25,6 +26,8 @@ function AutoSizeCanvas(props: {
   painter: (canvas: HTMLCanvasElement) => void;
   resX?: number;
   resY?: number;
+  /** CSS px to shift the layer down by (the Press keyboard offset). */
+  offsetY?: number;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rx = props.resX ?? 1;
@@ -44,7 +47,7 @@ function AutoSizeCanvas(props: {
     props.painter(canvasRef.current!);
   }, [props.painter, props.width, props.height, rx, ry]);
 
-  return <canvas ref={canvasRef} style={{ position: "absolute", top: 0, left: 0 }} />;
+  return <canvas ref={canvasRef} style={{ position: "absolute", top: props.offsetY ?? 0, left: 0 }} />;
 }
 
 function HighlightCanvas(props: {
@@ -53,6 +56,8 @@ function HighlightCanvas(props: {
   painter: (canvas: HTMLCanvasElement, keys: number[]) => void;
   resX?: number;
   resY?: number;
+  /** CSS px to shift the layer down by (the Press keyboard offset). */
+  offsetY?: number;
 }) {
   const { player, channelMask } = useContext(PlayerContext);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -90,7 +95,7 @@ function HighlightCanvas(props: {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  return <canvas ref={canvasRef} style={{ position: "absolute", top: 0, left: 0 }} />;
+  return <canvas ref={canvasRef} style={{ position: "absolute", top: props.offsetY ?? 0, left: 0 }} />;
 }
 
 // ---- Main piano roll canvas ----
@@ -147,7 +152,8 @@ function PianoRollCanvas(props: { width: number; height: number; resX?: number; 
           voiceColors: defaultVoiceColors,
         },
         ac.pianoRollMode,
-        shape3dRef.current
+        shape3dRef.current,
+        ac.pianoRollPress
       );
       rollFrameGov.addCost(performance.now() - t0);
     };
@@ -240,6 +246,10 @@ export function PianoRoll(props: { mode: string }) {
     const norm = Math.sqrt(scaleX * c * SCALE_Y);
     shape3d = { sx: norm / scaleX, sy: norm / (c * SCALE_Y) };
   }
+  // With Press on, the 2D keyboard is drawn shifted down by the sink distance so
+  // a sounding note stays on its own key. `top` (not a transform) keeps it inside
+  // the box's own coordinate space, so the 3D transform composes as before.
+  const kbOffset = pressKeyboardOffset(size.height, appContext.pianoRollPress, props.mode === "3d");
 
   return (
     <div className="pianoroll-wrap">
@@ -256,9 +266,16 @@ export function PianoRoll(props: { mode: string }) {
       >
         <AutoSizeCanvas
           painter={(c) =>
-            // always draw the key-lane grooves — even with the keyboard off — so a
-            // stopped/empty roll still shows the pitch grid instead of looking broken
-            paintPianoRollBg(c, appContext.theme.palette.primary.main, true)
+            // Octave lines are always drawn — even with the keyboard off — so a
+            // stopped/empty roll still shows the pitch grid instead of looking
+            // broken; with Press on they shift down with the keyboard. The key rows
+            // go away there (they would disagree with the shifted keys).
+            paintPianoRollBg(
+              c,
+              appContext.theme.palette.primary.main,
+              appContext.pianoRollPress,
+              props.mode === "3d"
+            )
           }
           width={size.width} height={size.height} resX={resX} resY={resY}
         />
@@ -271,19 +288,19 @@ export function PianoRoll(props: { mode: string }) {
         {appContext.pianoRollKeyboard === "on" && <>
           <AutoSizeCanvas
             painter={(c) => paintWhiteKeyboard(c, props.mode === "3d")}
-            width={size.width} height={size.height} resX={resX} resY={resY}
+            width={size.width} height={size.height} resX={resX} resY={resY} offsetY={kbOffset}
           />
           <HighlightCanvas
             painter={(c, keys) => paintWhiteHighlight(c, keys, props.mode === "3d")}
-            width={size.width} height={size.height} resX={resX} resY={resY}
+            width={size.width} height={size.height} resX={resX} resY={resY} offsetY={kbOffset}
           />
           <AutoSizeCanvas
             painter={(c) => paintBlackKeyboard(c, props.mode === "3d")}
-            width={size.width} height={size.height} resX={resX} resY={resY}
+            width={size.width} height={size.height} resX={resX} resY={resY} offsetY={kbOffset}
           />
           <HighlightCanvas
             painter={(c, keys) => paintBlackHighlight(c, keys, props.mode === "3d")}
-            width={size.width} height={size.height} resX={resX} resY={resY}
+            width={size.width} height={size.height} resX={resX} resY={resY} offsetY={kbOffset}
           />
         </>}
       </div>

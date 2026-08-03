@@ -116,6 +116,104 @@ const GAP = 2;
 
 type Seg = { note: number; start: number; end: number; color: string; gap: boolean };
 
+// ---- Key-press "sink" ----
+//
+// While a note sounds, its whole block sinks slightly downward — like a struck
+// key held down — and rises back after it releases. The block moves rigidly
+// (never bends), and the amount is driven by the play head's NTSC frame index
+// rather than by screen position, so the motion is smooth as the roll scrolls
+// and identical at any canvas size / range setting.
+//
+// In 2D the sink would drop a sounding note off the key it belongs to, so the
+// keyboard is drawn shifted down by the same distance (see pressKeyboardOffset):
+// the note and its key stay together, and the note is free to move by the full
+// depth without being squashed or clamped. The keyboard is then offset from the
+// background key rows, so those are dropped while Press is on.
+const PRESS_DEPTH = 0.5; // 2D sink distance as a fraction of one pitch slot
+const PRESS_SHRINK = 0.2; // 3D inset per edge as a fraction of the note thickness
+const PRESS_SLIDE = 0.8; // 3D shift toward the past, as a fraction of the inset
+const PRESS_SOCKET = 0.55; // 3D darkness of the recess the note sank into
+const PRESS_ATTACK = 2; // NTSC frames to sink in after key-on (snappy)
+const PRESS_RELEASE = 8; // NTSC frames to rise back after the tail passes
+
+const smoothstep = (t: number) => (t <= 0 ? 0 : t >= 1 ? 1 : t * t * (3 - 2 * t));
+
+/** 0-1 sink amount of a segment for a play head at `nowIdx` (window index). */
+function pressAmount(seg: Seg, nowIdx: number): number {
+  if (nowIdx < seg.start) return 0; // not reached yet — at rest
+  if (nowIdx > seg.end) return smoothstep(1 - (nowIdx - seg.end) / PRESS_RELEASE);
+  return smoothstep((nowIdx - seg.start + 1) / PRESS_ATTACK);
+}
+
+type PressedRect = {
+  x: number; y: number; w: number; h: number;
+  /** 3D only: the resting footprint, drawn as a dark recess behind the note. */
+  socket: { x: number; y: number; w: number; h: number } | null;
+  amount: number;
+};
+
+/**
+ * Displace a note rect by `amount` (0-1) of press.
+ *
+ * 2D: the roll is seen face-on, so the block slides down the pitch axis. The
+ * keyboard follows it (pressKeyboardOffset), so nothing has to be clamped.
+ *
+ * 3D: canvas y IS the pitch axis (rotateZ(90deg) maps it to screen x), so a y
+ * offset would read as a pitch shift, not a press. The block is pushed along z
+ * instead — into the surface — which needs three cues, because a plain shrink is
+ * ambiguous (it just reads as a thinner note):
+ *
+ *  - it gets smaller (perspective: it moved away from the camera);
+ *  - it shifts slightly toward the past. Working through the transform, canvas
+ *    -x is the in-plane direction whose on-screen motion matches sinking: the
+ *    tilt is past 90°, so we see the surface's back face and its normal points
+ *    UP-screen — going into it moves down-screen. The shift is a fraction of a
+ *    pixel of note length, far too small to read as a timing change;
+ *  - the footprint it left behind is drawn as a dark recess (`socket`), which is
+ *    what actually sells the depth: it gives the shrink a reference frame and
+ *    doubles as the shaded walls of the hole.
+ *
+ * The x inset is the same number of pixels as the y inset (tied to the note
+ * thickness), so a long held note shrinks evenly instead of visibly retracting
+ * its ends — its length is musical information.
+ */
+function pressRect(
+  x: number, y: number, w: number, h: number,
+  slot: number, amount: number, is3d: boolean
+): PressedRect {
+  if (amount <= 0) return { x, y, w, h, socket: null, amount: 0 };
+  if (!is3d) return { x, y: y + amount * slot * PRESS_DEPTH, w, h, socket: null, amount };
+  const d = amount * h * PRESS_SHRINK;
+  return {
+    x: x + d * (1 - PRESS_SLIDE),
+    y: y + d,
+    w: Math.max(1, w - d * 2),
+    h: Math.max(1, h - d * 2),
+    socket: { x, y, w, h },
+    amount,
+  };
+}
+
+/**
+ * How far down the keyboard graphics must be drawn so a fully-pressed note still
+ * lines up with its own key. Applies to the 2D roll only — the 3D press pushes
+ * notes into the surface instead of along the pitch axis, so the keyboard stays
+ * put. `height` is the roll's height in the same unit as the wanted offset (pass
+ * CSS px to get CSS px), matching the pitch slot the notes are laid out on.
+ */
+export function pressKeyboardOffset(height: number, press: boolean, is3d: boolean): number {
+  if (!press || is3d) return 0;
+  return slotOf(height) * PRESS_DEPTH;
+}
+
+/** Shaded walls of the recess a pressed note sank into (3D only, no-op in 2D). */
+function fillSocket(ctx: CanvasRenderingContext2D, r: PressedRect) {
+  const s = r.socket;
+  if (s == null) return;
+  ctx.fillStyle = `rgba(0,0,0,${PRESS_SOCKET * r.amount})`;
+  ctx.fillRect(s.x, s.y, s.w, s.h);
+}
+
 // ---- Per-channel status cache, keyed by NTSC frame index ----
 //
 // Heavy register decoding (getStatusFromSnapshot) runs at most ONCE per NTSC
@@ -364,29 +462,43 @@ function drawParticles(
 
 // ---- Keyboard / background ----
 
-export function paintPianoRollBg(canvas: HTMLCanvasElement, primary = "#ffffff", showLanes = true) {
+export function paintPianoRollBg(
+  canvas: HTMLCanvasElement,
+  primary = "#ffffff",
+  press = false,
+  is3d = false
+) {
   const ctx = canvas.getContext("2d")!;
   // transparent background (no dark fill) so the roll composites over whatever is
   // behind it; white-key rows get a faint primary-colour tint (black-key rows are
-  // left blank), plus faint per-octave lines to hint the pitch lanes. The key
-  // lanes are hidden when the keyboard overlay is off.
+  // left blank), plus faint per-octave lines to hint the pitch lanes.
   ctx.clearRect(0, 0, canvas.width, canvas.height);
-  // when the keyboard overlay is off, the roll background stays fully blank
-  if (!showLanes) return;
   const px = Math.max(1, Math.floor(devicePixelRatio));
-  const rowH = Math.ceil(canvas.height / 96);
-  ctx.globalAlpha = 0.03;
-  ctx.fillStyle = primary;
-  for (let i = 0; i < 96; i++) {
-    const k = i % 12;
-    const isBlack = k === 1 || k === 3 || k === 6 || k === 8 || k === 10;
-    if (isBlack) continue; // black-key rows: nothing
-    ctx.fillRect(0, canvas.height * (1 - (i + 1) / 96), canvas.width, rowH);
+  // When the keyboard is displaced (2D Press), the octave lines follow it — they
+  // read as chrome belonging to the keys, not as note positions — and the key rows
+  // are dropped, since a second, unshifted set of rows behind the keys would just
+  // fight them. The lines always stay: a roll without them feels unmoored.
+  const shift = pressKeyboardOffset(canvas.height, press, is3d);
+  if (shift === 0) {
+    // The rows are a chromatic 96-row layout (12 per octave) while the notes and
+    // the keyboard use the 56 diatonic slots, so they only agree octave by octave.
+    // Both span the same area, above the reserved bottom pad.
+    const base = canvas.height - BOTTOM_PAD * slotOf(canvas.height);
+    const span = N_WHITE * slotOf(canvas.height);
+    const rowH = Math.ceil(span / 96);
+    ctx.globalAlpha = 0.03;
+    ctx.fillStyle = primary;
+    for (let i = 0; i < 96; i++) {
+      const k = i % 12;
+      const isBlack = k === 1 || k === 3 || k === 6 || k === 8 || k === 10;
+      if (isBlack) continue; // black-key rows: nothing
+      ctx.fillRect(0, base - ((i + 1) * span) / 96, canvas.width, rowH);
+    }
+    ctx.globalAlpha = 1;
   }
-  ctx.globalAlpha = 1;
   ctx.fillStyle = "rgba(255,255,255,0.08)";
   for (let o = 1; o < 8; o++) {
-    const gy = canvas.height * (1 - (o * 12) / 96);
+    const gy = slotTopOf(canvas.height, o * 7 - 1) + shift; // octave boundary = 7 slots
     ctx.fillRect(0, Math.round(gy), canvas.width, px);
   }
 }
@@ -414,25 +526,37 @@ function kbGeom(canvas: HTMLCanvasElement) {
 // between two white keys. Notes map to the same layout so they line up with the
 // keys (white notes on a key slot; black notes on the boundary between slots).
 const N_WHITE = 56;
+// Free space kept below the lowest key, in pitch slots. With Press on the
+// keyboard is drawn shifted down by PRESS_DEPTH of a slot (pressKeyboardOffset),
+// which would otherwise clip its lowest key against the bottom edge. Reserved
+// unconditionally so the pitch layout doesn't jump when Press is toggled — keep
+// it >= PRESS_DEPTH.
+const BOTTOM_PAD = 0.5;
 // kcode%12 -> white-key index within the octave (0..6), null for a black note
 const WHITE_INDEX: (number | null)[] = [0, null, 1, null, 2, 3, null, 4, null, 5, null, 6];
 // kcode%12 -> the white-key index a black note sits just above, null otherwise
 const BLACK_AFTER: (number | null)[] = [null, 0, null, 1, null, null, 3, null, 4, null, 5, null];
 
+/** Height of one white-key slot on a roll `height` px tall. */
+const slotOf = (height: number) => height / (N_WHITE + BOTTOM_PAD);
+/** Top edge of white slot `s` (0 = lowest), i.e. its boundary with slot s+1. */
+const slotTopOf = (height: number, s: number) =>
+  height - (s + 1 + BOTTOM_PAD) * slotOf(height);
+
 // Vertical placement of a note on a roll of the given height: top y and height
 // (device px). Parameterized by height so the per-channel grid cells can reuse
 // the same diatonic layout at any cell size.
 function noteGeomIn(height: number, kcode: number) {
-  const slot = height / N_WHITE;
+  const slot = slotOf(height);
   const k = ((kcode % 12) + 12) % 12;
   const oct = Math.floor(kcode / 12);
   const wi = WHITE_INDEX[k];
   if (wi != null) {
     const s = wi + oct * 7; // white slot index from the bottom
-    return { yTop: height * (1 - (s + 1) / N_WHITE), h: slot, black: false };
+    return { yTop: slotTopOf(height, s), h: slot, black: false };
   }
   const s = BLACK_AFTER[k]! + oct * 7; // black key sits above white slot s
-  const boundary = height * (1 - (s + 1) / N_WHITE);
+  const boundary = slotTopOf(height, s);
   const h = slot * 0.6;
   return { yTop: boundary - h / 2, h, black: true };
 }
@@ -478,7 +602,7 @@ export function paintWhiteKeyboard(canvas: HTMLCanvasElement, flip: boolean) {
   const ctx = canvas.getContext("2d")!;
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const { kw, dx } = kbGeom(canvas);
-  const slot = canvas.height / N_WHITE;
+  const slot = slotOf(canvas.height);
   const gap = Math.max(1, Math.round(slot * 0.12));
   const kh = Math.max(1, Math.ceil(slot) - gap);
   // lengthen the white keys a touch, extending the front (play-head/rounded) end:
@@ -493,7 +617,7 @@ export function paintWhiteKeyboard(canvas: HTMLCanvasElement, flip: boolean) {
   shade.addColorStop(0.22, "rgba(0,0,0,0)");
   shade.addColorStop(1, "rgba(255,255,255,0.07)");
   for (let i = 0; i < N_WHITE; i++) {
-    const y = canvas.height * (1.0 - (i + 1) / N_WHITE);
+    const y = slotTopOf(canvas.height, i);
     keyPath(ctx, kx, y, klen, kh, r, flip);
     ctx.fillStyle = "#f0f0f060";
     ctx.fill();
@@ -507,7 +631,7 @@ export function paintBlackKeyboard(canvas: HTMLCanvasElement, flip: boolean) {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const g = kbGeom(canvas);
   const dx = g.dx + (flip ? g.flip : 0);
-  const slot = canvas.height / N_WHITE;
+  const slot = slotOf(canvas.height);
   const bkh = Math.max(1, Math.round(slot * 0.6));
   const r = Math.max(1, Math.min(g.bw * 0.12, bkh * 0.25));
   // glossy at the play-head front → black at the back tip
@@ -519,7 +643,7 @@ export function paintBlackKeyboard(canvas: HTMLCanvasElement, flip: boolean) {
   // E (i%7===2) and B (i%7===6) where two white keys are adjacent.
   for (let i = 0; i < N_WHITE; i++) {
     if (i % 7 === 2 || i % 7 === 6) continue;
-    const boundary = canvas.height * (1.0 - (i + 1) / N_WHITE);
+    const boundary = slotTopOf(canvas.height, i);
     keyPath(ctx, dx, boundary - bkh / 2, g.bw, bkh, r, flip);
     ctx.fillStyle = body;
     ctx.fill();
@@ -533,7 +657,7 @@ export function paintWhiteHighlight(canvas: HTMLCanvasElement, keys: number[], f
   const ext = Math.round(kw * 0.1); // match paintWhiteKeyboard's lengthened keys
   const kx = flip ? dx - ext : dx;
   const klen = kw + ext;
-  const r = Math.max(1, Math.min(klen * 0.06, (canvas.height / N_WHITE) * 0.15));
+  const r = Math.max(1, Math.min(klen * 0.06, slotOf(canvas.height) * 0.15));
   ctx.fillStyle = "#f0f0f0f0";
   for (const kc of keys) {
     const ng = noteGeom(canvas, kc);
@@ -548,7 +672,7 @@ export function paintBlackHighlight(canvas: HTMLCanvasElement, keys: number[], f
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   const g = kbGeom(canvas);
   const dx = g.dx + (flip ? g.flip : 0);
-  const r = Math.max(1, Math.min(g.bw * 0.12, (canvas.height / N_WHITE) * 0.25));
+  const r = Math.max(1, Math.min(g.bw * 0.12, slotOf(canvas.height) * 0.25));
   ctx.fillStyle = "#f0f0f0f0";
   for (const kc of keys) {
     const ng = noteGeom(canvas, kc);
@@ -636,7 +760,8 @@ export function paintPianoRoll(
   particleType: PianoRollParticleType,
   colorConfig: PianoRollColorConfig = defaultColorConfig,
   mode: string = "2d",
-  shape3d: { sx: number; sy: number } | null = null
+  shape3d: { sx: number; sy: number } | null = null,
+  press: boolean = true
 ) {
   const now = performance.now();
   const dt = Math.min((now - lastRenderTime) / 1000, 1 / 20);
@@ -658,7 +783,7 @@ export function paintPianoRoll(
 
   // Deferred draws for currently-playing segments so they always sit on top,
   // giving a stable z-order regardless of channel index.
-  type Draw = { x: number; y: number; w: number; h: number; color: string; nowX: number; noteAge: number; vol: number };
+  type Draw = { r: PressedRect; color: string; nowX: number; noteAge: number; vol: number };
   const playingDraws: Draw[] = [];
 
   // Channel spotlight (set on solo-button hover): outline every note of the
@@ -669,6 +794,13 @@ export function paintPianoRoll(
   const hiStroke = "#ffffff";
   const hiLineWidth = Math.max(1, Math.round(1.5 * devicePixelRatio));
   const frameDraws: { x: number; y: number; w: number; h: number }[] = [];
+
+  // Note geometry is the same for every channel: a uniform thickness (midway
+  // between the white-key slot and the narrower black-key height) centered on the
+  // note's own slot/boundary center, so black and white notes read as the same
+  // weight and line up with the keyboard.
+  const slot = slotOf(canvas.height);
+  const noteH = Math.max(1, slot * 0.7 - 2);
 
   // Pass 1: build segments per channel, draw non-playing ones immediately
   const mask = playerContext.channelMask;
@@ -724,16 +856,19 @@ export function paintPianoRoll(
 
     for (const seg of segments) {
       const g = seg.gap ? GAP : 0;
-      const x = seg.start * step + g;
-      const w = Math.max(1, (seg.end - seg.start + 1) * step - g);
-      // Diatonic vertical placement so notes line up with the keyboard. Render
-      // every note at a uniform thickness (midway between the white-key slot and
-      // the narrower black-key height) centered on its own slot/boundary center,
-      // so black and white notes read as the same weight.
-      const ng = noteGeom(canvas, seg.note);
-      const noteH = (canvas.height / N_WHITE) * 0.7;
-      const h = Math.max(1, noteH - 2);
-      const y = ng.yTop + ng.h / 2 - h / 2;
+      const ng = noteGeom(canvas, seg.note); // diatonic placement, keyboard-aligned
+      // press while sounding (see pressAmount / pressRect): the block, its
+      // spotlight frame and its particle origin all move together
+      const pr = pressRect(
+        seg.start * step + g,
+        ng.yTop + ng.h / 2 - noteH / 2,
+        Math.max(1, (seg.end - seg.start + 1) * step - g),
+        noteH,
+        slot,
+        press ? pressAmount(seg, nowIdx) : 0,
+        mode === "3d"
+      );
+      const { x, y, w, h } = pr;
       const isPlaying = seg.start <= nowIdx && nowIdx <= seg.end;
 
       // Spotlight frames are collected and drawn last (frontmost), regardless of
@@ -745,8 +880,9 @@ export function paintPianoRoll(
       if (isPlaying) {
         // Volume at the play head (0-15); windowStart + nowIdx === currentNtsc.
         const vol = getStatusCached(playerContext.player, ch, windowStart + nowIdx)?.vol ?? 15;
-        playingDraws.push({ x, y, w, h, color: seg.color, nowX, noteAge: nowIdx - seg.start, vol });
+        playingDraws.push({ r: pr, color: seg.color, nowX, noteAge: nowIdx - seg.start, vol });
       } else {
+        fillSocket(ctx, pr); // still rising back after release
         ctx.fillStyle = seg.color + "99"; // dimmer when not sounding
         ctx.fillRect(x, y, w, h);
       }
@@ -755,13 +891,16 @@ export function paintPianoRoll(
 
   // Pass 2: draw playing segments on top (no blur) + particles
   for (const d of playingDraws) {
+    const { x, y, w, h } = d.r;
+    // The recess it sank into, under the note itself (3D only).
+    fillSocket(ctx, d.r);
     // Solid body so the note color stays true at its center.
     ctx.fillStyle = d.color + "ff";
-    ctx.fillRect(d.x, d.y, d.w, d.h);
+    ctx.fillRect(x, y, w, h);
     // Brightness lift the old glow used to give, but cheap: one additive pass
     // over the body (no shadowBlur) pushes the note toward its bright core.
     ctx.globalCompositeOperation = "lighter";
-    ctx.fillRect(d.x, d.y, d.w, d.h);
+    ctx.fillRect(x, y, w, h);
     ctx.globalCompositeOperation = "source-over";
 
     if (particleType !== "off") {
@@ -780,7 +919,7 @@ export function paintPianoRoll(
       // Scale particle size by channel volume: vol 0 → 50%, vol 15 → 100%.
       const sizeScale = 0.5 + 0.5 * (Math.max(0, Math.min(15, d.vol)) / 15);
       if (count > 0) {
-        spawnParticles(d.nowX, d.y + d.h / 2, d.color, count, sizeScale, particleType, canvas.height / PARTICLE_REF_H);
+        spawnParticles(d.nowX, y + h / 2, d.color, count, sizeScale, particleType, canvas.height / PARTICLE_REF_H);
       }
     }
   }
@@ -829,6 +968,7 @@ export function paintCellRoll(
   store: ParticleStore,
   dt: number,
   showVoice: boolean = true,
+  press: boolean = true,
 ) {
   const ctx = canvas.getContext("2d")!;
   const W = canvas.width;
@@ -857,7 +997,7 @@ export function paintCellRoll(
   // chrome: octave guides + now line
   ctx.fillStyle = "rgba(255,255,255,0.06)";
   for (let o = 1; o < 8; o++) {
-    const gy = H * (1 - (o * 7) / N_WHITE);
+    const gy = slotTopOf(H, o * 7 - 1);
     ctx.fillRect(0, Math.round(gy), W, px);
   }
   ctx.fillStyle = "rgba(255,255,255,0.14)";
@@ -865,7 +1005,7 @@ export function paintCellRoll(
 
   if (active) {
     const step = W / frames;
-    const slot = H / N_WHITE;
+    const slot = slotOf(H);
     // note thickness scales with the cell's aspect ratio: 2× a pitch slot when
     // wider than 2:1, 1× when taller than 16:9, linearly interpolated between.
     // (uniform across white/black keys; noteGeomIn returns a shorter height for
@@ -894,11 +1034,17 @@ export function paintCellRoll(
       const segments = buildSegments(playerContext.player, ch, windowStart, frames, channelMode, colorConfig);
       for (const seg of segments) {
         const g = seg.gap ? GAP : 0;
-        const x = seg.start * step + g;
-        const w = Math.max(1, (seg.end - seg.start + 1) * step - g);
         const ng = noteGeomIn(H, seg.note);
-        const h = noteH; // uniform thickness, centered on the note's slot
-        const y = ng.yTop + ng.h / 2 - h / 2;
+        // uniform thickness, centered on the note's slot; sinks while sounding
+        const { x, y, w, h } = pressRect(
+          seg.start * step + g,
+          ng.yTop + ng.h / 2 - noteH / 2,
+          Math.max(1, (seg.end - seg.start + 1) * step - g),
+          noteH,
+          slot,
+          press ? pressAmount(seg, nowIdx) : 0,
+          false // the grid is always face-on
+        );
         if (chMuted) {
           ctx.fillStyle = seg.color + "40";
           ctx.fillRect(x, y, w, h);

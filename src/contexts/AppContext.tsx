@@ -102,6 +102,7 @@ type AppContextData = {
   playlistFontScaleLevel: number;
   pianoRollRangeInSec: number;
   pianoRollLayered: boolean;
+  pianoRollPress: boolean; // sounding notes sink in, like a struck key
   pianoRollMode: string;
   pianoRollParticleType: PianoRollParticleType;
   pianoRollKeyboard: PianoRollKeyboardMode;
@@ -130,6 +131,7 @@ type AppContextData = {
   setPlaylistFontScaleLevel: (value: number) => void;
   setPianoRollRangeInSec: (value: number) => void;
   setPianoRollLayered: (value: boolean) => void;
+  setPianoRollPress: (value: boolean) => void;
   setPianoRollMode: (value: PianoRollMode) => void;
   setPianoRollParticleType: (value: PianoRollParticleType) => void;
   setPianoRollKeyboard: (value: PianoRollKeyboardMode) => void;
@@ -158,6 +160,7 @@ const defaultContextData: AppContextData = {
   playlistFontScaleLevel: 2,
   pianoRollRangeInSec: 4.0,
   pianoRollLayered: false,
+  pianoRollPress: true,
   pianoRollMode: "2d",
   pianoRollParticleType: "off",
   pianoRollKeyboard: "line",
@@ -186,6 +189,7 @@ const defaultContextData: AppContextData = {
   setPlaylistFontScaleLevel: noop,
   setPianoRollRangeInSec: noop,
   setPianoRollLayered: noop,
+  setPianoRollPress: noop,
   setPianoRollMode: noop,
   setPianoRollParticleType: noop,
   setPianoRollKeyboard: noop,
@@ -212,6 +216,7 @@ const keyChannelFontScaleLevel = "m3disp.channelFontScaleLevel";
 const keyPlaylistFontScaleLevel = "m3disp.playlistFontScaleLevel";
 const keyPianoRollRangeInSec = "m3disp.pianoRoll.rangeInSec";
 const keyPianoRollLayered = "m3disp.pianoRoll.layered";
+const keyPianoRollPress = "m3disp.pianoRoll.press";
 const keyPianoRollShowParticles = "m3disp.pianoRoll.showParticles"; // legacy boolean, migrated
 const keyPianoRollParticleType = "m3disp.pianoRoll.particleType";
 const keyPianoRollShowKeyboard = "m3disp.pianoRoll.showKeyboard"; // legacy boolean, migrated
@@ -399,6 +404,15 @@ export function AppContextProvider(props: PropsWithChildren) {
     }
   };
 
+  const setPianoRollPress = (value: boolean, save: boolean = true) => {
+    setState((oldState) => {
+      return { ...oldState, pianoRollPress: value };
+    });
+    if (save) {
+      localStorage.setItem(keyPianoRollPress, value.toString());
+    }
+  };
+
   const setPianoRollMode = (value: string, save: boolean = true) => {
     setState((oldState) => {
       return { ...oldState, pianoRollMode: value };
@@ -454,6 +468,7 @@ export function AppContextProvider(props: PropsWithChildren) {
     setPlaylistFontScaleLevel(2);
     setPianoRollRangeInSec(4.0);
     setPianoRollLayered(false);
+    setPianoRollPress(true);
     setPianoRollMode("2d");
     setPianoRollParticleType("off");
     setPianoRollKeyboard("line");
@@ -548,6 +563,10 @@ export function AppContextProvider(props: PropsWithChildren) {
     if (str != null) {
       setPianoRollLayered(str == "true", false);
     }
+    str = localStorage.getItem(keyPianoRollPress);
+    if (str != null) {
+      setPianoRollPress(str == "true", false);
+    }
     str = localStorage.getItem(keyPianoRollParticleType);
     if (str === "off" || str === "spark" || str === "star" || str === "heart") {
       setPianoRollParticleType(str, false);
@@ -624,6 +643,7 @@ export function AppContextProvider(props: PropsWithChildren) {
         setPlaylistFontScaleLevel,
         setPianoRollRangeInSec,
         setPianoRollLayered,
+        setPianoRollPress,
         setPianoRollMode,
         setPianoRollParticleType,
         setPianoRollKeyboard,

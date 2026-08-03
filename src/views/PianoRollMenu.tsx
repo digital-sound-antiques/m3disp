@@ -1,4 +1,4 @@
-import { AutoAwesome, Layers, Palette, Piano, ZoomIn } from "@mui/icons-material";
+import { AutoAwesome, Layers, Palette, Piano, TouchApp, ZoomIn } from "@mui/icons-material";
 import { ReactNode, useContext } from "react";
 import { AppContext, keyboardModeCycle, type PianoRollKeyboardMode } from "../contexts/AppContext";
 import { pianoRollColorDialogId } from "../widgets/PianoRollControl";
@@ -55,6 +55,9 @@ export function PianoRollMenu(props: { grid?: boolean; colorize?: boolean }) {
         toggle(<Layers sx={{ fontSize: 18 }} />, "Layer", ctx.pianoRollLayered, () =>
           ctx.setPianoRollLayered(!ctx.pianoRollLayered)
         )}
+      {toggle(<TouchApp sx={{ fontSize: 18 }} />, "Press", ctx.pianoRollPress, () =>
+        ctx.setPianoRollPress(!ctx.pianoRollPress)
+      )}
       <MenuSelect
         icon={<AutoAwesome sx={{ fontSize: 18 }} />}
         label="Particles"

@@ -83,7 +83,8 @@ export function KeyboardRoll(props: { channels: number[]; color: string }) {
         ac.pianoRollParticleType,
         storeRef.current,
         dt,
-        false // no voice/instrument name in the keyboard-side roll
+        false, // no voice/instrument name in the keyboard-side roll
+        ac.pianoRollPress
       );
       rollFrameGov.addCost(performance.now() - t0);
     };
