@@ -160,7 +160,7 @@ const defaultContextData: AppContextData = {
   playlistFontScaleLevel: 2,
   pianoRollRangeInSec: 4.0,
   pianoRollLayered: false,
-  pianoRollPress: true,
+  pianoRollPress: false,
   pianoRollMode: "2d",
   pianoRollParticleType: "off",
   pianoRollKeyboard: "line",
@@ -468,7 +468,7 @@ export function AppContextProvider(props: PropsWithChildren) {
     setPlaylistFontScaleLevel(2);
     setPianoRollRangeInSec(4.0);
     setPianoRollLayered(false);
-    setPianoRollPress(true);
+    setPianoRollPress(false);
     setPianoRollMode("2d");
     setPianoRollParticleType("off");
     setPianoRollKeyboard("line");

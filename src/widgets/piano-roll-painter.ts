@@ -761,7 +761,7 @@ export function paintPianoRoll(
   colorConfig: PianoRollColorConfig = defaultColorConfig,
   mode: string = "2d",
   shape3d: { sx: number; sy: number } | null = null,
-  press: boolean = true
+  press: boolean = false
 ) {
   const now = performance.now();
   const dt = Math.min((now - lastRenderTime) / 1000, 1 / 20);
@@ -968,7 +968,7 @@ export function paintCellRoll(
   store: ParticleStore,
   dt: number,
   showVoice: boolean = true,
-  press: boolean = true,
+  press: boolean = false,
 ) {
   const ctx = canvas.getContext("2d")!;
   const W = canvas.width;
