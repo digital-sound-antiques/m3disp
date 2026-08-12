@@ -108,6 +108,9 @@ type AppContextData = {
   pianoRollKeyboard: PianoRollKeyboardMode;
   pianoRollColorMode: PianoRollColorModeMap;
   pianoRollChannelColors: string[];
+  // Roll tab's own Colorize switch (independent of the Scope tab's waveColorize):
+  // off = every note in the primary color.
+  pianoRollColorize: boolean;
   openMap: { [key: string]: boolean };
   anchorElMap: { [key: string]: HTMLElement | null };
   isOpen: (id: string) => boolean;
@@ -137,6 +140,7 @@ type AppContextData = {
   setPianoRollKeyboard: (value: PianoRollKeyboardMode) => void;
   setPianoRollColorMode: (value: PianoRollColorModeMap) => void;
   setPianoRollChannelColors: (value: string[]) => void;
+  setPianoRollColorize: (value: boolean) => void;
   resetAllSettings: () => void;
 };
 
@@ -166,6 +170,7 @@ const defaultContextData: AppContextData = {
   pianoRollKeyboard: "line",
   pianoRollColorMode: { opll: "voice", psg: "voice", scc: "voice" },
   pianoRollChannelColors: [...defaultChannelColors],
+  pianoRollColorize: true,
   openMap: {},
   anchorElMap: {},
   isOpen: () => false,
@@ -195,6 +200,7 @@ const defaultContextData: AppContextData = {
   setPianoRollKeyboard: noop,
   setPianoRollColorMode: noop,
   setPianoRollChannelColors: noop,
+  setPianoRollColorize: noop,
   resetAllSettings: noop,
 };
 
@@ -224,6 +230,7 @@ const keyPianoRollKeyboard = "m3disp.pianoRoll.keyboard";
 const keyPianoRollMode = "m3disp.pianoRoll.mode";
 const keyPianoRollColorMode = "m3disp.pianoRoll.colorMode";
 const keyPianoRollChannelColors = "m3disp.pianoRoll.channelColors";
+const keyPianoRollColorize = "m3disp.pianoRoll.colorize";
 
 export function AppContextProvider(props: PropsWithChildren) {
   const isOpen = (id: string) => {
@@ -450,6 +457,13 @@ export function AppContextProvider(props: PropsWithChildren) {
     }
   };
 
+  const setPianoRollColorize = (value: boolean, save: boolean = true) => {
+    setState((oldState) => ({ ...oldState, pianoRollColorize: value }));
+    if (save) {
+      localStorage.setItem(keyPianoRollColorize, value.toString());
+    }
+  };
+
   // Restore every app-level setting to its factory default (and persist it).
   const resetAllSettings = () => {
     setPrimaryColor(defaultTheme.palette.primary.main);
@@ -474,6 +488,7 @@ export function AppContextProvider(props: PropsWithChildren) {
     setPianoRollKeyboard("line");
     setPianoRollColorMode({ opll: "voice", psg: "voice", scc: "voice" });
     setPianoRollChannelColors([...defaultChannelColors]);
+    setPianoRollColorize(true);
     // Let the layout (channel/playlist collapse, widths, section order, view
     // tab) reset itself; those states live in <Layout> and the section store.
     window.dispatchEvent(new Event("m3disp:reset-layout"));
@@ -567,6 +582,10 @@ export function AppContextProvider(props: PropsWithChildren) {
     if (str != null) {
       setPianoRollPress(str == "true", false);
     }
+    str = localStorage.getItem(keyPianoRollColorize);
+    if (str != null) {
+      setPianoRollColorize(str == "true", false);
+    }
     str = localStorage.getItem(keyPianoRollParticleType);
     if (str === "off" || str === "spark" || str === "star" || str === "heart") {
       setPianoRollParticleType(str, false);
@@ -649,6 +668,7 @@ export function AppContextProvider(props: PropsWithChildren) {
         setPianoRollKeyboard,
         setPianoRollColorMode,
         setPianoRollChannelColors,
+        setPianoRollColorize,
         resetAllSettings,
       }}
     >

@@ -1,9 +1,8 @@
-import { AutoAwesome, Layers, Palette, Piano, TouchApp, ZoomIn } from "@mui/icons-material";
+import { AutoAwesome, InvertColors, Layers, Piano, TouchApp, ZoomIn } from "@mui/icons-material";
 import { ReactNode, useContext } from "react";
 import { AppContext, keyboardModeCycle, type PianoRollKeyboardMode } from "../contexts/AppContext";
-import { pianoRollColorDialogId } from "../widgets/PianoRollControl";
 import { particleTypeCycle, type PianoRollParticleType } from "../widgets/piano-roll-painter";
-import { ColorizeItems, ScopeColumnsItem, ScopeFpsItem } from "./WaveMenu";
+import { ColorizeItems, ColorsItem, ScopeColumnsItem, ScopeFpsItem } from "./WaveMenu";
 import { MenuSelect } from "./MenuSelect";
 import { MenuToggle } from "./MenuToggle";
 
@@ -81,13 +80,16 @@ export function PianoRollMenu(props: { grid?: boolean; colorize?: boolean }) {
       {props.colorize ? (
         <ColorizeItems />
       ) : (
-        <button className="menu-item" onClick={() => ctx.openDialog(pianoRollColorDialogId)}>
-          <span className="menu-ico">
-            <Palette sx={{ fontSize: 18 }} />
-          </span>
-          <span className="menu-label">Colors…</span>
-        </button>
+        /* the Roll tab has its own Colorize switch, independent of the Scope
+           tab's: OFF = every note in the primary color */
+        <MenuToggle
+          icon={<InvertColors sx={{ fontSize: 18 }} />}
+          label="Colorize"
+          on={ctx.pianoRollColorize}
+          onToggle={() => ctx.setPianoRollColorize(!ctx.pianoRollColorize)}
+        />
       )}
+      <ColorsItem />
     </div>
   );
 }

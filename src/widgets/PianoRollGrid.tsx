@@ -16,6 +16,7 @@ import {
   createParticleStore,
   defaultVoiceColors,
   isChannelMuted,
+  monoColorConfig,
   opllBit,
   paintCellRoll,
 } from "./piano-roll-painter";
@@ -35,18 +36,6 @@ import {
   subscribeChannelVisibility,
 } from "../views/channel-visibility";
 import type { KSSDeviceName } from "../kss/kss-device";
-
-// A channelColors palette that is a single color for every channel (used when
-// Colorize is off). Memoized so the array identity is stable per color.
-let monoCache = "";
-let monoArr: string[] = [];
-function monoColors(color: string): string[] {
-  if (color !== monoCache) {
-    monoCache = color;
-    monoArr = channelIds.map(() => color);
-  }
-  return monoArr;
-}
 
 // flat channelIds[] index for (device, device-local index)
 const flatIndex = (device: KSSDeviceName, index: number) =>
@@ -121,11 +110,7 @@ function GridCell(props: {
             channelColors: ac.pianoRollChannelColors,
             voiceColors: defaultVoiceColors,
           }
-        : {
-            mode: { opll: "channel", psg: "channel", scc: "channel" } as const,
-            channelColors: monoColors(ac.theme.palette.primary.main),
-            voiceColors: defaultVoiceColors,
-          };
+        : monoColorConfig(ac.theme.palette.primary.main);
       paintCellRoll(
         c,
         playerRef.current,

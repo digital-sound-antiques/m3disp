@@ -2,25 +2,13 @@ import { useContext, useEffect, useRef, useState } from "react";
 import { PlayerContext } from "../contexts/PlayerContext";
 import { AppContext } from "../contexts/AppContext";
 import { rollFrameGov } from "./frame-governor";
-import { channelIds, createParticleStore, defaultVoiceColors, paintCellRoll } from "./piano-roll-painter";
-
-// single-color palette (Colorize off) — memoized so the array identity is stable
-let monoCache = "";
-let monoArr: string[] = [];
-function monoColors(color: string): string[] {
-  if (color !== monoCache) {
-    monoCache = color;
-    monoArr = channelIds.map(() => color);
-  }
-  return monoArr;
-}
-const CHANNEL_MODE = { opll: "channel", psg: "channel", scc: "channel" } as const;
+import { createParticleStore, monoColorConfig, paintCellRoll } from "./piano-roll-painter";
 
 /**
  * Compact per-channel piano roll shown beside a keyboard row when the Keyboard
  * view's Scope option is "roll". Reuses the same paintCellRoll as the Scope
- * grid; paced by the shared frame governor. Colorize follows the wave/roll
- * setting; otherwise a single `color`.
+ * grid; paced by the shared frame governor. Always drawn in the single `color`
+ * given by the keyboard row (the Colorize switches don't apply here).
  */
 export function KeyboardRoll(props: { channels: number[]; color: string }) {
   const player = useContext(PlayerContext);
@@ -68,12 +56,8 @@ export function KeyboardRoll(props: { channels: number[]; color: string }) {
       const ac = appRef.current;
       const dt = lastRef.current ? Math.min((t - lastRef.current) / 1000, 1 / 20) : 0;
       lastRef.current = t;
-      // fixed single color (independent of the Scope view's Colorize setting)
-      const colorConfig = {
-        mode: CHANNEL_MODE,
-        channelColors: monoColors(propsRef.current.color),
-        voiceColors: defaultVoiceColors,
-      };
+      // fixed single color (independent of the Colorize settings)
+      const colorConfig = monoColorConfig(propsRef.current.color);
       paintCellRoll(
         c,
         playerRef.current,

@@ -108,6 +108,23 @@ const defaultColorConfig: PianoRollColorConfig = {
   voiceColors: defaultVoiceColors,
 };
 
+/** A config that paints every channel in a single color (used when Colorize is
+ *  off, and by the keyboard-side rolls). Memoized per color so the palette array
+ *  keeps a stable identity across frames. */
+const monoColorConfigCache = new Map<string, PianoRollColorConfig>();
+export function monoColorConfig(color: string): PianoRollColorConfig {
+  let config = monoColorConfigCache.get(color);
+  if (config == null) {
+    config = {
+      mode: { opll: "channel", psg: "channel", scc: "channel" },
+      channelColors: channelIds.map(() => color),
+      voiceColors: defaultVoiceColors,
+    };
+    monoColorConfigCache.set(color, config);
+  }
+  return config;
+}
+
 export const lpos = 0.25;
 // leading gap (canvas px) for hard breaks (real key-on / note change)
 const GAP = 2;
@@ -795,12 +812,14 @@ export function paintPianoRoll(
   const hiLineWidth = Math.max(1, Math.round(1.5 * devicePixelRatio));
   const frameDraws: { x: number; y: number; w: number; h: number }[] = [];
 
-  // Note geometry is the same for every channel: a uniform thickness (midway
-  // between the white-key slot and the narrower black-key height) centered on the
-  // note's own slot/boundary center, so black and white notes read as the same
-  // weight and line up with the keyboard.
+  // Note geometry is the same for every channel: a uniform thickness centered on
+  // the note's own slot/boundary center, so black and white notes read as the
+  // same weight and line up with the keyboard. Capped at half a slot because the
+  // pitch axis is diatonic — a black note sits ON the boundary between two white
+  // slots, so semitone neighbours are only slot/2 apart and the nominal 0.7·slot
+  // thickness would have them overlap by 0.2·slot. The 1px keeps a hairline gap.
   const slot = slotOf(canvas.height);
-  const noteH = Math.max(1, slot * 0.7 - 2);
+  const noteH = Math.max(1, Math.min(slot * 0.7 - 2, slot * 0.5 - 1));
 
   // Pass 1: build segments per channel, draw non-playing ones immediately
   const mask = playerContext.channelMask;
@@ -883,7 +902,7 @@ export function paintPianoRoll(
         playingDraws.push({ r: pr, color: seg.color, nowX, noteAge: nowIdx - seg.start, vol });
       } else {
         fillSocket(ctx, pr); // still rising back after release
-        ctx.fillStyle = seg.color + "99"; // dimmer when not sounding
+        ctx.fillStyle = seg.color + "bb"; // dimmer when not sounding (alpha 0.73)
         ctx.fillRect(x, y, w, h);
       }
     }

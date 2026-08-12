@@ -14,6 +14,7 @@ import {
   paintKeyboardEdgeLine,
   pressKeyboardOffset,
   defaultVoiceColors,
+  monoColorConfig,
 } from "./piano-roll-painter";
 import { rollFrameGov } from "./frame-governor";
 import { isChannelHidden } from "../views/channel-visibility";
@@ -140,17 +141,22 @@ function PianoRollCanvas(props: { width: number; height: number; resX?: number; 
       rollFrameGov.forcedFps = ac.scopeFps;
       if (!rollFrameGov.frame(t)) return;
       const t0 = performance.now();
+      // Colorize OFF → every note in the primary color; ON → the usual
+      // per-channel/voice palette.
+      const colorConfig = ac.pianoRollColorize
+        ? {
+            mode: ac.pianoRollColorMode,
+            channelColors: ac.pianoRollChannelColors,
+            voiceColors: defaultVoiceColors,
+          }
+        : monoColorConfig(ac.theme.palette.primary.main);
       paintPianoRoll(
         canvas,
         playerContextRef.current,
         ac.pianoRollRangeInSec,
         ac.pianoRollLayered,
         ac.pianoRollParticleType,
-        {
-          mode: ac.pianoRollColorMode,
-          channelColors: ac.pianoRollChannelColors,
-          voiceColors: defaultVoiceColors,
-        },
+        colorConfig,
         ac.pianoRollMode,
         shape3dRef.current,
         ac.pianoRollPress

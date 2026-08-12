@@ -1,6 +1,7 @@
-import { GraphicEq, Height, InvertColors, Layers, Speed, ViewColumn } from "@mui/icons-material";
+import { GraphicEq, Height, InvertColors, Layers, Palette, Speed, ViewColumn } from "@mui/icons-material";
 import { useContext } from "react";
 import { AppContext } from "../contexts/AppContext";
+import { pianoRollColorDialogId } from "../widgets/PianoRollControl";
 import { MenuSelect } from "./MenuSelect";
 import { MenuToggle } from "./MenuToggle";
 
@@ -113,6 +114,21 @@ export function ColorizeItems() {
   );
 }
 
+/** Opens the channel/voice color dialog. The palette it edits is shared by every
+ *  view that colorizes (the roll, both Scope grids), so it belongs in each of
+ *  their menus. */
+export function ColorsItem() {
+  const ctx = useContext(AppContext);
+  return (
+    <button className="menu-item" onClick={() => ctx.openDialog(pianoRollColorDialogId)}>
+      <span className="menu-ico">
+        <Palette sx={{ fontSize: 18 }} />
+      </span>
+      <span className="menu-label">Colors…</span>
+    </button>
+  );
+}
+
 /** Settings menu for the Scope tab in WAVE mode: Waterfall, colorize options,
  *  and the oscilloscope window size. */
 export function WaveMenu() {
@@ -132,6 +148,7 @@ export function WaveMenu() {
       <WaveYScaleItem />
       <ScopeFpsItem />
       <ColorizeItems />
+      <ColorsItem />
     </div>
   );
 }
