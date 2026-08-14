@@ -4,7 +4,7 @@ import { ChevronRight, ExpandMore } from "@mui/icons-material";
 import { DragDropContext, Draggable, Droppable, DropResult } from "@hello-pangea/dnd";
 import { PlayerContext } from "../contexts/PlayerContext";
 import { ChannelId } from "../kss/channel-status";
-import { KSSChannelMask, KSSDeviceName } from "../kss/kss-device";
+import { KSSChannelMask, DeviceName } from "../kss/kss-device";
 import { toggleSolo } from "../kss/channel-solo";
 import { Keyboard } from "./Keyboard";
 import { TrackInfoPanel, VolumeInfoPanel } from "./TrackInfo";
@@ -28,7 +28,7 @@ import { KeyboardRoll } from "./KeyboardRoll";
 
 type DeviceCardProps = {
   name: string;
-  device: KSSDeviceName;
+  device: DeviceName;
   targets: Array<number[] | number>;
   small?: boolean;
   columns?: number;
@@ -41,11 +41,11 @@ const opllBit = (ch: number) => (ch < 9 ? ch : 22 - ch);
 
 // flat channelIds[] index for (device, device-local index), and per-cell/card
 // visibility (a card is hidden when every cell's channels are all hidden)
-const flatIndex = (device: KSSDeviceName, index: number) =>
+const flatIndex = (device: DeviceName, index: number) =>
   channelIds.findIndex((c) => c.device === device && c.index === index);
-const cellChannels = (device: KSSDeviceName, t: number[] | number) =>
+const cellChannels = (device: DeviceName, t: number[] | number) =>
   (typeof t === "number" ? [t] : t).map((e) => flatIndex(device, e));
-const isCardHidden = (device: KSSDeviceName, targets: Array<number[] | number>) =>
+const isCardHidden = (device: DeviceName, targets: Array<number[] | number>) =>
   targets.every((t) => areChannelsHidden(cellChannels(device, t)));
 
 function DeviceCard(props: DeviceCardProps) {
@@ -210,11 +210,14 @@ function DeviceCard(props: DeviceCardProps) {
 // OPLL slots and PSG tone+noise pairs identically.
 export const DEVICE_CARDS: Record<
   string,
-  { name: string; device: KSSDeviceName; targets: Array<number[] | number> }
+  { name: string; device: DeviceName; targets: Array<number[] | number> }
 > = {
   opll: { name: "OPLL", device: "opll", targets: [0, 1, 2, 3, 4, 5, [6, 9], [7, 10, 13], [8, 11, 12]] },
   psg: { name: "PSG", device: "psg", targets: [[0, 3], [1, 4], [2, 5]] },
   scc: { name: "SCC", device: "scc", targets: [0, 1, 2, 3, 4] },
+  // SPC mode's only section. The eight S-DSP voices are interchangeable — no
+  // fixed roles, no shared slots — so each one is its own card.
+  spc: { name: "S-DSP", device: "spc", targets: [0, 1, 2, 3, 4, 5, 6, 7] },
 };
 
 export function KeyboardList(props: {

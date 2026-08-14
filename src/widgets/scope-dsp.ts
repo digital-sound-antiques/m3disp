@@ -3,7 +3,7 @@
 // and the phase-lock (correlation) trigger. Kept out of WaveGrid so both callers
 // can import it without an import cycle.
 import { PerChLayout } from "libkss-js";
-import type { KSSDeviceName } from "../kss/kss-device";
+import type { DeviceName } from "../kss/kss-device";
 
 // OPLL rhythm channels are ordered differently in emu2413's ch_out (the per-ch
 // wave buffer) than in m3disp's channelIds convention. Map channelIds rhythm
@@ -12,7 +12,9 @@ import type { KSSDeviceName } from "../kss/kss-device";
 const OPLL_RHYTHM_WAVE: Record<number, number> = { 9: 9, 10: 11, 11: 12, 12: 13, 13: 10 };
 
 // per-channel wave-buffer int16 offset for a device-local channel index
-export const waveOffset = (device: KSSDeviceName, index: number) => {
+export const waveOffset = (device: DeviceName, index: number) => {
+  // The eight S-DSP voices sit at the front of the shared per-channel layout.
+  if (device === "spc") return index;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const base = (PerChLayout as any)[device].offset as number;
   if (device === "opll" && index >= 9) return base + OPLL_RHYTHM_WAVE[index];

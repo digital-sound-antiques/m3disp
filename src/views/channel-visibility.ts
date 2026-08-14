@@ -4,11 +4,18 @@
 // list. This is a display concern parallel to channel-section-order, so it's the
 // same standalone external store: keyed by the flat channelIds index (opll 0-13,
 // psg 14-19, scc 20-24), persisted, default = everything visible (empty set).
+import { modeStorageSuffix, subscribePlayerMode } from "../player-mode";
+
+// The flat index means something different per player mode (25 KSS channels vs
+// 8 SPC voices), so each mode gets its own storage slot and the set is reloaded
+// when the mode changes.
 const KEY = "m3disp.chHidden";
+
+const storageKey = () => `${KEY}${modeStorageSuffix()}`;
 
 function load(): Set<number> {
   try {
-    const raw = localStorage.getItem(KEY);
+    const raw = localStorage.getItem(storageKey());
     if (raw) return new Set<number>(JSON.parse(raw) as number[]);
   } catch {
     /* ignore malformed */
@@ -23,9 +30,16 @@ const listeners = new Set<() => void>();
 
 function commit() {
   snapshot = [...hidden].sort((a, b) => a - b);
-  localStorage.setItem(KEY, JSON.stringify(snapshot));
+  localStorage.setItem(storageKey(), JSON.stringify(snapshot));
   for (const l of listeners) l();
 }
+
+// Switching modes swaps in that mode's own hidden set.
+subscribePlayerMode(() => {
+  hidden = load();
+  snapshot = [...hidden].sort((a, b) => a - b);
+  for (const l of listeners) l();
+});
 
 export function subscribeChannelVisibility(cb: () => void): () => void {
   listeners.add(cb);
@@ -65,6 +79,7 @@ export function setChannelsHidden(flatIndices: number[], hide: boolean): void {
 }
 
 export function resetChannelVisibility(): void {
+  for (const suffix of ["", ".spc"]) localStorage.removeItem(`${KEY}${suffix}`);
   if (hidden.size) {
     hidden = new Set();
     commit();

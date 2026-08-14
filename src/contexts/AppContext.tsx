@@ -51,6 +51,7 @@ export type PianoRollColorModeMap = {
   opll: PianoRollColorMode;
   psg: PianoRollColorMode;
   scc: PianoRollColorMode;
+  spc: PianoRollColorMode;
 };
 
 // How the flat pianoRollChannelColors[] array maps onto each device, matching
@@ -60,6 +61,10 @@ const channelColorGroups: { device: keyof PianoRollColorModeMap; base: number; c
   { device: "opll", base: 0, count: 14 },
   { device: "psg", base: 14, count: 6 },
   { device: "scc", base: 20, count: 5 },
+  // SPC mode replaces the KSS channel list rather than extending it, so its
+  // voices are indexed 0-7 there; the shared colour array keeps them after the
+  // KSS block so one stored palette covers both modes.
+  { device: "spc", base: 25, count: 8 },
 ];
 
 function channelColorsToMap(colors: string[]): { [device: string]: string[] } {
@@ -77,6 +82,9 @@ function channelColorsFromMap(obj: unknown, fallback: string[]): string[] | null
   const result = fallback.slice();
   for (const g of channelColorGroups) {
     const arr = map[g.device];
+    // A group added after the settings were last saved is simply absent; keep
+    // its defaults rather than discarding the whole stored palette.
+    if (arr === undefined) continue;
     if (!Array.isArray(arr) || arr.length !== g.count) return null;
     for (let i = 0; i < g.count; i++) {
       if (typeof arr[i] !== "string") return null;
@@ -168,7 +176,7 @@ const defaultContextData: AppContextData = {
   pianoRollMode: "2d",
   pianoRollParticleType: "off",
   pianoRollKeyboard: "line",
-  pianoRollColorMode: { opll: "voice", psg: "voice", scc: "voice" },
+  pianoRollColorMode: { opll: "voice", psg: "voice", scc: "voice", spc: "channel" },
   pianoRollChannelColors: [...defaultChannelColors],
   pianoRollColorize: true,
   openMap: {},
@@ -486,7 +494,7 @@ export function AppContextProvider(props: PropsWithChildren) {
     setPianoRollMode("2d");
     setPianoRollParticleType("off");
     setPianoRollKeyboard("line");
-    setPianoRollColorMode({ opll: "voice", psg: "voice", scc: "voice" });
+    setPianoRollColorMode({ opll: "voice", psg: "voice", scc: "voice", spc: "channel" });
     setPianoRollChannelColors([...defaultChannelColors]);
     setPianoRollColorize(true);
     // Let the layout (channel/playlist collapse, widths, section order, view
@@ -610,8 +618,19 @@ export function AppContextProvider(props: PropsWithChildren) {
     if (colorModeStr != null) {
       try {
         const m = JSON.parse(colorModeStr);
-        const pick = (v: unknown): PianoRollColorMode => (v === "channel" ? "channel" : "voice");
-        setPianoRollColorMode({ opll: pick(m?.opll), psg: pick(m?.psg), scc: pick(m?.scc) }, false);
+        const pick = (v: unknown, fallback: PianoRollColorMode = "voice"): PianoRollColorMode =>
+          v === "channel" ? "channel" : v === "voice" ? "voice" : fallback;
+        setPianoRollColorMode(
+          {
+            opll: pick(m?.opll),
+            psg: pick(m?.psg),
+            scc: pick(m?.scc),
+            // Absent from settings saved before SPC support; the S-DSP has no
+            // voice numbers to colour by, so it defaults to "by channel".
+            spc: pick(m?.spc, "channel"),
+          },
+          false
+        );
       } catch {
         /* ignore malformed value */
       }

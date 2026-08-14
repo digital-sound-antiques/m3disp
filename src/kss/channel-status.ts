@@ -1,6 +1,7 @@
 import { KSSPlayer } from "./kss-player";
-import { KSSDeviceName } from "./kss-device";
+import { DeviceName } from "./kss-device";
 import type { KSSDecoderDeviceSnapshot } from "./kss-decoder-worker";
+import { SPC_VOICE_FIELDS, SPC_FLAG_NOISE, SPC_FLAG_ECHO, SPC_FLAG_PMOD } from "../spc/spc-engine";
 
 export type ChannelStatus = {
   id: ChannelId;
@@ -210,6 +211,8 @@ export function getChannelStatus(player: KSSPlayer, id: ChannelId): ChannelStatu
       return createSCCStatus(snapshot.scc!, id, snapshot.sccKeyKeepFrames!);
     case "opll":
       return createOPLLStatus(snapshot.opll!, id, snapshot.opllKeyKeepFrames!);
+    case "spc":
+      return snapshot.spc ? createSPCStatus(snapshot.spc, id) : null;
     default:
       throw new Error(`Uknown device: ${id.device}`);
   }
@@ -246,6 +249,9 @@ export function getChannelStatusArray(
       case "opll":
         res.push(createOPLLStatus(snapshot.opll!, id, snapshot.opllKeyKeepFrames!));
         break;
+      case "spc":
+        res.push(snapshot.spc ? createSPCStatus(snapshot.spc, id) : null);
+        break;
       default:
         res.push(null);
         break;
@@ -256,9 +262,42 @@ export function getChannelStatusArray(
 }
 
 export type ChannelId = {
-  device: KSSDeviceName;
+  device: DeviceName;
   index: number;
 };
+
+/**
+ * One S-DSP voice, decoded from the packed snapshot the SPC engine posts.
+ *
+ * `kcode` is anchored at C5 for a pitch of $1000 (see spc-engine): the pitch
+ * register is a resampling ratio, and the base pitch of the BRR sample it
+ * applies to is not stored in an .spc, so only the intervals are meaningful.
+ */
+function createSPCStatus(spc: Int16Array, id: ChannelId): ChannelStatus {
+  const o = id.index * SPC_VOICE_FIELDS;
+  const kcode = spc[o];
+  const vol = spc[o + 1];
+  const keyKeepFrames = spc[o + 2];
+  const srcn = spc[o + 3];
+  const flags = spc[o + 4];
+
+  const noise = (flags & SPC_FLAG_NOISE) !== 0;
+  const names: string[] = [];
+  if (noise) names.push("Noise");
+  if (flags & SPC_FLAG_PMOD) names.push("PMod");
+  if (flags & SPC_FLAG_ECHO) names.push("Echo");
+
+  return {
+    id,
+    freq: kcode >= 0 ? 440 * Math.pow(2, (kcode - 57) / 12) : 0,
+    kcode: kcode >= 0 ? kcode : null,
+    vol,
+    voice: noise ? "Noise" : `Sample ${srcn}`,
+    vnum: srcn,
+    mode: names.join(" ") || null,
+    keyKeepFrames,
+  };
+}
 
 /** Extract full ChannelStatus from a single snapshot (for incremental caching) */
 export function getStatusFromSnapshot(
@@ -271,6 +310,7 @@ export function getStatusFromSnapshot(
       case "psg": return snapshot.psg ? createPSGStatus(snapshot.psg, id, snapshot.psgKeyKeepFrames ?? []) : null;
       case "scc": return snapshot.scc ? createSCCStatus(snapshot.scc, id, snapshot.sccKeyKeepFrames ?? []) : null;
       case "opll": return snapshot.opll ? createOPLLStatus(snapshot.opll, id, snapshot.opllKeyKeepFrames ?? []) : null;
+      case "spc": return snapshot.spc ? createSPCStatus(snapshot.spc, id) : null;
       default: return null;
     }
   } catch { return null; }
@@ -287,6 +327,7 @@ export function getKcodeAt(
       case "psg": return snapshot.psg ? createPSGStatus(snapshot.psg, id, snapshot.psgKeyKeepFrames ?? [])?.kcode ?? null : null;
       case "scc": return snapshot.scc ? createSCCStatus(snapshot.scc, id, snapshot.sccKeyKeepFrames ?? [])?.kcode ?? null : null;
       case "opll": return snapshot.opll ? createOPLLStatus(snapshot.opll, id, snapshot.opllKeyKeepFrames ?? [])?.kcode ?? null : null;
+      case "spc": return snapshot.spc ? createSPCStatus(snapshot.spc, id).kcode ?? null : null;
       default: return null;
     }
   } catch { return null; }

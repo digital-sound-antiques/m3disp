@@ -19,7 +19,6 @@ export function AboutDialog() {
     <FloatingDialog id="about-dialog" title="About" className="fdlg-about">
       <div className="crd-body abt-body">
         <img className="abt-logo" src={logo} width={128} alt="m3disp" />
-        <div className="abt-line">A realtime MSX sound player for the Web</div>
         <div className="abt-line">v{packageJson.version}</div>
         <div className="abt-line abt-drivers">This software uses the following drivers.</div>
         {acknowledgements.map((e) => (

@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useRef, useState } from "react";
 import { AppContext, PianoRollColorModeMap } from "../contexts/AppContext";
 import { ColorBall } from "../widgets/ColorSelector";
 import { pianoRollColorDialogId } from "../widgets/PianoRollControl";
+import { PlayerContext } from "../contexts/PlayerContext";
 import { defaultChannelColors, type PianoRollColorMode } from "../widgets/piano-roll-painter";
 
 // Channel labels, aligned 1:1 with channelIds[] in piano-roll-painter.ts.
@@ -9,14 +10,26 @@ const oplFmLabels = ["OPLL1", "OPLL2", "OPLL3", "OPLL4", "OPLL5", "OPLL6", "OPLL
 const oplRhythmLabels = ["BD", "SD", "TOM", "CYM", "HH"];
 const psgLabels = ["PSG1", "PSG2", "PSG3", "NOISE1", "NOISE2", "NOISE3"];
 const sccLabels = ["SCC1", "SCC2", "SCC3", "SCC4", "SCC5"];
+const spcLabels = ["CH1", "CH2", "CH3", "CH4", "CH5", "CH6", "CH7", "CH8"];
 
-type ChannelGroup = { device: keyof PianoRollColorModeMap; name: string; labels: string[]; base: number };
+type ChannelGroup = {
+  device: keyof PianoRollColorModeMap;
+  name: string;
+  labels: string[];
+  base: number;
+  /** Only offered once the playlist actually holds an .spc. */
+  spcOnly?: boolean;
+};
 
 // base = starting index into channelIds[] / the channel color arrays.
 const channelGroups: ChannelGroup[] = [
   { device: "opll", name: "OPLL", labels: [...oplFmLabels, ...oplRhythmLabels], base: 0 },
   { device: "psg", name: "PSG", labels: psgLabels, base: 14 },
   { device: "scc", name: "SCC", labels: sccLabels, base: 20 },
+  // SPC mode replaces the KSS channel list rather than extending it, so its
+  // voices are indexed 0-7 while playing; the shared colour array keeps them
+  // after the KSS block, which is the base used here.
+  { device: "spc", name: "SPC700", labels: spcLabels, base: 25, spcOnly: true },
 ];
 
 /** Normalize an arbitrary stored color into the #rrggbb form <input type="color"> requires. */
@@ -52,7 +65,14 @@ function ColorPickerBall(props: { color: string; disabled?: boolean; onChange: (
 
 function DialogBody(props: { id: string }) {
   const app = useContext(AppContext);
-  const [tab, setTab] = useState(0);
+  const { entries } = useContext(PlayerContext);
+  // The SPC tab would be dead weight for the MSX listener this app is built
+  // for, so it appears only once an .spc is in the playlist. Older entries
+  // predate the format flag, hence the filename fallback.
+  const hasSPC = entries.some((e) => e.format === "spc" || /\.spc$/i.test(e.filename));
+  const groups = channelGroups.filter((g) => !g.spcOnly || hasSPC);
+  const [tabIndex, setTab] = useState(0);
+  const tab = Math.min(tabIndex, groups.length - 1);
 
   // Snapshot of the values when the dialog opened, restored on Cancel.
   const [savedMode] = useState(app.pianoRollColorMode);
@@ -95,7 +115,7 @@ function DialogBody(props: { id: string }) {
     <>
       <div className="crd-body">
         <div className="crd-tabs">
-          {channelGroups.map((grp, i) => (
+          {groups.map((grp, i) => (
             <button
               key={grp.device}
               className={`crd-tab${tab === i ? " active" : ""}`}
@@ -109,7 +129,7 @@ function DialogBody(props: { id: string }) {
         {/* stack all device groups in one grid cell so switching tabs doesn't
             resize the dialog (height stays at the tallest group) */}
         <div className="crd-panels">
-          {channelGroups.map((grp, i) => {
+          {groups.map((grp, i) => {
             const gMode = mode[grp.device];
             const disabled = gMode === "voice"; // channel colors only apply "By Channel"
             return (

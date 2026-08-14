@@ -11,6 +11,8 @@ import { PlayerContextReducer } from "./PlayerContextReducer";
 import { AppProgressContext } from "./AppProgressContext";
 import { KSSDecoderStartOptions } from "../kss/kss-decoder-worker";
 import { SurroundEffect, SurroundMode } from "../utils/surround";
+import { isSPCFile } from "spc700-js";
+import { setPlayerMode } from "../player-mode";
 
 export type PlayListEntry = {
   title?: string | null;
@@ -19,6 +21,8 @@ export type PlayListEntry = {
   duration?: number | null; // in ms
   fadeDuration?: number | null; // in ms
   song?: number | null; // sub song number
+  /** Set for .spc entries; drives the SPC-only parts of the UI. */
+  format?: "spc" | null;
   loop?: number | null; // loop number
 };
 
@@ -100,6 +104,7 @@ const createDefaultContextState = () => {
       opl: 0,
       opll: 0,
       scc: 0,
+      spc: 0,
     },
     unmute: async () => {
       unmuteAudio();
@@ -223,6 +228,13 @@ async function applyPlayStateChange(
     const { channelMask } = state;
     const { dataId, song, duration, fadeDuration } = entry;
     const data = await state.storage.get(dataId);
+
+    // The track's format decides the whole display mode: an SPC track shows
+    // only its 8 S-DSP voices, everything else only the MSX devices. Set it
+    // before play() so the views never render one mode's channels against the
+    // other's data.
+    setPlayerMode(isSPCFile(data) ? "spc" : "kss");
+
     const options: KSSDecoderStartOptions = {
       channelMask,
       data,

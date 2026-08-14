@@ -35,14 +35,14 @@ import {
   getHiddenChannels,
   subscribeChannelVisibility,
 } from "../views/channel-visibility";
-import type { KSSDeviceName } from "../kss/kss-device";
+import type { DeviceName } from "../kss/kss-device";
 
 // flat channelIds[] index for (device, device-local index)
-const flatIndex = (device: KSSDeviceName, index: number) =>
+const flatIndex = (device: DeviceName, index: number) =>
   channelIds.findIndex((c) => c.device === device && c.index === index);
 
 // a category is hidden when every one of its cells (all their channels) is hidden
-const isCardHidden = (device: KSSDeviceName, targets: Array<number[] | number>) =>
+const isCardHidden = (device: DeviceName, targets: Array<number[] | number>) =>
   targets.every((t) =>
     areChannelsHidden((typeof t === "number" ? [t] : t).map((e) => flatIndex(device, e)))
   );
@@ -53,7 +53,7 @@ const isCardHidden = (device: KSSDeviceName, targets: Array<number[] | number>) 
 function GridCell(props: {
   label: string;
   channels: number[];
-  device: KSSDeviceName;
+  device: DeviceName;
   targets: number[];
   row: number;
 }) {

@@ -4,7 +4,8 @@ import { type ChannelId, type ChannelStatus, getStatusFromSnapshot } from "../ks
 import { pianoRollHighlight } from "./piano-roll-highlight";
 import { isChannelHidden } from "../views/channel-visibility";
 import type { KSSDecoderDeviceSnapshot } from "../kss/kss-decoder-worker";
-import type { KSSChannelMask, KSSDeviceName } from "../kss/kss-device";
+import type { KSSChannelMask, DeviceName } from "../kss/kss-device";
+import { channelIds, getPlayerMode, KSS_CHANNEL_IDS, SPC_CHANNEL_IDS } from "../player-mode";
 
 // OPLL rhythm channels (index 9-13) use reversed mute bits (BD=13 … HH=9); PSG
 // tone channels 3-5 share bits 0-2 with 0-2; SCC and OPLL melody map 1:1.
@@ -17,6 +18,8 @@ export function isChannelMuted(mask: KSSChannelMask, id: ChannelId): boolean {
       return (mask.psg & (1 << (id.index % 3))) !== 0;
     case "scc":
       return (mask.scc & (1 << id.index)) !== 0;
+    case "spc":
+      return (mask.spc & (1 << id.index)) !== 0;
     default:
       return false;
   }
@@ -24,33 +27,10 @@ export function isChannelMuted(mask: KSSChannelMask, id: ChannelId): boolean {
 
 // ---- Channel definitions ----
 
-export const channelIds: ChannelId[] = [
-  { device: "opll", index: 0 },
-  { device: "opll", index: 1 },
-  { device: "opll", index: 2 },
-  { device: "opll", index: 3 },
-  { device: "opll", index: 4 },
-  { device: "opll", index: 5 },
-  { device: "opll", index: 6 },
-  { device: "opll", index: 7 },
-  { device: "opll", index: 8 },
-  { device: "opll", index: 9 },
-  { device: "opll", index: 10 },
-  { device: "opll", index: 11 },
-  { device: "opll", index: 12 },
-  { device: "opll", index: 13 },
-  { device: "psg", index: 0 },
-  { device: "psg", index: 1 },
-  { device: "psg", index: 2 },
-  { device: "psg", index: 3 },
-  { device: "psg", index: 4 },
-  { device: "psg", index: 5 },
-  { device: "scc", index: 0 },
-  { device: "scc", index: 1 },
-  { device: "scc", index: 2 },
-  { device: "scc", index: 3 },
-  { device: "scc", index: 4 },
-];
+// The channel list is per player mode and swaps with it; re-exported here so
+// the long-standing `import { channelIds } from "./piano-roll-painter"` sites
+// keep working. It is a live binding, so they follow the swap.
+export { channelIds };
 
 // Default 16-color palette for the "by tone" (voice) coloring mode. Indexed by
 // the channel's voice number (vnum % 16). Editable via the color settings dialog.
@@ -79,6 +59,10 @@ export const defaultChannelColors: string[] = [
   "#7f95fe", "#07b6ac", "#d176d6", "#e75f66", "#fb8370", "#e56636",
   // SCC 1-5
   "#b0a106", "#1aa9f4", "#1fbb6f", "#a388fb", "#d78c18",
+  // S-DSP voices 1-8: eight hues spread evenly around the wheel at the same
+  // perceptual lightness and chroma, so both modes read as one design.
+  "#e18516", "#b99c1c", "#47b95f", "#1db98d",
+  "#1fbb6f", "#20ace5", "#968efa", "#dd72c2",
 ];
 
 export const colorMap = [
@@ -89,6 +73,26 @@ export const colorMap = [
   Colors.red, Colors.red, Colors.red,
   Colors.yellow, Colors.yellow, Colors.yellow, Colors.yellow, Colors.yellow,
 ];
+
+/** Fallback families for the eight S-DSP voices, spread around the wheel. */
+const spcColorMap = [
+  Colors.orange, Colors.amber, Colors.green, Colors.teal,
+  Colors.cyan, Colors.blue, Colors.deepPurple, Colors.pink,
+];
+
+/** Family table for the active mode (drives the per-channel fallback color). */
+const activeColorMap = () => (getPlayerMode() === "spc" ? spcColorMap : colorMap);
+
+/** Index into the shared colour array for a flat channel index. SPC mode
+ *  replaces the KSS channel list rather than extending it, so its voices count
+ *  from 0 there but are stored after the KSS block. */
+export function colorIndexOf(ch: number): number {
+  return getPlayerMode() === "spc" ? KSS_CHANNEL_IDS.length + ch : ch;
+}
+
+function channelColorOf(config: PianoRollColorConfig, ch: number, fallback: string): string {
+  return config.channelColors[colorIndexOf(ch)] ?? fallback;
+}
 
 export type PianoRollColorMode = "voice" | "channel";
 
@@ -103,7 +107,7 @@ export type PianoRollColorConfig = {
 };
 
 const defaultColorConfig: PianoRollColorConfig = {
-  mode: { opll: "voice", psg: "voice", scc: "voice" },
+  mode: { opll: "voice", psg: "voice", scc: "voice", spc: "channel" },
   channelColors: defaultChannelColors,
   voiceColors: defaultVoiceColors,
 };
@@ -116,8 +120,9 @@ export function monoColorConfig(color: string): PianoRollColorConfig {
   let config = monoColorConfigCache.get(color);
   if (config == null) {
     config = {
-      mode: { opll: "channel", psg: "channel", scc: "channel" },
-      channelColors: channelIds.map(() => color),
+      mode: { opll: "channel", psg: "channel", scc: "channel", spc: "channel" },
+      // Long enough for either mode: the SPC voices live past the KSS block.
+      channelColors: new Array(KSS_CHANNEL_IDS.length + SPC_CHANNEL_IDS.length).fill(color),
       voiceColors: defaultVoiceColors,
     };
     monoColorConfigCache.set(color, config);
@@ -737,7 +742,7 @@ function buildSegments(
   channelMode: PianoRollColorMode,
   colorConfig: PianoRollColorConfig
 ): Seg[] {
-  const baseColor: string = (colorMap[ch] as any)["A200"];
+  const baseColor: string = (activeColorMap()[ch] as any)["A200"];
   const segments: Seg[] = [];
   let cur: Seg | null = null;
   for (let i = 0; i < frames; i++) {
@@ -747,7 +752,7 @@ function buildSegments(
     if (note != null && note >= 0 && note < 96) {
       const color =
         channelMode === "channel"
-          ? colorConfig.channelColors[ch] ?? baseColor
+          ? channelColorOf(colorConfig, ch, baseColor)
           : s?.vnum != null
             ? colorConfig.voiceColors[s.vnum % 16] ?? baseColor
             : baseColor;
@@ -835,7 +840,7 @@ export function paintPianoRoll(
     const step = canvas.width / frames;
     const nowIdx = Math.floor(frames * lpos);
     const nowX = nowIdx * step;
-    const baseColor: string = (colorMap[ch] as any)["A200"];
+    const baseColor: string = (activeColorMap()[ch] as any)["A200"];
     const channelMode = colorConfig.mode[channelIds[ch].device] ?? "voice";
 
     // Read statuses on demand (computed once per NTSC frame, then cached)
@@ -852,7 +857,7 @@ export function paintPianoRoll(
       if (note != null && note >= 0 && note < 96) {
         const color =
           channelMode === "channel"
-            ? colorConfig.channelColors[ch] ?? baseColor
+            ? channelColorOf(colorConfig, ch, baseColor)
             : s?.vnum != null
               ? colorConfig.voiceColors[s.vnum % 16] ?? baseColor
               : baseColor;
@@ -1041,10 +1046,10 @@ export function paintCellRoll(
       // pitch name at the play head (skip noise/rhythm and muted channels)
       const now = chMuted ? null : getStatusCached(playerContext.player, ch, windowStart + nowIdx);
       if (now?.kcode != null && now.mode == null && now.kcode >= 0 && now.kcode < 96) {
-        const baseColor: string = (colorMap[ch] as any)["A200"];
+        const baseColor: string = (activeColorMap()[ch] as any)["A200"];
         const color =
           channelMode === "channel"
-            ? colorConfig.channelColors[ch] ?? baseColor
+            ? channelColorOf(colorConfig, ch, baseColor)
             : now.vnum != null
               ? colorConfig.voiceColors[now.vnum % 16] ?? baseColor
               : baseColor;

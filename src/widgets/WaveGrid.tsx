@@ -29,7 +29,7 @@ import {
   subscribeSectionOrder,
   toggleSectionCollapsed,
 } from "../views/channel-section-order";
-import type { KSSDeviceName } from "../kss/kss-device";
+import type { DeviceName } from "../kss/kss-device";
 
 // samples shown per cell is user-selectable (waveWindowSize: 128/256/512/1024);
 // 2× that many are read so a trigger point can be found before the shown window.
@@ -152,13 +152,13 @@ function drawWaterfall(
 // with the radius and a 1-column grid can make the cells very tall.
 const glowFor = (lineWidth: number, dpr: number) => Math.min(14 * dpr, lineWidth * 4);
 
-const flatIndex = (device: KSSDeviceName, index: number) =>
+const flatIndex = (device: DeviceName, index: number) =>
   channelIds.findIndex((c) => c.device === device && c.index === index);
 
 // a category cell's flat channelIds indices; the cell is hidden when all are
-const cellChannels = (device: KSSDeviceName, t: number[] | number) =>
+const cellChannels = (device: DeviceName, t: number[] | number) =>
   (typeof t === "number" ? [t] : t).map((e) => flatIndex(device, e));
-const isCardHidden = (device: KSSDeviceName, targets: Array<number[] | number>) =>
+const isCardHidden = (device: DeviceName, targets: Array<number[] | number>) =>
   targets.every((t) => areChannelsHidden(cellChannels(device, t)));
 
 // One channel-cell: an oscilloscope of that channel's raw output at the play
@@ -167,7 +167,7 @@ function WaveCell(props: {
   label: string;
   channels: number[];
   offsets: number[];
-  device: KSSDeviceName;
+  device: DeviceName;
   targets: number[];
   row: number;
 }) {

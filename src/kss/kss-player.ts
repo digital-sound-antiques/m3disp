@@ -29,7 +29,11 @@ export class KSSPlayer extends AudioPlayer {
       rendererWorkletUrl: workletUrl,
       rendererWorkletName: "renderer",
       recycleDecoder: true,
-      numberOfChannels: 1,
+      // Stereo throughout: the SPC path is natively stereo (per-voice L/R
+      // volumes plus a stereo echo), and the channel count is baked into the
+      // renderer at construction, so it can't be swapped per track. KSS is mono
+      // and simply duplicates its output into both channels.
+      numberOfChannels: 2,
     });
 
     this.addEventListener("decodermessage", (ev: CustomEvent) => {

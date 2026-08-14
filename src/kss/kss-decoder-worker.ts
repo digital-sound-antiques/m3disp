@@ -1,6 +1,7 @@
 import { KSS, KSSPlay } from "libkss-js";
 import { AudioDecoderWorker } from "webaudio-stream-player";
 import { KSSChannelMask } from "./kss-device";
+import { SPCEngine, isSPCFile } from "../spc/spc-engine";
 
 export type KSSDecoderStartOptions = {
   data: Uint8Array | ArrayBuffer | ArrayBufferLike | ArrayLike<number>;
@@ -36,6 +37,8 @@ export type KSSDecoderDeviceSnapshot = {
   sccKeyKeepFrames?: ArrayLike<number> | null;
   opll?: Uint8Array | null;
   opllKeyKeepFrames?: ArrayLike<number> | null;
+  /** SPC mode only: 8 voices x SPC_VOICE_FIELDS int16s. */
+  spc?: Int16Array | null;
 };
 
 const defaultDuration = 60 * 1000 * 5;
@@ -74,13 +77,17 @@ class KSSDecoderWorker extends AudioDecoderWorker {
           return;
         case "config":
           if (d.lookaheadMs != null) this._lookaheadMs = d.lookaheadMs;
-          if (d.waveEnabled != null) this._waveEnabled = d.waveEnabled;
+          if (d.waveEnabled != null) {
+            this._waveEnabled = d.waveEnabled;
+            this._spc?.setWaveEnabled(d.waveEnabled);
+          }
           return;
         case "setChannelMask":
           // live channel mute: apply to BOTH engines so keyframes stay consistent
           this._channelMask = d.mask;
           this._applyChannelMask(this._player);
           this._applyChannelMask(this._keyframer);
+          this._spc?.setVoiceMask(this._channelMask.spc ?? 0);
           return;
         default:
           // The base abort awaits the in-flight process(); set our flag here so
@@ -92,6 +99,8 @@ class KSSDecoderWorker extends AudioDecoderWorker {
   }
 
   private _kss: KSS | null = null;
+  /** Non-null while an .spc track is loaded; the KSS engines idle in that case. */
+  private _spc: SPCEngine | null = null;
   // Audible engine, kept ~lookaheadMs ahead of the play head.
   private _player: KSSPlay | null = null;
   // State-save engine: runs ahead (calcSilent), captures keyframes every
@@ -131,7 +140,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
   private _fadeInRemaining = 0; // samples of start-fade left to apply
   // current per-device channel mute mask; applied to both engines and re-applied
   // after every loadState/reset so a keyframe's mask never overrides the live one
-  private _channelMask: KSSChannelMask = { psg: 0, scc: 0, opll: 0, opl: 0 };
+  private _channelMask: KSSChannelMask = { psg: 0, scc: 0, opll: 0, opl: 0, spc: 0 };
 
   private get _keyframeFrames() {
     return KEYFRAME_SECONDS * this.sampleRate;
@@ -186,6 +195,28 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     const startFrame = Math.max(0, args.startFrame ?? 0);
     this._playhead = startFrame;
 
+    const u8raw =
+      args.data instanceof Uint8Array
+        ? args.data
+        : args.data instanceof ArrayBuffer
+          ? new Uint8Array(args.data)
+          : null;
+
+    // SPC takes over the whole decoder: the KSS engines stay loaded but idle,
+    // and every message this worker posts describes the SPC machine instead.
+    //
+    // The dispatch has to live here rather than in a worker of its own: the
+    // player builds its decoder once and recycles it, so the worker is chosen
+    // before any track — and therefore any format — is known.
+    if (u8raw != null && isSPCFile(u8raw)) {
+      await this._startSPC(u8raw, args, startFrame);
+      return;
+    }
+    if (this._spc != null) {
+      this._spc.dispose();
+      this._spc = null;
+    }
+
     const inSong =
       args.seek === true &&
       args.songToken != null &&
@@ -216,6 +247,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
         scc: args.channelMask?.scc ?? 0,
         opll: args.channelMask?.opll ?? 0,
         opl: args.channelMask?.opl ?? 0,
+        spc: args.channelMask?.spc ?? 0,
       };
 
       this._configureEngine(this._player!, args);
@@ -249,6 +281,116 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     }
 
     this._postBuffered();
+  }
+
+  /** Start (or seek within) an .spc track. */
+  private async _startSPC(
+    u8: Uint8Array,
+    args: KSSDecoderStartOptions,
+    startFrame: number
+  ): Promise<void> {
+    const inSong =
+      args.seek === true &&
+      args.songToken != null &&
+      args.songToken === this._loadedToken &&
+      this._spc != null;
+
+    if (!inSong) {
+      this._spc?.dispose();
+      this._spc = new SPCEngine(this.sampleRate);
+      this._spc.setWaveEnabled(this._waveEnabled);
+      this._channelMask = {
+        psg: args.channelMask?.psg ?? 0,
+        scc: args.channelMask?.scc ?? 0,
+        opll: args.channelMask?.opll ?? 0,
+        opl: args.channelMask?.opl ?? 0,
+        spc: args.channelMask?.spc ?? 0,
+      };
+      this._spc.setVoiceMask(this._channelMask.spc);
+      this._spc.load(u8, {
+        // m3disp's own defaults only apply when the tags say nothing.
+        defaultPlaySeconds: (args.defaultDuration ?? defaultDuration) / 1000,
+        loopCount: args.loop ?? defaultLoop,
+      });
+      this._loadedToken = args.songToken ?? -1;
+      this._bufferedHWM = 0;
+      this._endFrame = 0;
+      this._endIsFadeOut = false;
+      // SPC length comes from the ID666/xid6 tags and is known up front, so the
+      // seek bar gets its true total immediately rather than after a scan.
+      this._reportDuration(this._spc.totalFrames, false);
+    }
+
+    const spc = this._spc!;
+    if (startFrame > 0 || inSong) {
+      spc.seekAudibleTo(startFrame);
+      if (spc.scannerFrames < startFrame) spc.seekScannerTo(startFrame);
+    }
+    this._bufferedHWM = Math.max(this._bufferedHWM, spc.bufferedFrame);
+    this._postBuffered();
+  }
+
+  /** Decode one chunk of the loaded .spc, feeding the look-ahead as it goes. */
+  private async _processSPC(): Promise<Array<Int16Array> | null> {
+    const spc = this._spc;
+    if (spc == null) return null;
+
+    if (spc.totalFrames > 0 && spc.audibleFrames >= spc.totalFrames) return null;
+
+    // Same decode-ahead throttle as the KSS path: while the buffer is full,
+    // spend the time extending the look-ahead instead of sleeping.
+    const limit = (this._lookaheadMs / 1000) * this.sampleRate;
+    let waits = 0;
+    while (
+      !this._aborted &&
+      this._playhead > 0 &&
+      spc.audibleFrames - this._playhead > limit &&
+      waits < 200
+    ) {
+      spc.advanceScanner(spc.scannerFrames + this.sampleRate);
+      this._flushSPCSnapshots();
+      await sleep(15);
+      waits++;
+    }
+    if (this._aborted || this._spc == null) return null;
+
+    let step = Math.floor(this.sampleRate / 8);
+    if (spc.totalFrames > 0) step = Math.min(step, spc.totalFrames - spc.audibleFrames);
+    if (step <= 0) return null;
+
+    const { left, right, perCh } = spc.render(step);
+    const chunkStart = spc.audibleFrames - step;
+
+    const primed =
+      spc.audibleFrames - this._playhead >= (this._lookaheadMs / 1000) * this.sampleRate;
+    spc.advanceScanner(
+      this._playhead + SCAN_AHEAD_SECONDS * this.sampleRate,
+      primed ? Infinity : this.sampleRate
+    );
+    this._flushSPCSnapshots();
+
+    if (perCh != null) {
+      this.worker.postMessage(
+        { type: "wave", frame: chunkStart, data: perCh, token: this._loadedToken },
+        [perCh.buffer]
+      );
+    }
+
+    return [left, right];
+  }
+
+  /** Post whatever voice snapshots the scanner produced, and the buffer mark. */
+  private _flushSPCSnapshots(): void {
+    const spc = this._spc;
+    if (spc == null) return;
+    const snapshots = spc.takeSnapshots();
+    if (snapshots.length > 0) {
+      this.worker.postMessage({ type: "snapshots", data: snapshots, token: this._loadedToken });
+    }
+    if (spc.bufferedFrame > this._bufferedHWM) {
+      this._bufferedHWM = spc.bufferedFrame;
+      this._postBuffered();
+    }
   }
 
   /** Restore the player to `target` (absolute frame) from the nearest keyframe
@@ -620,6 +762,8 @@ class KSSDecoderWorker extends AudioDecoderWorker {
   }
 
   async process(): Promise<Array<Int16Array> | null> {
+    if (this._spc != null) return this._processSPC();
+
     const player = this._player;
     if (player == null) return null;
 
@@ -741,7 +885,9 @@ class KSSDecoderWorker extends AudioDecoderWorker {
       );
     }
 
-    return [res];
+    // KSS is mono; the player runs stereo for the SPC path's sake. Both channel
+    // buffers are transferred to the renderer, so they must be distinct objects.
+    return [res, res.slice()];
   }
 
   async abort(): Promise<void> {
@@ -749,6 +895,8 @@ class KSSDecoderWorker extends AudioDecoderWorker {
   }
 
   async dispose(): Promise<void> {
+    this._spc?.dispose();
+    this._spc = null;
     this._player?.release();
     this._keyframer?.release();
     this._player = null;

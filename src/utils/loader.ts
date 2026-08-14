@@ -4,6 +4,7 @@ import { MGSC, TextDecoderEncoding, detectEncoding } from "mgsc-js";
 import { PlayListEntry } from "../contexts/PlayerContext";
 import { BinaryDataStorage } from "./binary-data-storage";
 import { parseM3U } from "./m3u-parser";
+import { isSPCFile, parseSPC } from "spc700-js";
 
 /// Convert a given url to a download endpoint that allows CORS access.
 export function toDownloadEndpoint(url: string) {
@@ -57,7 +58,7 @@ function _unzip(data: Uint8Array): { [key: string]: Uint8Array } {
         return false;
       }
       console.log(`filter: ${file.name}`);
-      return /\.(mgs|bgm|opx|mpk|kss|mbm|m3u8?|pls)$/i.test(file.name);
+      return /\.(mgs|bgm|opx|mpk|kss|mbm|spc|m3u8?|pls)$/i.test(file.name);
     },
   });
 }
@@ -196,15 +197,24 @@ const createPlayListEntry = async (
   data: Uint8Array,
   filename: string
 ): Promise<PlayListEntry> => {
-  const kss = new KSS(data, filename);
-  let title = kss.getTitle();
-  if (title == "") title = filename;
-  kss.release();
+  let title: string;
+  const isSPC = isSPCFile(data);
+  if (isSPC) {
+    // KSS can't parse an SPC dump; its title lives in the ID666/xid6 tags.
+    const { tags } = parseSPC(data);
+    title = tags.title || tags.game || filename;
+  } else {
+    const kss = new KSS(data, filename);
+    title = kss.getTitle();
+    if (title == "") title = filename;
+    kss.release();
+  }
   const dataId = await storage.put(data);
   return {
     title,
     filename,
     dataId,
+    format: isSPC ? "spc" : undefined,
   };
 };
 
