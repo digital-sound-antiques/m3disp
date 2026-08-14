@@ -1,6 +1,6 @@
 // Which sound engine the current track uses. The two modes never coexist: an
 // SPC track shows only its 8 S-DSP voices, and everything else shows only the
-// MSX devices. Rather than have every view filter a combined channel list, the
+// KSS devices. Rather than have every view filter a combined channel list, the
 // mode swaps the definitions themselves — channelIds, the section list and the
 // color tables are live bindings that follow it.
 //

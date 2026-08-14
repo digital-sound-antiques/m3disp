@@ -180,6 +180,13 @@ export class SPCEngine {
     const left = new Int16Array(step);
     const right = new Int16Array(step);
     this.audible.renderInto(left, right, 0, step);
+    // The S-DSP runs about twice as hot as the KSS devices at the same master
+    // volume, so halve it here rather than making the listener ride the volume
+    // control when a track changes format.
+    for (let i = 0; i < step; i++) {
+      left[i] >>= 1;
+      right[i] >>= 1;
+    }
     this.audibleFrames += step;
 
     let perCh: Int16Array | null = null;
@@ -195,7 +202,7 @@ export class SPCEngine {
           // applied spans the full 16-bit range, whereas the scope is drawn
           // against a full scale of ~3000 (see WaveGrid) — the level libkss's
           // per-channel outputs sit at.
-          for (let v = 0; v < 8; v++) perCh[d + v] = src[s + v] >> 4;
+          for (let v = 0; v < 8; v++) perCh[d + v] = src[s + v] >> 5;
         }
       }
     }
