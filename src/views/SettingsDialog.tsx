@@ -46,7 +46,7 @@ function EmulationPanel() {
   return (
     <div className="crd-fields">
       <NumberSelector
-        label="CPU Speed"
+        label="Z80 CPU Speed"
         values={CPU_SPEED_VALUES}
         value={context.cpuSpeed}
         valueLabelFn={cpuSpeedLabel}
