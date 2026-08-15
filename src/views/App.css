@@ -1387,6 +1387,9 @@ textarea {
   padding-bottom: 16px;
   /* size container so cell/section gaps can scale with the grid's own size */
   container-type: size;
+  /* shared by the section and cell gaps, and by the aspect cap that has to
+     subtract them from the available width */
+  --pr-grid-gap: clamp(3px, 1cqmin, 12px);
 }
 .pr-grid-list {
   flex: 1 1 0;
@@ -1394,7 +1397,7 @@ textarea {
   display: flex;
   flex-direction: column;
   /* section spacing scales with the grid size */
-  gap: clamp(3px, 1cqmin, 12px);
+  gap: var(--pr-grid-gap);
 }
 .pr-grid-section {
   display: flex;
@@ -1409,7 +1412,43 @@ textarea {
   grid-template-columns: repeat(var(--pr-grid-cols, 3), 1fr);
   grid-auto-rows: 1fr;
   /* column/row gaps scale with the grid size */
-  gap: clamp(3px, 1cqmin, 12px);
+  gap: var(--pr-grid-gap);
+}
+/* Scope only: a waveform cell stretched too wide reads as a flat line, so the
+   cell height is floored at (cell width / --pr-grid-max-aspect). Once the rows
+   no longer fit, the list scrolls instead of squashing them — which is why the
+   sections here keep their content height rather than shrinking to fit. The
+   floor is derived from the container width, so it needs no measurement. */
+.pr-grid-scope .pr-grid-list {
+  overflow-y: auto;
+  /* Firefox: hide the scrollbar until hover (same as the keyboard view) */
+  scrollbar-color: transparent transparent;
+}
+.pr-grid-scope:hover .pr-grid-list {
+  scrollbar-color: #666 transparent;
+}
+/* WebKit (Chrome/Safari): keep the gutter but show the thumb only on hover */
+.pr-grid-scope .pr-grid-list::-webkit-scrollbar-track {
+  background: transparent;
+}
+.pr-grid-scope .pr-grid-list::-webkit-scrollbar-thumb {
+  background-color: transparent;
+}
+.pr-grid-scope:hover .pr-grid-list::-webkit-scrollbar-thumb {
+  background-color: #666;
+}
+.pr-grid-scope .pr-grid-section,
+.pr-grid-scope .pr-grid-body {
+  min-height: auto;
+}
+.pr-grid-scope .pr-grid-body {
+  grid-auto-rows: minmax(
+    calc(
+      (100cqw - (var(--pr-grid-cols, 3) - 1) * var(--pr-grid-gap)) / var(--pr-grid-cols, 3) /
+        var(--pr-grid-max-aspect, 8)
+    ),
+    1fr
+  );
 }
 .pr-grid-cell {
   position: relative;

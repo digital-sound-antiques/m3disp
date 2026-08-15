@@ -22,6 +22,7 @@ import {
 } from "./piano-roll-painter";
 import { DEVICE_CARDS } from "./KeyboardList";
 import { rollFrameGov } from "./frame-governor";
+import { maxScopeCellAspect } from "./scope-dsp";
 import { toggleSolo } from "../kss/channel-solo";
 import {
   getCollapsedSections,
@@ -205,7 +206,12 @@ export function PianoRollGrid() {
   };
 
   return (
-    <div className="pr-grid" style={{ "--pr-grid-cols": cols } as CSSProperties}>
+    <div
+      className="pr-grid pr-grid-scope"
+      style={
+        { "--pr-grid-cols": cols, "--pr-grid-max-aspect": maxScopeCellAspect(cols) } as CSSProperties
+      }
+    >
       <DragDropContext onDragEnd={onDragEnd}>
         <Droppable droppableId="grid-sections">
           {(dp) => (

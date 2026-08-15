@@ -16,7 +16,7 @@ import { getStatusFromSnapshot } from "../kss/channel-status";
 import { toggleSolo } from "../kss/channel-solo";
 import { DEVICE_CARDS } from "./KeyboardList";
 import { rollFrameGov } from "./frame-governor";
-import { correlationOffset, waveOffset } from "./scope-dsp";
+import { maxScopeCellAspect, correlationOffset, waveOffset } from "./scope-dsp";
 import {
   areChannelsHidden,
   getHiddenChannels,
@@ -493,7 +493,12 @@ export function WaveGrid() {
   };
 
   return (
-    <div className="pr-grid" style={{ "--pr-grid-cols": cols } as CSSProperties}>
+    <div
+      className="pr-grid pr-grid-scope"
+      style={
+        { "--pr-grid-cols": cols, "--pr-grid-max-aspect": maxScopeCellAspect(cols) } as CSSProperties
+      }
+    >
       <DragDropContext onDragEnd={onDragEnd}>
         <Droppable droppableId="wave-sections">
           {(dp) => (

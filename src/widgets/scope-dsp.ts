@@ -5,6 +5,18 @@
 import { PerChLayout } from "libkss-js";
 import type { DeviceName } from "../kss/kss-device";
 
+/**
+ * Widest a Scope cell is allowed to get, as width/height. Past this a trace
+ * flattens into a line and its shape stops reading; the grid grows past the
+ * pane and scrolls rather than squashing further.
+ *
+ * Dividing a fixed budget by the column count keeps the *row* at a constant
+ * shape however the channels are split across it: two columns of 8:1 cells
+ * occupy the same band as one 16:1 cell, so changing the column count
+ * rearranges the traces without changing how tall the grid wants to be.
+ */
+export const maxScopeCellAspect = (cols: number) => 16 / cols;
+
 // OPLL rhythm channels are ordered differently in emu2413's ch_out (the per-ch
 // wave buffer) than in m3disp's channelIds convention. Map channelIds rhythm
 // index → ch_out index. ch_out: 9=BD 10=HH 11=SD 12=TOM 13=CYM; channelIds:
