@@ -39,11 +39,12 @@ export function PianoRollMenu(props: { grid?: boolean; colorize?: boolean }) {
           <ZoomIn sx={{ fontSize: 18 }} />
         </span>
         <span className="menu-label">Zoom</span>
+        <span className="menu-state">{`${ctx.pianoRollRangeInSec}s`}</span>
         <input
           className="pr-range"
           type="range"
           min={1}
-          max={16}
+          max={20}
           step={1}
           value={ctx.pianoRollRangeInSec}
           onChange={(e) => ctx.setPianoRollRangeInSec(Number(e.target.value))}

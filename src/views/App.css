@@ -1240,13 +1240,12 @@ textarea {
 .pl-art-menu .menu-list {
   min-width: 160px;
 }
+/* Icons stay neutral whatever the row's state — the value on the right is what
+   carries the highlight, so tinting the icon as well only added noise. */
 .menu-ico {
   display: inline-flex;
   align-items: center;
   color: #8b949e;
-}
-.menu-item.active .menu-ico {
-  color: var(--primary);
 }
 .menu-label {
   flex: 1 1 auto;
@@ -1256,6 +1255,10 @@ textarea {
   color: #6e7681;
 }
 .menu-item.active .menu-state {
+  color: var(--primary);
+}
+/* Slider rows have no off state, so their value is always the live one. */
+.menu-row .menu-state {
   color: var(--primary);
 }
 /* small on/off switch shown at the right of a toggle menu row (MenuToggle) */

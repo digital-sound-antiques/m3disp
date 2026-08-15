@@ -22,7 +22,6 @@ function KeyboardColumnsItem() {
       label="Columns"
       value={ctx.keyboardColumns}
       options={keyboardColumnOptions}
-      active={ctx.keyboardColumns !== 1}
       onChange={(v) => ctx.setKeyboardColumns(v)}
     />
   );

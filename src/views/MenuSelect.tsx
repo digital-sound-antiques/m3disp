@@ -10,7 +10,11 @@ export function MenuSelect<T extends string | number>(props: {
   label: string;
   value: T;
   options: { value: T; label: string }[];
-  /** header highlight (e.g. "not the default"); defaults to false */
+  /**
+   * Header highlight. Defaults to on: a setting reads as live unless it has
+   * been switched off, so only rows whose value means "off" pass false — being
+   * merely at the default is not a reason to grey a row out.
+   */
   active?: boolean;
   onChange: (v: T) => void;
 }) {
@@ -19,7 +23,7 @@ export function MenuSelect<T extends string | number>(props: {
   return (
     <>
       <button
-        className={`menu-item${props.active ? " active" : ""}`}
+        className={`menu-item${props.active !== false ? " active" : ""}`}
         onClick={() => setOpen((o) => !o)}
       >
         <span className="menu-ico">{props.icon}</span>

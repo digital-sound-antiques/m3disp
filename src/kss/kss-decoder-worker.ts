@@ -49,9 +49,10 @@ const defaultLoop = 2;
  *  memory for a full track modest while giving fine enough seek granularity. */
 const KEYFRAME_SECONDS = 2;
 /** How far ahead of the play head the keyframer keeps its device-register
- *  snapshots so the piano-roll / score look-ahead stays populated (the piano
- *  roll can show up to ~12s ahead at its widest range). */
-const SCAN_AHEAD_SECONDS = 13;
+ *  snapshots so the piano-roll / score look-ahead stays populated. The roll's
+ *  now-line sits a quarter up the view (see `lpos`), so its widest Zoom of 20s
+ *  shows 15s of future — anything less here leaves the top of the roll blank. */
+const SCAN_AHEAD_SECONDS = 16;
 /** Short ramp applied to the first samples of every (re)start so a track that
  *  opens on a non-zero sample doesn't click at the transition. Kept as short as
  *  short (~5ms) so it removes the DC step without audibly softening the

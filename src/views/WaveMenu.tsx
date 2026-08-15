@@ -30,7 +30,6 @@ export function ScopeFpsItem() {
       label="FPS"
       value={ctx.scopeFps}
       options={scopeFpsOptions}
-      active={ctx.scopeFps !== 0}
       onChange={(v) => ctx.setScopeFps(v)}
     />
   );
@@ -65,7 +64,6 @@ export function ScopeColumnsItem() {
       label="Columns"
       value={ctx.scopeColumns}
       options={scopeColumnOptions}
-      active={ctx.scopeColumns !== 3}
       onChange={(v) => ctx.setScopeColumns(v)}
     />
   );
