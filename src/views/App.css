@@ -1048,12 +1048,70 @@ textarea {
   display: flex;
   flex-direction: column;
 }
+/* One stacked pane: its own tab strip plus the body of the active tab. The
+   slot carries the flex share so the pane itself can stay a plain column. */
+.viz-pane-slot {
+  position: relative;
+  min-height: 0;
+  display: flex;
+}
+.viz-pane {
+  flex: 1 1 0;
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+/* Divider between the two panes; same drag idiom as the other resizers. */
+.viz-split-resize {
+  flex: 0 0 auto;
+  height: 7px;
+  margin: 1px 0;
+  cursor: row-resize;
+  border-radius: 3px;
+  background: transparent;
+  transition: background 0.12s;
+  touch-action: none;
+}
+.viz-split-resize:hover,
+.viz-split-resize:active {
+  background: #ffffff26;
+}
+/* Only while a tab is being dragged: the target that creates the split. */
+.viz-split-drop {
+  flex: 0 0 auto;
+  height: 64px;
+  margin-top: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: #ffffff8c;
+  border: 1px dashed #ffffff40;
+  border-radius: 6px;
+}
+.viz-split-drop:hover {
+  color: #fff;
+  border-color: #ffffff99;
+  background: #ffffff12;
+}
 .viz-tabs {
   flex: 0 0 auto;
   display: flex;
   align-items: center;
   gap: 4px;
   margin-bottom: 6px;
+}
+.viz-tab {
+  cursor: grab;
+}
+.viz-tab:active {
+  cursor: grabbing;
+}
+/* Insertion marker for the tab the pointer is currently over. */
+.viz-tab.drop-before {
+  box-shadow: inset 2px 0 0 0 currentColor;
 }
 /* 1/2-column segmented control, right-aligned in the tab row */
 .viz-seg {

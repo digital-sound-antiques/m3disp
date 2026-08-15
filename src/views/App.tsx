@@ -1,16 +1,6 @@
 import { ThemeProvider } from "@mui/material/styles";
 import { CssBaseline } from "@mui/material";
-import {
-  CropLandscape,
-  CropPortrait,
-  FormatAlignCenter,
-  FormatAlignLeft,
-  FormatAlignRight,
-  MusicNote,
-  Settings,
-  ShowChart,
-  ViewAgenda,
-} from "@mui/icons-material";
+import { FormatAlignCenter, FormatAlignLeft, FormatAlignRight } from "@mui/icons-material";
 import { useContext, useEffect, useRef, useState } from "react";
 import { useRegisterSW } from "virtual:pwa-register/react";
 
@@ -19,13 +9,13 @@ import { FileDropContext } from "../contexts/FileDropContext";
 import { PlayerContext } from "../contexts/PlayerContext";
 
 import { ChannelMaskPanel } from "./ChannelMaskPanel";
-import { PianoRoll } from "../widgets/PianoRoll";
-import { PianoRollGrid } from "../widgets/PianoRollGrid";
-import { WaveGrid } from "../widgets/WaveGrid";
-import { PianoRollMenu } from "./PianoRollMenu";
-import { WaveMenu } from "./WaveMenu";
-import { KeyboardMenu } from "./KeyboardMenu";
-import { KeyboardList } from "../widgets/KeyboardList";
+import {
+  VizPane,
+  VIZ_TABS,
+  VIZ_TAB_MIME,
+  isVizTabDrag,
+  type VizTabId,
+} from "./VizPane";
 import { TimeSlider } from "../widgets/TimeSlider";
 import { PlayControl } from "./PlayerControl";
 import { TransportButtons } from "./TransportButtons";
@@ -64,6 +54,77 @@ function onColor(hex: string): string {
   const b = parseInt(m[3], 16);
   const brightness = (r * 299 + g * 587 + b * 114) / 1000;
   return brightness >= ON_COLOR_THRESHOLD ? "#0d1117" : "#ffffff";
+}
+
+// ---- visualiser pane layout ----
+
+const VIZ_LAYOUT_KEY = "m3disp.vizLayout";
+const SPLIT_MIN = 0.15;
+const SPLIT_MAX = 0.85;
+const clampSplit = (r: number) => Math.min(SPLIT_MAX, Math.max(SPLIT_MIN, r));
+
+type VizLayout = {
+  top: VizTabId[];
+  bottom: VizTabId[];
+  activeTop: VizTabId | null;
+  activeBottom: VizTabId | null;
+  /** Top pane's share of the height, 0..1. Only meaningful when split. */
+  ratio: number;
+};
+
+/**
+ * Keep a layout self-consistent: every tab present exactly once, each pane's
+ * active tab actually in that pane, and an unsplit layout always held in `top`
+ * so "not split" has a single representation.
+ */
+function normalizeVizLayout(l: VizLayout): VizLayout {
+  const seen = new Set<VizTabId>();
+  const keep = (list: VizTabId[]) =>
+    list.filter((t) => VIZ_TABS.includes(t) && !seen.has(t) && seen.add(t) !== undefined);
+  let top = keep(l.top);
+  let bottom = keep(l.bottom);
+  // Any tab lost by malformed storage comes back in the top pane.
+  for (const t of VIZ_TABS) if (!seen.has(t)) top.push(t);
+  if (top.length === 0) {
+    top = bottom;
+    bottom = [];
+  }
+  const pick = (list: VizTabId[], active: VizTabId | null) =>
+    list.length === 0 ? null : list.includes(active as VizTabId) ? active : list[0];
+  return {
+    top,
+    bottom,
+    activeTop: pick(top, l.activeTop),
+    activeBottom: pick(bottom, l.activeBottom),
+    ratio: clampSplit(l.ratio),
+  };
+}
+
+function loadVizLayout(): VizLayout {
+  const fallback: VizLayout = {
+    top: [...VIZ_TABS],
+    bottom: [],
+    activeTop: "pianoroll",
+    activeBottom: null,
+    ratio: 0.5,
+  };
+  try {
+    const raw = localStorage.getItem(VIZ_LAYOUT_KEY);
+    if (raw) return normalizeVizLayout({ ...fallback, ...JSON.parse(raw) });
+  } catch {
+    /* ignore malformed storage */
+  }
+  // Carry over the single-tab selection this replaced. The old "grid" tab
+  // folded into Scope (Type = ROLL).
+  const old = localStorage.getItem("m3disp.vizTab");
+  if (old === "grid") {
+    localStorage.setItem("m3disp.scopeType", "roll");
+    return normalizeVizLayout({ ...fallback, activeTop: "wave" });
+  }
+  if (old === "keyboard" || old === "wave") {
+    return normalizeVizLayout({ ...fallback, activeTop: old });
+  }
+  return fallback;
 }
 
 const BOTTOM_MIN = 40;
@@ -163,20 +224,65 @@ function Layout() {
     const v = localStorage.getItem("m3disp.titleAlign");
     return v === "center" || v === "right" ? v : "left";
   });
-  // center view tab: "pianoroll" (default), "grid" (per-channel rolls),
-  // "scope" (per-channel oscilloscope / piano grid, chosen via Scope > Type) or
-  // "keyboard". The old "grid" tab folded into Scope (Type = ROLL) — migrate it.
-  const [vizTab, setVizTab] = useState<"pianoroll" | "wave" | "keyboard">(() => {
-    const v = localStorage.getItem("m3disp.vizTab");
-    if (v === "grid") {
-      localStorage.setItem("m3disp.scopeType", "roll");
-      return "wave";
-    }
-    return v === "keyboard" || v === "wave" ? v : "pianoroll";
-  });
+  // Which tab sits in which pane, and which is on top in each. Everything lives
+  // in one pane until a tab is dragged out, which is when the split appears.
+  const [vizLayout, setVizLayout] = useState<VizLayout>(loadVizLayout);
   useEffect(() => {
-    localStorage.setItem("m3disp.vizTab", vizTab);
-  }, [vizTab]);
+    localStorage.setItem(VIZ_LAYOUT_KEY, JSON.stringify(vizLayout));
+  }, [vizLayout]);
+  // True while a tab is being dragged, which is when the "drop to split" target
+  // is worth showing.
+  const [tabDragging, setTabDragging] = useState(false);
+  // A tab dropped into the other pane unmounts the button it was dragged from,
+  // so its own dragend never fires. Watch for the end of the drag at the window
+  // instead, which also covers dropping outside and cancelling with Esc.
+  useEffect(() => {
+    if (!tabDragging) return;
+    // Bubble phase, not capture: React handles the drop at the root container,
+    // so capturing here would clear the flag — and unmount the drop target —
+    // before its onDrop ever ran.
+    const stop = () => setTabDragging(false);
+    window.addEventListener("dragend", stop);
+    window.addEventListener("drop", stop);
+    return () => {
+      window.removeEventListener("dragend", stop);
+      window.removeEventListener("drop", stop);
+    };
+  }, [tabDragging]);
+
+  const vizRef = useRef<HTMLDivElement>(null);
+  const splitDragRef = useRef(false);
+  const startSplitResize = (e: React.PointerEvent) => {
+    splitDragRef.current = true;
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const onSplitResize = (e: React.PointerEvent) => {
+    if (!splitDragRef.current || vizRef.current == null) return;
+    const r = vizRef.current.getBoundingClientRect();
+    if (r.height <= 0) return;
+    const ratio = (e.clientY - r.top) / r.height;
+    setVizLayout((l) => ({ ...l, ratio: clampSplit(ratio) }));
+  };
+  const endSplitResize = (e: React.PointerEvent) => {
+    splitDragRef.current = false;
+    e.currentTarget.releasePointerCapture(e.pointerId);
+  };
+
+  /** Move `tab` into `pane` at `index`, keeping both panes' active tabs valid. */
+  const moveVizTab = (tab: VizTabId, pane: "top" | "bottom", index: number) => {
+    // The drag is over once a drop lands. The window listener below can't be
+    // relied on for this: a drop onto a tab stops propagation so the strip
+    // underneath doesn't also handle it, which keeps the event from reaching
+    // the window at all.
+    setTabDragging(false);
+    setVizLayout((l) => {
+      const top = l.top.filter((t) => t !== tab);
+      const bottom = l.bottom.filter((t) => t !== tab);
+      const target = pane === "top" ? top : bottom;
+      target.splice(Math.max(0, Math.min(index, target.length)), 0, tab);
+      return normalizeVizLayout({ ...l, top, bottom, [pane === "top" ? "activeTop" : "activeBottom"]: tab });
+    });
+  };
   // keyboard view: 1 or 2 channels per row
   const [keyboardCols, setKeyboardCols] = useState<number>(() =>
     localStorage.getItem("m3disp.keyboardCols") === "2" ? 2 : 1
@@ -228,7 +334,15 @@ function Layout() {
       setBottomHeight(BOTTOM_DEFAULT);
       setTitleHeight(TITLE_DEFAULT);
       setTitleAlign("left");
-      setVizTab("pianoroll");
+      setVizLayout(
+        normalizeVizLayout({
+          top: [...VIZ_TABS],
+          bottom: [],
+          activeTop: "pianoroll",
+          activeBottom: null,
+          ratio: 0.5,
+        })
+      );
       setKeyboardCols(1);
       resetSections();
     };
@@ -355,128 +469,65 @@ function Layout() {
           </aside>
 
           <div className="main">
-            <div className="viz">
-              <div className="viz-tabs">
-                <button
-                  className={`viz-tab${vizTab === "keyboard" ? " active" : ""}`}
-                  onClick={() => setVizTab("keyboard")}
-                >
-                  Keyboard
-                </button>
-                <button
-                  className={`viz-tab${vizTab === "pianoroll" ? " active" : ""}`}
-                  onClick={() => setVizTab("pianoroll")}
-                >
-                  Roll
-                </button>
-                <button
-                  className={`viz-tab${vizTab === "wave" ? " active" : ""}`}
-                  onClick={() => setVizTab("wave")}
-                >
-                  Scope
-                </button>
-                {(vizTab === "pianoroll" || vizTab === "wave" || vizTab === "keyboard") && (
-                  <div className="pr-menu-wrap" ref={prMenuRef}>
-                    {vizTab === "keyboard" && (
-                      <div className="viz-seg">
-                        <button
-                          className={`viz-seg-btn${keyboardCols === 1 ? " active" : ""}`}
-                          onClick={() => setKeyboardCols(1)}
-                          title="1 column"
-                        >
-                          <ViewAgenda sx={{ fontSize: 15 }} />
-                        </button>
-                        <button
-                          className={`viz-seg-btn${keyboardCols === 2 ? " active" : ""}`}
-                          onClick={() => setKeyboardCols(2)}
-                          title="2 columns"
-                        >
-                          <ViewAgenda sx={{ fontSize: 15, transform: "rotate(90deg)" }} />
-                        </button>
-                      </div>
-                    )}
-                    {vizTab === "wave" && (
-                      <div className="viz-seg">
-                        <button
-                          className={`viz-seg-btn${app.scopeType === "wave" ? " active" : ""}`}
-                          onClick={() => app.setScopeType("wave")}
-                          title="Waveform"
-                        >
-                          <ShowChart sx={{ fontSize: 15 }} />
-                        </button>
-                        <button
-                          className={`viz-seg-btn${app.scopeType === "roll" ? " active" : ""}`}
-                          onClick={() => app.setScopeType("roll")}
-                          title="Piano notes"
-                        >
-                          <MusicNote sx={{ fontSize: 15 }} />
-                        </button>
-                      </div>
-                    )}
-                    {vizTab === "pianoroll" && (
-                      <div className="viz-seg">
-                        <button
-                          className={`viz-seg-btn${app.pianoRollMode !== "3d" ? " active" : ""}`}
-                          onClick={() => app.setPianoRollMode("2d")}
-                          title="2D"
-                        >
-                          <CropLandscape sx={{ fontSize: 15 }} />
-                        </button>
-                        <button
-                          className={`viz-seg-btn${app.pianoRollMode === "3d" ? " active" : ""}`}
-                          onClick={() => app.setPianoRollMode("3d")}
-                          title="3D"
-                        >
-                          <CropPortrait sx={{ fontSize: 15 }} />
-                        </button>
-                      </div>
-                    )}
-                    <button
-                      className={`viz-gear${prMenuOpen ? " active" : ""}`}
-                      onClick={() => setPrMenuOpen((o) => !o)}
-                      title={
-                        vizTab === "wave"
-                          ? "Scope settings"
-                          : vizTab === "keyboard"
-                            ? "Keyboard settings"
-                            : "Piano roll settings"
-                      }
+            <div className="viz" ref={vizRef}>
+              {(() => {
+                const l = vizLayout;
+                const split = l.top.length > 0 && l.bottom.length > 0;
+                const pane = (which: "top" | "bottom") => (
+                  <VizPane
+                    tabs={which === "top" ? l.top : l.bottom}
+                    active={(which === "top" ? l.activeTop : l.activeBottom)!}
+                    onActivate={(t) =>
+                      setVizLayout((s) => ({
+                        ...s,
+                        [which === "top" ? "activeTop" : "activeBottom"]: t,
+                      }))
+                    }
+                    onDropTab={(t, i) => moveVizTab(t, which, i)}
+                    onDragStateChange={setTabDragging}
+                    keyboardCols={keyboardCols}
+                    setKeyboardCols={setKeyboardCols}
+                  />
+                );
+                return (
+                  <>
+                    <div
+                      className="viz-pane-slot"
+                      style={{ flex: split ? `${l.ratio} 1 0` : "1 1 0" }}
                     >
-                      <Settings sx={{ fontSize: 16 }} />
-                    </button>
-                    {prMenuOpen && (
-                      <div className="pr-menu">
-                        {vizTab === "wave" ? (
-                          app.scopeType === "roll" ? (
-                            <PianoRollMenu grid colorize />
-                          ) : (
-                            <WaveMenu />
-                          )
-                        ) : vizTab === "keyboard" ? (
-                          <KeyboardMenu />
-                        ) : (
-                          <PianoRollMenu />
-                        )}
+                      {pane("top")}
+                    </div>
+                    {split && (
+                      <>
+                        <div
+                          className="viz-split-resize"
+                          onPointerDown={startSplitResize}
+                          onPointerMove={onSplitResize}
+                          onPointerUp={endSplitResize}
+                        />
+                        <div className="viz-pane-slot" style={{ flex: `${1 - l.ratio} 1 0` }}>
+                          {pane("bottom")}
+                        </div>
+                      </>
+                    )}
+                    {!split && tabDragging && (
+                      <div
+                        className="viz-split-drop"
+                        onDragOver={(e) => {
+                          if (isVizTabDrag(e)) e.preventDefault();
+                        }}
+                        onDrop={(e) => {
+                          if (!isVizTabDrag(e)) return;
+                          e.preventDefault();
+                          moveVizTab(e.dataTransfer.getData(VIZ_TAB_MIME) as VizTabId, "bottom", 0);
+                        }}
+                      >
+                        Drop here to split
                       </div>
                     )}
-                  </div>
-                )}
-              </div>
-              <div className="viz-body">
-                {vizTab === "pianoroll" ? (
-                  <PianoRoll mode={app.pianoRollMode} />
-                ) : vizTab === "wave" ? (
-                  app.scopeType === "roll" ? (
-                    <PianoRollGrid />
-                  ) : (
-                    <WaveGrid />
-                  )
-                ) : (
-                  <div className="viz-keyboard">
-                    <KeyboardList isSmall={false} columns={keyboardCols} />
-                  </div>
-                )}
-              </div>
+                  </>
+                );
+              })()}
             </div>
 
             <section className="transport">
