@@ -13,7 +13,6 @@ import {
   MusicNote,
   Settings,
   ShowChart,
-  ViewAgenda,
 } from "@mui/icons-material";
 
 import { AppContext } from "../contexts/AppContext";
@@ -48,8 +47,6 @@ type Props = {
   /** Drop of `tab` onto this pane, at `index` within its strip. */
   onDropTab: (tab: VizTabId, index: number) => void;
   onDragStateChange: (dragging: boolean) => void;
-  keyboardCols: number;
-  setKeyboardCols: (cols: number) => void;
 };
 
 export function VizPane(props: Props) {
@@ -131,24 +128,6 @@ export function VizPane(props: Props) {
         ))}
 
         <div className="pr-menu-wrap" ref={menuRef}>
-          {active === "keyboard" && (
-            <div className="viz-seg">
-              <button
-                className={`viz-seg-btn${props.keyboardCols === 1 ? " active" : ""}`}
-                onClick={() => props.setKeyboardCols(1)}
-                title="1 column"
-              >
-                <ViewAgenda sx={{ fontSize: 15 }} />
-              </button>
-              <button
-                className={`viz-seg-btn${props.keyboardCols === 2 ? " active" : ""}`}
-                onClick={() => props.setKeyboardCols(2)}
-                title="2 columns"
-              >
-                <ViewAgenda sx={{ fontSize: 15, transform: "rotate(90deg)" }} />
-              </button>
-            </div>
-          )}
           {active === "wave" && (
             <div className="viz-seg">
               <button
@@ -221,7 +200,7 @@ export function VizPane(props: Props) {
           )
         ) : (
           <div className="viz-keyboard">
-            <KeyboardList isSmall={false} columns={props.keyboardCols} />
+            <KeyboardList isSmall={false} columns={app.keyboardColumns} />
           </div>
         )}
       </div>

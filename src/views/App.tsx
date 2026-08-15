@@ -283,13 +283,6 @@ function Layout() {
       return normalizeVizLayout({ ...l, top, bottom, [pane === "top" ? "activeTop" : "activeBottom"]: tab });
     });
   };
-  // keyboard view: 1 or 2 channels per row
-  const [keyboardCols, setKeyboardCols] = useState<number>(() =>
-    localStorage.getItem("m3disp.keyboardCols") === "2" ? 2 : 1
-  );
-  useEffect(() => {
-    localStorage.setItem("m3disp.keyboardCols", String(keyboardCols));
-  }, [keyboardCols]);
   // piano-roll settings dropdown (gear in the tab row)
   const [prMenuOpen, setPrMenuOpen] = useState(false);
   const prMenuRef = useRef<HTMLDivElement>(null);
@@ -343,7 +336,6 @@ function Layout() {
           ratio: 0.5,
         })
       );
-      setKeyboardCols(1);
       resetSections();
     };
     window.addEventListener("m3disp:reset-layout", onReset);
@@ -485,8 +477,6 @@ function Layout() {
                     }
                     onDropTab={(t, i) => moveVizTab(t, which, i)}
                     onDragStateChange={setTabDragging}
-                    keyboardCols={keyboardCols}
-                    setKeyboardCols={setKeyboardCols}
                   />
                 );
                 return (

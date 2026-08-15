@@ -1,4 +1,4 @@
-import { ShowChart } from "@mui/icons-material";
+import { ShowChart, ViewColumn } from "@mui/icons-material";
 import { useContext } from "react";
 import { AppContext, type KeyboardScopeType } from "../contexts/AppContext";
 import { ScopeFpsItem, WaveSamplesItem, WaveYScaleItem } from "./WaveMenu";
@@ -10,6 +10,24 @@ const scopeOptions: { value: KeyboardScopeType; label: string }[] = [
   { value: "roll", label: "Piano Roll" },
 ];
 
+const keyboardColumnOptions = [1, 2].map((n) => ({ value: n, label: String(n) }));
+
+/** Keyboards per row. Two columns fit more channels on screen at the cost of
+ *  each keyboard's width, and stack the track info above rather than beside. */
+function KeyboardColumnsItem() {
+  const ctx = useContext(AppContext);
+  return (
+    <MenuSelect
+      icon={<ViewColumn sx={{ fontSize: 18 }} />}
+      label="Columns"
+      value={ctx.keyboardColumns}
+      options={keyboardColumnOptions}
+      active={ctx.keyboardColumns !== 1}
+      onChange={(v) => ctx.setKeyboardColumns(v)}
+    />
+  );
+}
+
 /** Settings for the Keyboard tab: an optional per-keyboard side visualizer —
  *  a waveform or a mini piano roll — plus the sample window (wave only, shared
  *  with the Scope wave view) and the shared FPS that paces it. */
@@ -17,6 +35,7 @@ export function KeyboardMenu() {
   const ctx = useContext(AppContext);
   return (
     <div className="menu-list">
+      <KeyboardColumnsItem />
       <MenuSelect
         icon={<ShowChart sx={{ fontSize: 18 }} />}
         label="Scope"
