@@ -39,6 +39,12 @@ export type KSSDecoderDeviceSnapshot = {
   opllKeyKeepFrames?: ArrayLike<number> | null;
   /** SPC mode only: 8 voices x SPC_VOICE_FIELDS int16s. */
   spc?: Int16Array | null;
+  /**
+   * Channels keyed ON during this frame. Counted from the rising edges alone —
+   * `keyKeepFrames` is reset by a key-off too, so it cannot tell the two apart —
+   * which is what the beat estimator needs as its onset weight.
+   */
+  keyOns?: number;
 };
 
 const defaultDuration = 60 * 1000 * 5;
@@ -530,6 +536,8 @@ class KSSDecoderWorker extends AudioDecoderWorker {
   _sccKeyEdgeHints: boolean[] = [];
   _sccKeyKeepFrames: number[] = [];
   _sccEnhancedMode = false;
+  /** Rising key edges seen since the last snapshot. See {@link KSSDecoderDeviceSnapshot.keyOns}. */
+  _keyOnCount = 0;
 
   private _resetKeyState() {
     this._opllAdr = 0xff;
@@ -546,6 +554,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     this._sccKeyEdgeHints = [];
     this._sccKeyKeepFrames = [];
     this._sccEnhancedMode = false;
+    this._keyOnCount = 0;
   }
 
   _memWriteHandler = (_: any, a: number, d: number) => {
@@ -581,6 +590,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
         if (this._sccKeyStatus[ch] != k) {
           this._sccKeyStatus[ch] = k;
           this._sccKeyEdgeHints[ch] = true;
+          if (k) this._keyOnCount++;
         }
       }
     }
@@ -596,6 +606,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
         if (this._psgKeyStatus[ch] != newKeyStatus) {
           this._psgKeyStatus[ch] = newKeyStatus;
           this._psgKeyEdgeHints[ch] = true;
+          if (newKeyStatus) this._keyOnCount++;
         }
       }
     } else if (a == 0x7c) {
@@ -607,6 +618,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
         if (newKeyStatus != this._opllKeyStatus[ch]) {
           this._opllKeyStatus[ch] = newKeyStatus;
           this._opllKeyEdgeHints[ch] = true;
+          if (newKeyStatus) this._keyOnCount++;
         }
       }
       if (this._opllAdr == 0x0e) {
@@ -631,6 +643,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
           if (newKeyStatus != this._opllKeyStatus[ch]) {
             this._opllKeyStatus[ch] = newKeyStatus;
             this._opllKeyEdgeHints[ch] = true;
+            if (newKeyStatus) this._keyOnCount++;
           }
         }
       }
@@ -726,7 +739,9 @@ class KSSDecoderWorker extends AudioDecoderWorker {
         sccKeyKeepFrames: [...this._sccKeyKeepFrames],
         opll: kf.readDeviceRegs("opll"),
         opllKeyKeepFrames: [...this._opllKeyKeepFrames],
+        keyOns: this._keyOnCount,
       });
+      this._keyOnCount = 0;
       if (this._keyframerFrames >= this._nextKeyframeFrame) {
         this._captureKeyframe();
         this._nextKeyframeFrame += this._keyframeFrames;

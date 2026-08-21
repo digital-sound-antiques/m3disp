@@ -1376,6 +1376,21 @@ textarea {
   /* breathing room above and below the roll content */
   padding: 16px 0;
 }
+/* estimated tempo, in the roll's top-right corner. Outside the 3D-transformed
+   box so it stays flat and legible, and above the note canvases. */
+.pianoroll-bpm {
+  position: absolute;
+  top: 6px;
+  right: 10px;
+  z-index: 1;
+  pointer-events: none;
+  font-variant-numeric: tabular-nums;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  color: #8b949e;
+  opacity: 0.72;
+  white-space: nowrap;
+}
 /* per-channel grid: OPLL/PSG/SCC sections (collapsible/reorderable like the
    Keyboard view), each a 3-column grid of channel-roll cells. The whole grid
    stretches to fit the viewport (no scroll): sections grow by their row count

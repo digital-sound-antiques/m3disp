@@ -1,4 +1,12 @@
-import { AutoAwesome, InvertColors, Layers, Piano, TouchApp, ZoomIn } from "@mui/icons-material";
+import {
+  AutoAwesome,
+  InvertColors,
+  Layers,
+  Piano,
+  TouchApp,
+  ViewWeek,
+  ZoomIn,
+} from "@mui/icons-material";
 import { ReactNode, useContext } from "react";
 import { AppContext, keyboardModeCycle, type PianoRollKeyboardMode } from "../contexts/AppContext";
 import { particleTypeCycle, type PianoRollParticleType } from "../widgets/piano-roll-painter";
@@ -66,6 +74,10 @@ export function PianoRollMenu(props: { grid?: boolean; colorize?: boolean }) {
         active={ctx.pianoRollParticleType !== "off"}
         onChange={(v) => ctx.setPianoRollParticleType(v)}
       />
+      {!props.grid &&
+        toggle(<ViewWeek sx={{ fontSize: 18 }} />, "Beat", ctx.pianoRollBeatLines, () =>
+          ctx.setPianoRollBeatLines(!ctx.pianoRollBeatLines)
+        )}
       {!props.grid && (
         <MenuSelect
           icon={<Piano sx={{ fontSize: 18 }} />}

@@ -18,6 +18,7 @@ import {
 } from "./piano-roll-painter";
 import { rollFrameGov } from "./frame-governor";
 import { isChannelHidden } from "../views/channel-visibility";
+import { useBeat } from "./useBeat";
 
 // ---- Canvas utility components ----
 
@@ -159,7 +160,8 @@ function PianoRollCanvas(props: { width: number; height: number; resX?: number; 
         colorConfig,
         ac.pianoRollMode,
         shape3dRef.current,
-        ac.pianoRollPress
+        ac.pianoRollPress,
+        ac.pianoRollBeatLines
       );
       rollFrameGov.addCost(performance.now() - t0);
     };
@@ -174,6 +176,7 @@ function PianoRollCanvas(props: { width: number; height: number; resX?: number; 
 
 export function PianoRoll(props: { mode: string }) {
   const appContext = useContext(AppContext);
+  const beat = useBeat();
   const boxRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 0, height: 0 });
 
@@ -310,6 +313,12 @@ export function PianoRoll(props: { mode: string }) {
           />
         </>}
       </div>
+      {/* The tempo is estimated from the notes, so it belongs with them rather
+          than with the transport's file-derived numbers. Shown under the same
+          switch as the beat rules: one estimate, one thing to turn off. */}
+      {appContext.pianoRollBeatLines && beat != null && (
+        <div className="pianoroll-bpm">{Math.round(beat.bpm)} BPM</div>
+      )}
     </div>
   );
 }

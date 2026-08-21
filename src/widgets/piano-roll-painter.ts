@@ -2,6 +2,7 @@ import * as Colors from "@mui/material/colors";
 import type { PlayerContextState } from "../contexts/PlayerContext";
 import { type ChannelId, type ChannelStatus, getStatusFromSnapshot } from "../kss/channel-status";
 import { pianoRollHighlight } from "./piano-roll-highlight";
+import { getConfidentBeat } from "../kss/beat-tracker";
 import { isChannelHidden } from "../views/channel-visibility";
 import type { KSSDecoderDeviceSnapshot } from "../kss/kss-decoder-worker";
 import type { KSSChannelMask, DeviceName } from "../kss/kss-device";
@@ -774,6 +775,38 @@ function buildSegments(
 
 // ---- Main piano roll drawing ----
 
+/** Faint vertical rule on every estimated beat, behind the notes. */
+const BEAT_LINE_ALPHA = 0.09;
+
+/**
+ * Rules on the beat, drawn across the roll behind the notes.
+ *
+ * Only the beat is drawn, not bars: the estimate says how long a beat is and
+ * where the beats fall, but nothing in the notes says which of them is a
+ * downbeat, and a bar line every four beats starting from an arbitrary one would
+ * be a claim the estimate cannot make.
+ */
+function paintBeatLines(
+  ctx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  windowStart: number,
+  frames: number,
+  step: number
+) {
+  const beat = getConfidentBeat();
+  if (beat == null || beat.periodFrames <= 0) return;
+  const { periodFrames: period, phaseFrames: phase } = beat;
+  const px = Math.max(1, Math.floor(devicePixelRatio));
+  ctx.fillStyle = `rgba(255,255,255,${BEAT_LINE_ALPHA})`;
+  const first = Math.ceil((windowStart - phase) / period);
+  for (let n = first; ; n++) {
+    const frame = phase + n * period;
+    const i = frame - windowStart;
+    if (i > frames) break;
+    ctx.fillRect(Math.round(i * step), 0, px, canvas.height);
+  }
+}
+
 export function paintPianoRoll(
   canvas: HTMLCanvasElement,
   playerContext: PlayerContextState,
@@ -783,7 +816,8 @@ export function paintPianoRoll(
   colorConfig: PianoRollColorConfig = defaultColorConfig,
   mode: string = "2d",
   shape3d: { sx: number; sy: number } | null = null,
-  press: boolean = false
+  press: boolean = false,
+  beatLines: boolean = true
 ) {
   const now = performance.now();
   const dt = Math.min((now - lastRenderTime) / 1000, 1 / 20);
@@ -802,6 +836,14 @@ export function paintPianoRoll(
 
   // latency-corrected current NTSC frame, shared across channels
   const currentNtsc = currentNtscFrame(playerContext);
+
+  // Beat rules first, so every note sits on top of them. Laid out on the
+  // unlayered time axis: the per-channel offset `layered` adds is a look, not a
+  // different clock, and the rules have to agree with the roll as a whole.
+  if (beatLines) {
+    const frames = Math.round(60 * rangeInSec);
+    paintBeatLines(ctx, canvas, currentNtsc - Math.floor(frames * lpos), frames, canvas.width / frames);
+  }
 
   // Deferred draws for currently-playing segments so they always sit on top,
   // giving a stable z-order regardless of channel index.
