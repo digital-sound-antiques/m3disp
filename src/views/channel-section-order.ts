@@ -1,4 +1,4 @@
-// Shared device-section state (OPLL / PSG / SCC, or the single SPC section):
+// Shared device-section state (OPLL / PSG / SCC, or the single SPC or NES section):
 // display order and per-section collapse. Reorderable/collapsible from both the
 // channel list and the keyboard tab, mirrored live and persisted across reloads.
 // Views subscribe via useSyncExternalStore.
@@ -93,7 +93,7 @@ export function toggleSectionCollapsed(key: string) {
 export function resetSections() {
   order = [...sectionKeys];
   collapsed = [];
-  for (const suffix of ["", ".spc"]) {
+  for (const suffix of ["", ".spc", ".nsf"]) {
     localStorage.removeItem(`${ORDER_KEY}${suffix}`);
     localStorage.removeItem(`${COLLAPSED_KEY}${suffix}`);
   }

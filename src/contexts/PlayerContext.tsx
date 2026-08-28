@@ -11,7 +11,9 @@ import { PlayerContextReducer } from "./PlayerContextReducer";
 import { AppProgressContext } from "./AppProgressContext";
 import { KSSDecoderStartOptions } from "../kss/kss-decoder-worker";
 import { SurroundEffect, SurroundMode } from "../utils/surround";
+import { OutputFilter } from "../utils/output-filter";
 import { isSPCFile } from "spc700-js";
+import { isNSFFile } from "nsf-js";
 import { setPlayerMode } from "../player-mode";
 
 export type PlayListEntry = {
@@ -21,8 +23,9 @@ export type PlayListEntry = {
   duration?: number | null; // in ms
   fadeDuration?: number | null; // in ms
   song?: number | null; // sub song number
-  /** Set for .spc entries; drives the SPC-only parts of the UI. */
-  format?: "spc" | null;
+  /** Set for entries that are not KSS; drives the format-specific parts of the
+   *  UI. */
+  format?: "spc" | "nsf" | null;
   loop?: number | null; // loop number
 };
 
@@ -32,6 +35,8 @@ export interface PlayerContextState {
   audioContext: AudioContext;
   gainNode: GainNode;
   surround: SurroundEffect;
+  /** Stands in for the listener's equipment; the last thing in the path. */
+  outputFilter: OutputFilter;
   surroundMode: SurroundMode;
   storage: BinaryDataStorage;
   masterGain: number;
@@ -84,6 +89,7 @@ const createDefaultContextState = () => {
     audioContext: audioContext,
     gainNode: new GainNode(audioContext),
     surround: new SurroundEffect(audioContext),
+    outputFilter: new OutputFilter(audioContext),
     surroundMode: DEFAULT_SURROUND_MODE,
     storage: new BinaryDataStorage(),
     // Workaround: AudioWorklet's playback is broken in iOS 17.5.1
@@ -105,6 +111,7 @@ const createDefaultContextState = () => {
       opll: 0,
       scc: 0,
       spc: 0,
+      nsf: 0,
     },
     unmute: async () => {
       unmuteAudio();
@@ -116,7 +123,11 @@ const createDefaultContextState = () => {
 
   state.gainNode.gain.value = state.masterGain;
   state.gainNode.connect(state.surround.input);
-  state.surround.output.connect(state.audioContext.destination);
+  // After the surround stage rather than before it: what the filter is standing
+  // in for comes last in a real signal path, and putting it there also takes the
+  // edge off anything the master gain has driven into the rails.
+  state.surround.output.connect(state.outputFilter.input);
+  state.outputFilter.output.connect(state.audioContext.destination);
   state.player.connect(state.gainNode);
   autoResumeAudioContext(state.audioContext);
 
@@ -230,10 +241,10 @@ async function applyPlayStateChange(
     const data = await state.storage.get(dataId);
 
     // The track's format decides the whole display mode: an SPC track shows
-    // only its 8 S-DSP voices, everything else only the MSX devices. Set it
-    // before play() so the views never render one mode's channels against the
-    // other's data.
-    setPlayerMode(isSPCFile(data) ? "spc" : "kss");
+    // only its 8 S-DSP voices, an NSF only its 6 NES channels, everything else
+    // only the MSX devices. Set it before play() so the views never render one
+    // mode's channels against another's data.
+    setPlayerMode(isSPCFile(data) ? "spc" : isNSFFile(data) ? "nsf" : "kss");
 
     const options: KSSDecoderStartOptions = {
       channelMask,

@@ -6,7 +6,13 @@ import { getConfidentBeat } from "../kss/beat-tracker";
 import { isChannelHidden } from "../views/channel-visibility";
 import type { KSSDecoderDeviceSnapshot } from "../kss/kss-decoder-worker";
 import type { KSSChannelMask, DeviceName } from "../kss/kss-device";
-import { channelIds, getPlayerMode, KSS_CHANNEL_IDS, SPC_CHANNEL_IDS } from "../player-mode";
+import {
+  channelIds,
+  getPlayerMode,
+  KSS_CHANNEL_IDS,
+  NSF_CHANNEL_IDS,
+  SPC_CHANNEL_IDS,
+} from "../player-mode";
 
 // OPLL rhythm channels (index 9-13) use reversed mute bits (BD=13 … HH=9); PSG
 // tone channels 3-5 share bits 0-2 with 0-2; SCC and OPLL melody map 1:1.
@@ -64,6 +70,11 @@ export const defaultChannelColors: string[] = [
   // perceptual lightness and chroma, so both modes read as one design.
   "#e18516", "#b99c1c", "#47b95f", "#1db98d",
   "#1fbb6f", "#20ace5", "#968efa", "#dd72c2",
+  // NES channels: the two pulses take neighbouring hues because they are a
+  // pair, and noise and the DMC — the percussion pair — take the far side. The
+  // VRC6's three follow, in the blues.
+  "#e18516", "#b99c1c", "#47b95f", "#968efa", "#dd72c2", "#1fb3ba",
+  "#20ace5", "#4fa1fb", "#1db98d",
 ];
 
 export const colorMap = [
@@ -81,14 +92,37 @@ const spcColorMap = [
   Colors.cyan, Colors.blue, Colors.deepPurple, Colors.pink,
 ];
 
-/** Family table for the active mode (drives the per-channel fallback color). */
-const activeColorMap = () => (getPlayerMode() === "spc" ? spcColorMap : colorMap);
+/** Fallback families for the six NES channels and the VRC6's three. */
+const nsfColorMap = [
+  Colors.orange, Colors.amber, Colors.green,
+  Colors.deepPurple, Colors.pink, Colors.cyan,
+  Colors.lightBlue, Colors.blue, Colors.teal,
+];
 
-/** Index into the shared colour array for a flat channel index. SPC mode
- *  replaces the KSS channel list rather than extending it, so its voices count
- *  from 0 there but are stored after the KSS block. */
+/** Family table for the active mode (drives the per-channel fallback color). */
+const activeColorMap = () => {
+  switch (getPlayerMode()) {
+    case "spc":
+      return spcColorMap;
+    case "nsf":
+      return nsfColorMap;
+    default:
+      return colorMap;
+  }
+};
+
+/** Index into the shared colour array for a flat channel index. The SPC and NSF
+ *  modes replace the KSS channel list rather than extending it, so their
+ *  channels count from 0 while playing but are stored after the KSS block. */
 export function colorIndexOf(ch: number): number {
-  return getPlayerMode() === "spc" ? KSS_CHANNEL_IDS.length + ch : ch;
+  switch (getPlayerMode()) {
+    case "spc":
+      return KSS_CHANNEL_IDS.length + ch;
+    case "nsf":
+      return KSS_CHANNEL_IDS.length + SPC_CHANNEL_IDS.length + ch;
+    default:
+      return ch;
+  }
 }
 
 function channelColorOf(config: PianoRollColorConfig, ch: number, fallback: string): string {
@@ -108,7 +142,7 @@ export type PianoRollColorConfig = {
 };
 
 const defaultColorConfig: PianoRollColorConfig = {
-  mode: { opll: "voice", psg: "voice", scc: "voice", spc: "channel" },
+  mode: { opll: "voice", psg: "voice", scc: "voice", spc: "channel", nsf: "channel" },
   channelColors: defaultChannelColors,
   voiceColors: defaultVoiceColors,
 };
@@ -121,9 +155,18 @@ export function monoColorConfig(color: string): PianoRollColorConfig {
   let config = monoColorConfigCache.get(color);
   if (config == null) {
     config = {
-      mode: { opll: "channel", psg: "channel", scc: "channel", spc: "channel" },
-      // Long enough for either mode: the SPC voices live past the KSS block.
-      channelColors: new Array(KSS_CHANNEL_IDS.length + SPC_CHANNEL_IDS.length).fill(color),
+      mode: {
+        opll: "channel",
+        psg: "channel",
+        scc: "channel",
+        spc: "channel",
+        nsf: "channel",
+      },
+      // Long enough for any mode: the SPC voices and the NES channels live past
+      // the KSS block.
+      channelColors: new Array(
+        KSS_CHANNEL_IDS.length + SPC_CHANNEL_IDS.length + NSF_CHANNEL_IDS.length
+      ).fill(color),
       voiceColors: defaultVoiceColors,
     };
     monoColorConfigCache.set(color, config);

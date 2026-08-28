@@ -2,6 +2,7 @@ import { KSS, KSSPlay } from "libkss-js";
 import { AudioDecoderWorker } from "webaudio-stream-player";
 import { KSSChannelMask } from "./kss-device";
 import { SPCEngine, isSPCFile } from "../spc/spc-engine";
+import { NSFEngine, isNSFFile } from "../nsf/nsf-engine";
 
 export type KSSDecoderStartOptions = {
   data: Uint8Array | ArrayBuffer | ArrayBufferLike | ArrayLike<number>;
@@ -39,6 +40,10 @@ export type KSSDecoderDeviceSnapshot = {
   opllKeyKeepFrames?: ArrayLike<number> | null;
   /** SPC mode only: 8 voices x SPC_VOICE_FIELDS int16s. */
   spc?: Int16Array | null;
+  /** NSF mode only: 6 channels x NSF_CH_FIELDS int16s. */
+  nsf?: Int16Array | null;
+  /** NSF mode only: the FDS wavetable as signed bytes, when the file has one. */
+  nsfWave?: Uint8Array | null;
   /**
    * Channels keyed ON during this frame. Counted from the rising edges alone —
    * `keyKeepFrames` is reset by a key-off too, so it cannot tell the two apart —
@@ -59,6 +64,18 @@ const KEYFRAME_SECONDS = 2;
  *  now-line sits a quarter up the view (see `lpos`), so its widest Zoom of 20s
  *  shows 15s of future — anything less here leaves the top of the roll blank. */
 const SCAN_AHEAD_SECONDS = 16;
+/**
+ * Seconds of look-ahead the NSF scanner may cover in one decode step.
+ *
+ * The NSF scanner runs the whole machine — there is no cheap silent mode like
+ * the KSS keyframer's calcSilent, and no shortcut like the SPC path's DSP-rate
+ * skip — so letting it catch up in one unbounded pass blocks this worker for
+ * around 700 ms. That is longer than the audio buffer holds, and it is heard as
+ * every channel cutting out at once just after playback starts. Bounded, each
+ * step costs about a third of the audio it produces, and the scanner still
+ * reaches its full look-ahead within the first couple of seconds.
+ */
+const NSF_SCAN_BUDGET_SECONDS = 1;
 /** Short ramp applied to the first samples of every (re)start so a track that
  *  opens on a non-zero sample doesn't click at the transition. Kept as short as
  *  short (~5ms) so it removes the DC step without audibly softening the
@@ -87,6 +104,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
           if (d.waveEnabled != null) {
             this._waveEnabled = d.waveEnabled;
             this._spc?.setWaveEnabled(d.waveEnabled);
+            this._nsf?.setWaveEnabled(d.waveEnabled);
           }
           return;
         case "setChannelMask":
@@ -95,6 +113,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
           this._applyChannelMask(this._player);
           this._applyChannelMask(this._keyframer);
           this._spc?.setVoiceMask(this._channelMask.spc ?? 0);
+          this._nsf?.setChannelMask(this._channelMask.nsf ?? 0);
           return;
         default:
           // The base abort awaits the in-flight process(); set our flag here so
@@ -108,6 +127,8 @@ class KSSDecoderWorker extends AudioDecoderWorker {
   private _kss: KSS | null = null;
   /** Non-null while an .spc track is loaded; the KSS engines idle in that case. */
   private _spc: SPCEngine | null = null;
+  /** Non-null while an .nsf track is loaded; likewise. */
+  private _nsf: NSFEngine | null = null;
   // Audible engine, kept ~lookaheadMs ahead of the play head.
   private _player: KSSPlay | null = null;
   // State-save engine: runs ahead (calcSilent), captures keyframes every
@@ -147,7 +168,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
   private _fadeInRemaining = 0; // samples of start-fade left to apply
   // current per-device channel mute mask; applied to both engines and re-applied
   // after every loadState/reset so a keyframe's mask never overrides the live one
-  private _channelMask: KSSChannelMask = { psg: 0, scc: 0, opll: 0, opl: 0, spc: 0 };
+  private _channelMask: KSSChannelMask = { psg: 0, scc: 0, opll: 0, opl: 0, spc: 0, nsf: 0 };
 
   private get _keyframeFrames() {
     return KEYFRAME_SECONDS * this.sampleRate;
@@ -216,13 +237,17 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     // player builds its decoder once and recycles it, so the worker is chosen
     // before any track — and therefore any format — is known.
     if (u8raw != null && isSPCFile(u8raw)) {
+      this._disposeNSF();
       await this._startSPC(u8raw, args, startFrame);
       return;
     }
-    if (this._spc != null) {
-      this._spc.dispose();
-      this._spc = null;
+    if (u8raw != null && isNSFFile(u8raw)) {
+      this._disposeSPC();
+      await this._startNSF(u8raw, args, startFrame);
+      return;
     }
+    this._disposeSPC();
+    this._disposeNSF();
 
     const inSong =
       args.seek === true &&
@@ -255,6 +280,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
         opll: args.channelMask?.opll ?? 0,
         opl: args.channelMask?.opl ?? 0,
         spc: args.channelMask?.spc ?? 0,
+        nsf: args.channelMask?.nsf ?? 0,
       };
 
       this._configureEngine(this._player!, args);
@@ -312,6 +338,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
         opll: args.channelMask?.opll ?? 0,
         opl: args.channelMask?.opl ?? 0,
         spc: args.channelMask?.spc ?? 0,
+        nsf: args.channelMask?.nsf ?? 0,
       };
       this._spc.setVoiceMask(this._channelMask.spc);
       this._spc.load(u8, {
@@ -396,6 +423,146 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     }
     if (spc.bufferedFrame > this._bufferedHWM) {
       this._bufferedHWM = spc.bufferedFrame;
+      this._postBuffered();
+    }
+  }
+
+  private _disposeSPC(): void {
+    if (this._spc == null) return;
+    this._spc.dispose();
+    this._spc = null;
+  }
+
+  private _disposeNSF(): void {
+    if (this._nsf == null) return;
+    this._nsf.dispose();
+    this._nsf = null;
+  }
+
+  /** Start (or seek within) an .nsf track. */
+  private async _startNSF(
+    u8: Uint8Array,
+    args: KSSDecoderStartOptions,
+    startFrame: number
+  ): Promise<void> {
+    const inSong =
+      args.seek === true &&
+      args.songToken != null &&
+      args.songToken === this._loadedToken &&
+      this._nsf != null;
+
+    if (!inSong) {
+      this._nsf?.dispose();
+      this._nsf = new NSFEngine(this.sampleRate);
+      this._nsf.setWaveEnabled(this._waveEnabled);
+      this._channelMask = {
+        psg: args.channelMask?.psg ?? 0,
+        scc: args.channelMask?.scc ?? 0,
+        opll: args.channelMask?.opll ?? 0,
+        opl: args.channelMask?.opl ?? 0,
+        spc: args.channelMask?.spc ?? 0,
+        nsf: args.channelMask?.nsf ?? 0,
+      };
+      this._nsf.setChannelMask(this._channelMask.nsf);
+      this._nsf.load(u8, {
+        // The track number is the file's own sub-song index.
+        track: args.song ?? undefined,
+        // m3disp's own default only applies when the file's metadata says
+        // nothing; an NSFe with a `time` chunk knows its own length.
+        defaultPlaySeconds: (args.duration ?? args.defaultDuration ?? defaultDuration) / 1000,
+        defaultFadeSeconds: (args.fadeDuration ?? defaultFadeDuration) / 1000,
+      });
+      this._loadedToken = args.songToken ?? -1;
+      this._bufferedHWM = 0;
+      this._endFrame = 0;
+      this._endIsFadeOut = false;
+      // An NSF has no loop detection to wait for: the length is whatever the
+      // metadata or the default says, so the seek bar gets its total at once.
+      this._reportDuration(this._nsf.totalFrames, false);
+    }
+
+    const nsf = this._nsf!;
+    if (startFrame > 0 || inSong) {
+      nsf.seekAudibleTo(startFrame);
+      if (nsf.scannerFrames < startFrame) nsf.seekScannerTo(startFrame);
+    }
+    this._bufferedHWM = Math.max(this._bufferedHWM, nsf.bufferedFrame);
+    this._postBuffered();
+  }
+
+  /** Decode one chunk of the loaded .nsf, feeding the look-ahead as it goes. */
+  private async _processNSF(): Promise<Array<Int16Array> | null> {
+    const nsf = this._nsf;
+    if (nsf == null) return null;
+
+    if (nsf.totalFrames > 0 && nsf.audibleFrames >= nsf.totalFrames) return null;
+
+    // Same decode-ahead throttle as the other paths: while the buffer is full,
+    // spend the time extending the look-ahead instead of sleeping.
+    const limit = (this._lookaheadMs / 1000) * this.sampleRate;
+    let waits = 0;
+    while (
+      !this._aborted &&
+      this._playhead > 0 &&
+      nsf.audibleFrames - this._playhead > limit &&
+      waits < 200
+    ) {
+      nsf.advanceScanner(nsf.scannerFrames + this.sampleRate);
+      this._flushNSFSnapshots();
+      await sleep(15);
+      waits++;
+    }
+    if (this._aborted || this._nsf == null) return null;
+
+    let step = Math.floor(this.sampleRate / 8);
+    if (nsf.totalFrames > 0) step = Math.min(step, nsf.totalFrames - nsf.audibleFrames);
+    if (step <= 0) return null;
+
+    const { left, right, perCh } = nsf.render(step);
+    const chunkStart = nsf.audibleFrames - step;
+
+    nsf.advanceScanner(
+      this._playhead + SCAN_AHEAD_SECONDS * this.sampleRate,
+      NSF_SCAN_BUDGET_SECONDS * this.sampleRate
+    );
+    this._flushNSFSnapshots();
+
+    // Same restart ramp the KSS path uses: a track or seek target that opens on
+    // a non-zero sample would click without it.
+    if (this._fadeInRemaining > 0) {
+      const total = Math.floor(this.sampleRate * FADE_IN_SEC);
+      for (let i = 0; i < left.length && this._fadeInRemaining > 0; i++, this._fadeInRemaining--) {
+        const gain = (total - this._fadeInRemaining) / total;
+        left[i] = Math.round(left[i] * gain);
+        right[i] = Math.round(right[i] * gain);
+      }
+    }
+
+    if (perCh != null) {
+      this.worker.postMessage(
+        { type: "wave", frame: chunkStart, data: perCh, token: this._loadedToken },
+        [perCh.buffer]
+      );
+    }
+
+    return [left, right];
+  }
+
+  /** Post whatever channel snapshots the scanner produced, and the buffer mark. */
+  private _flushNSFSnapshots(): void {
+    const nsf = this._nsf;
+    if (nsf == null) return;
+    const snapshots = nsf.takeSnapshots();
+    if (snapshots.length > 0) {
+      this.worker.postMessage({ type: "snapshots", data: snapshots, token: this._loadedToken });
+    }
+    // The scanner may have found where the music actually stops, which shortens
+    // the track from whatever default it started with.
+    if (nsf.endDetected && nsf.totalFrames !== this._endFrame) {
+      this._reportDuration(nsf.totalFrames, true);
+    }
+    if (nsf.bufferedFrame > this._bufferedHWM) {
+      this._bufferedHWM = nsf.bufferedFrame;
       this._postBuffered();
     }
   }
@@ -779,6 +946,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
 
   async process(): Promise<Array<Int16Array> | null> {
     if (this._spc != null) return this._processSPC();
+    if (this._nsf != null) return this._processNSF();
 
     const player = this._player;
     if (player == null) return null;
@@ -911,8 +1079,8 @@ class KSSDecoderWorker extends AudioDecoderWorker {
   }
 
   async dispose(): Promise<void> {
-    this._spc?.dispose();
-    this._spc = null;
+    this._disposeSPC();
+    this._disposeNSF();
     this._player?.release();
     this._keyframer?.release();
     this._player = null;

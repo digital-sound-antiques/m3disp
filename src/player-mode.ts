@@ -1,8 +1,8 @@
-// Which sound engine the current track uses. The two modes never coexist: an
-// SPC track shows only its 8 S-DSP voices, and everything else shows only the
-// KSS devices. Rather than have every view filter a combined channel list, the
-// mode swaps the definitions themselves — channelIds, the section list and the
-// color tables are live bindings that follow it.
+// Which sound engine the current track uses. The modes never coexist: an SPC
+// track shows only its 8 S-DSP voices, an NSF track only its 6 NES channels, and
+// everything else only the KSS devices. Rather than have every view filter a
+// combined channel list, the mode swaps the definitions themselves — channelIds,
+// the section list and the color tables are live bindings that follow it.
 //
 // Same standalone-external-store shape as channel-section-order /
 // channel-visibility, so views subscribe with useSyncExternalStore.
@@ -10,7 +10,7 @@
 import { useSyncExternalStore } from "react";
 import type { ChannelId } from "./kss/channel-status";
 
-export type PlayerMode = "kss" | "spc";
+export type PlayerMode = "kss" | "spc" | "nsf";
 
 export const KSS_CHANNEL_IDS: ChannelId[] = [
   { device: "opll", index: 0 },
@@ -51,8 +51,28 @@ export const SPC_CHANNEL_IDS: ChannelId[] = [
   { device: "spc", index: 7 },
 ];
 
+/**
+ * The NES sound unit, in the order the hardware's registers run, followed by the
+ * VRC6 channels a cartridge may add.
+ *
+ * Every NSF track shows all nine, whether or not its file has those chips - the
+ * same way an MSX file without an SCC still shows the SCC section.
+ */
+export const NSF_CHANNEL_IDS: ChannelId[] = [
+  { device: "nsf", index: 0 },
+  { device: "nsf", index: 1 },
+  { device: "nsf", index: 2 },
+  { device: "nsf", index: 3 },
+  { device: "nsf", index: 4 },
+  { device: "nsf", index: 5 },
+  { device: "nsf", index: 6 },
+  { device: "nsf", index: 7 },
+  { device: "nsf", index: 8 },
+];
+
 export const KSS_SECTION_KEYS = ["opll", "psg", "scc"];
 export const SPC_SECTION_KEYS = ["spc"];
+export const NSF_SECTION_KEYS = ["nsf", "vrc6"];
 
 /** Eight hues spread evenly around the wheel at the same perceptual lightness
  *  and chroma as the KSS palette, so the two modes read as one design. */
@@ -66,6 +86,28 @@ export const SPC_CHANNEL_COLORS: string[] = [
   "#968efa", // violet
   "#dd72c2", // pink
 ];
+
+/** Six hues from the same wheel as the S-DSP palette, at the same perceptual
+ *  lightness and chroma, so every mode reads as one design. The two pulses take
+ *  neighbouring hues because they are a pair; noise and the DMC — the percussion
+ *  pair — take the far side. */
+export const NSF_CHANNEL_COLORS: string[] = [
+  "#e18516", // pulse 1     orange
+  "#b99c1c", // pulse 2     yellow
+  "#47b95f", // triangle    green
+  "#968efa", // noise       violet
+  "#dd72c2", // dmc         pink
+  "#1fb3ba", // fds         cyan
+  "#20ace5", // vrc6 pulse1 blue
+  "#4fa1fb", // vrc6 pulse2 light blue
+  "#1db98d", // vrc6 saw    teal
+];
+
+const MODES: Record<PlayerMode, { channels: ChannelId[]; sections: string[] }> = {
+  kss: { channels: KSS_CHANNEL_IDS, sections: KSS_SECTION_KEYS },
+  spc: { channels: SPC_CHANNEL_IDS, sections: SPC_SECTION_KEYS },
+  nsf: { channels: NSF_CHANNEL_IDS, sections: NSF_SECTION_KEYS },
+};
 
 let mode: PlayerMode = "kss";
 
@@ -83,8 +125,8 @@ export function getPlayerMode(): PlayerMode {
 export function setPlayerMode(next: PlayerMode): void {
   if (mode === next) return;
   mode = next;
-  channelIds = next === "spc" ? SPC_CHANNEL_IDS : KSS_CHANNEL_IDS;
-  sectionKeys = next === "spc" ? SPC_SECTION_KEYS : KSS_SECTION_KEYS;
+  channelIds = MODES[next].channels;
+  sectionKeys = MODES[next].sections;
   for (const l of listeners) l();
 }
 
@@ -102,5 +144,5 @@ export function usePlayerMode(): PlayerMode {
 /** Suffix for persisted per-mode layout keys. The flat channel index means
  *  something different in each mode, so their stored state must not collide. */
 export function modeStorageSuffix(m: PlayerMode = mode): string {
-  return m === "spc" ? ".spc" : "";
+  return m === "kss" ? "" : `.${m}`;
 }

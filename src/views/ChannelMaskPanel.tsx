@@ -26,7 +26,7 @@ import { ChannelId } from "../kss/channel-status";
 import { IconVolume, IconVolumeOff } from "../widgets/icons";
 import { setPianoRollHighlight } from "../widgets/piano-roll-highlight";
 
-type Dev = "opll" | "psg" | "scc" | "spc";
+type Dev = "opll" | "psg" | "scc" | "spc" | "nsf";
 // A row may cover several channels (OPLL 7/8/9 double as rhythm). `maskBits` are
 // the device-mask bits it toggles together, `targets` the channels whose voice/
 // level it shows, `hi` the flat channelIds indices to spotlight (opll 0-13,
@@ -96,10 +96,39 @@ const SECTIONS: Section[] = [
     })),
     bits: 0xff,
   },
+  {
+    // NSF mode's only section: six NES channels, each with a fixed role, so the
+    // rows are named rather than numbered. Flat indices start at 0 for the same
+    // reason the SPC ones do.
+    key: "nsf",
+    dev: "nsf",
+    label: "NES",
+    rows: ["SQ1", "SQ2", "TRI", "NOI", "DMC", "FDS"].map((label, i) => ({
+      label,
+      maskBits: [i],
+      targets: [{ device: "nsf", index: i } as ChannelId],
+      hi: [i],
+    })),
+    bits: 0x3f,
+  },
+  {
+    // The VRC6's three channels: the same device and mask as the rest of the NSF
+    // list, its own section because it is a different chip.
+    key: "vrc6",
+    dev: "nsf",
+    label: "VRC6",
+    rows: ["SQ1", "SQ2", "SAW"].map((label, i) => ({
+      label,
+      maskBits: [6 + i],
+      targets: [{ device: "nsf", index: 6 + i } as ChannelId],
+      hi: [6 + i],
+    })),
+    bits: 0x1c0,
+  },
 ];
 
-const ALL: KSSChannelMask = { opll: 0x3fff, psg: 0x7, scc: 0x1f, opl: 0, spc: 0xff };
-const NONE: KSSChannelMask = { opll: 0, psg: 0, scc: 0, opl: 0, spc: 0 };
+const ALL: KSSChannelMask = { opll: 0x3fff, psg: 0x7, scc: 0x1f, opl: 0, spc: 0xff, nsf: 0x1ff };
+const NONE: KSSChannelMask = { opll: 0, psg: 0, scc: 0, opl: 0, spc: 0, nsf: 0 };
 const maskEq = (a: KSSChannelMask, b: KSSChannelMask) =>
   a.opll === b.opll && a.psg === b.psg && a.scc === b.scc && a.opl === b.opl && a.spc === b.spc;
 const soloMask = (dev: Dev, bits: number): KSSChannelMask => ({ ...ALL, [dev]: ALL[dev] & ~bits });
@@ -293,7 +322,9 @@ export function ChannelMaskPanel() {
                             return (
                               <ChannelRow
                                 key={r.label}
-                                name={`CH${r.label}`}
+                                // A numbered row reads as "CH3"; a named one
+                                // (the NES channels) stands on its own.
+                                name={/^\d+$/.test(r.label) ? `CH${r.label}` : r.label}
                                 hi={r.hi}
                                 muted={muted}
                                 soloed={isSoloed(s.dev, rowBits)}

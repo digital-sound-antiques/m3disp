@@ -14,7 +14,7 @@ import { AppContext } from "../contexts/AppContext";
 import { channelIds, colorMap, defaultChannelColors, defaultVoiceColors, isChannelMuted, opllBit } from "./piano-roll-painter";
 import { getStatusFromSnapshot } from "../kss/channel-status";
 import { toggleSolo } from "../kss/channel-solo";
-import { DEVICE_CARDS } from "./KeyboardList";
+import { DEVICE_CARDS, channelLabel } from "./KeyboardList";
 import { rollFrameGov } from "./frame-governor";
 import { maxScopeCellAspect, correlationOffset, waveOffset } from "./scope-dsp";
 import {
@@ -541,7 +541,7 @@ export function WaveGrid() {
                               return (
                                 <WaveCell
                                   key={i}
-                                  label={`CH${i + 1}`}
+                                  label={channelLabel(card.device, targets[0])}
                                   channels={channels}
                                   offsets={[...new Set(targets.map((e) => waveOffset(card.device, e)))]}
                                   device={card.device}

@@ -5,6 +5,7 @@ import { PlayListEntry } from "../contexts/PlayerContext";
 import { BinaryDataStorage } from "./binary-data-storage";
 import { parseM3U } from "./m3u-parser";
 import { isSPCFile, parseSPC } from "spc700-js";
+import { isNSFFile, parseNSF, trackTitle } from "nsf-js";
 
 /// Convert a given url to a download endpoint that allows CORS access.
 export function toDownloadEndpoint(url: string) {
@@ -58,7 +59,7 @@ function _unzip(data: Uint8Array): { [key: string]: Uint8Array } {
         return false;
       }
       console.log(`filter: ${file.name}`);
-      return /\.(mgs|bgm|opx|mpk|kss|mbm|spc|m3u8?|pls)$/i.test(file.name);
+      return /\.(mgs|bgm|opx|mpk|kss|mbm|spc|nsfe?|m3u8?|pls)$/i.test(file.name);
     },
   });
 }
@@ -177,8 +178,7 @@ export const loadFilesFromUrls = async (
       const res = await queue[i];
       const filename = url.split(/[/\\]/).pop() ?? "Unknown";
       const data = compileIfRequired(new Uint8Array(await res.arrayBuffer()));
-      const entry = await createPlayListEntry(storage, data, filename);
-      entries.push(entry);
+      entries.push(...(await createPlayListEntries(storage, data, filename)));
       if (setProgress != null && i % 10 == 0) {
         setProgress(0.5 + (0.5 * i) / urls.length);
       }
@@ -192,11 +192,44 @@ export const loadFilesFromUrls = async (
   return entries;
 };
 
-const createPlayListEntry = async (
+/**
+ * Turn one file into playlist entries.
+ *
+ * Usually that is one entry, but an NSF is a program holding any number of
+ * tracks and it says how many, so each becomes its own entry - unlike KSS, where
+ * the sub-song count is not recorded anywhere and only an .m3u can name them.
+ * NSFe files carry per-track titles and lengths, which are used when present.
+ */
+const createPlayListEntries = async (
   storage: BinaryDataStorage,
   data: Uint8Array,
   filename: string
-): Promise<PlayListEntry> => {
+): Promise<PlayListEntry[]> => {
+  if (isNSFFile(data)) {
+    const nsf = parseNSF(data);
+    const dataId = await storage.put(data);
+    const album = nsf.title || filename;
+    const entries: PlayListEntry[] = [];
+    for (let track = 0; track < nsf.trackCount; track++) {
+      const named = nsf.trackLabels[track];
+      const ms = nsf.trackTimes[track];
+      entries.push({
+        title:
+          named != null && named !== ""
+            ? named
+            : nsf.trackCount > 1
+              ? `${album} (${trackTitle(nsf, track)})`
+              : album,
+        filename,
+        dataId,
+        song: track,
+        duration: ms != null && ms > 0 ? ms : undefined,
+        format: "nsf",
+      });
+    }
+    return entries;
+  }
+
   let title: string;
   const isSPC = isSPCFile(data);
   if (isSPC) {
@@ -210,12 +243,14 @@ const createPlayListEntry = async (
     kss.release();
   }
   const dataId = await storage.put(data);
-  return {
-    title,
-    filename,
-    dataId,
-    format: isSPC ? "spc" : undefined,
-  };
+  return [
+    {
+      title,
+      filename,
+      dataId,
+      format: isSPC ? "spc" : undefined,
+    },
+  ];
 };
 
 export function compileIfRequired(u8: Uint8Array): Uint8Array {
@@ -412,8 +447,7 @@ export async function loadEntriesFromFileList(
           }
         } else {
           const filename = file.name.split(/[/\\]/).pop() ?? "Unknown";
-          const entry = await createPlayListEntry(storage, data, filename);
-          res.push(entry);
+          res.push(...(await createPlayListEntries(storage, data, filename)));
         }
       }
     } catch (e) {

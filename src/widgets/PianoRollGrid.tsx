@@ -20,7 +20,7 @@ import {
   opllBit,
   paintCellRoll,
 } from "./piano-roll-painter";
-import { DEVICE_CARDS } from "./KeyboardList";
+import { DEVICE_CARDS, channelLabel } from "./KeyboardList";
 import { rollFrameGov } from "./frame-governor";
 import { maxScopeCellAspect } from "./scope-dsp";
 import { toggleSolo } from "../kss/channel-solo";
@@ -259,7 +259,7 @@ export function PianoRollGrid() {
                               return (
                                 <GridCell
                                   key={i}
-                                  label={`CH${i + 1}`}
+                                  label={channelLabel(card.device, targets[0])}
                                   channels={channels}
                                   device={card.device}
                                   targets={targets}

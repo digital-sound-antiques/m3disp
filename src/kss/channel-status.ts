@@ -2,6 +2,7 @@ import { KSSPlayer } from "./kss-player";
 import { DeviceName } from "./kss-device";
 import type { KSSDecoderDeviceSnapshot } from "./kss-decoder-worker";
 import { SPC_VOICE_FIELDS, SPC_FLAG_NOISE, SPC_FLAG_ECHO, SPC_FLAG_PMOD } from "../spc/spc-engine";
+import { NSF_CH_FIELDS, NSF_FLAG_SHORT } from "../nsf/nsf-engine";
 
 export type ChannelStatus = {
   id: ChannelId;
@@ -213,6 +214,8 @@ export function getChannelStatus(player: KSSPlayer, id: ChannelId): ChannelStatu
       return createOPLLStatus(snapshot.opll!, id, snapshot.opllKeyKeepFrames!);
     case "spc":
       return snapshot.spc ? createSPCStatus(snapshot.spc, id) : null;
+    case "nsf":
+      return snapshot.nsf ? createNSFStatus(snapshot.nsf, snapshot.nsfWave, id) : null;
     default:
       throw new Error(`Uknown device: ${id.device}`);
   }
@@ -251,6 +254,9 @@ export function getChannelStatusArray(
         break;
       case "spc":
         res.push(snapshot.spc ? createSPCStatus(snapshot.spc, id) : null);
+        break;
+      case "nsf":
+        res.push(snapshot.nsf ? createNSFStatus(snapshot.nsf, snapshot.nsfWave, id) : null);
         break;
       default:
         res.push(null);
@@ -299,6 +305,81 @@ function createSPCStatus(spc: Int16Array, id: ChannelId): ChannelStatus {
   };
 }
 
+/** The four pulse duty cycles, as trackers name them. */
+const NSF_DUTY_NAMES = ["12.5%", "25%", "50%", "75%"];
+
+/** The VRC6's eight duty settings: one sixteenth of a cycle per step. */
+const VRC6_DUTY_NAMES = [
+  "6.3%",
+  "12.5%",
+  "18.8%",
+  "25%",
+  "31.3%",
+  "37.5%",
+  "43.8%",
+  "50%",
+];
+
+/**
+ * One NES channel, decoded from the packed snapshot the NSF engine posts.
+ *
+ * The two percussion channels carry a non-null `mode` so the keyboard treats
+ * them as it treats PSG noise and OPLL rhythm — no note name, no key highlight.
+ * The FDS channel hands over its wavetable as its voice, which is the same shape
+ * the SCC channels use, so the waveform display works unchanged.
+ */
+function createNSFStatus(
+  nsf: Int16Array,
+  wave: Uint8Array | null | undefined,
+  id: ChannelId
+): ChannelStatus {
+  const o = id.index * NSF_CH_FIELDS;
+  const kcode = nsf[o];
+  const vol = nsf[o + 1];
+  const keyKeepFrames = nsf[o + 2];
+  const vnum = nsf[o + 3];
+  const flags = nsf[o + 4];
+  const period = nsf[o + 5];
+
+  const base = {
+    id,
+    freq: kcode >= 0 ? 440 * Math.pow(2, (kcode - 57) / 12) : 0,
+    kcode: kcode >= 0 ? kcode : null,
+    vol,
+    vnum,
+    keyKeepFrames,
+  };
+
+  switch (id.index) {
+    case 0:
+    case 1:
+      return { ...base, voice: `Pulse ${NSF_DUTY_NAMES[vnum & 3]}` };
+    case 2:
+      return { ...base, voice: "Triangle" };
+    case 3:
+      return {
+        ...base,
+        mode: "noise",
+        voice: flags & NSF_FLAG_SHORT ? "Noise Short" : "Noise",
+      };
+    case 4:
+      return {
+        ...base,
+        mode: "pcm",
+        voice: `Sample $${period.toString(16).padStart(2, "0").toUpperCase()}`,
+      };
+    case 5:
+      return { ...base, voice: wave ?? null };
+    case 6:
+    case 7:
+      // A VRC6 pulse in mode 1 is a bare DAC rather than a duty generator, which
+      // the engine flags by handing over a voice number past the eight duties.
+      return { ...base, voice: vnum > 7 ? "DAC" : `Pulse ${VRC6_DUTY_NAMES[vnum & 7]}` };
+    default:
+      return { ...base, voice: "Sawtooth" };
+  }
+}
+
 /** Extract full ChannelStatus from a single snapshot (for incremental caching) */
 export function getStatusFromSnapshot(
   snapshot: KSSDecoderDeviceSnapshot | null | undefined,
@@ -311,6 +392,7 @@ export function getStatusFromSnapshot(
       case "scc": return snapshot.scc ? createSCCStatus(snapshot.scc, id, snapshot.sccKeyKeepFrames ?? []) : null;
       case "opll": return snapshot.opll ? createOPLLStatus(snapshot.opll, id, snapshot.opllKeyKeepFrames ?? []) : null;
       case "spc": return snapshot.spc ? createSPCStatus(snapshot.spc, id) : null;
+      case "nsf": return snapshot.nsf ? createNSFStatus(snapshot.nsf, snapshot.nsfWave, id) : null;
       default: return null;
     }
   } catch { return null; }
@@ -328,6 +410,7 @@ export function getKcodeAt(
       case "scc": return snapshot.scc ? createSCCStatus(snapshot.scc, id, snapshot.sccKeyKeepFrames ?? [])?.kcode ?? null : null;
       case "opll": return snapshot.opll ? createOPLLStatus(snapshot.opll, id, snapshot.opllKeyKeepFrames ?? [])?.kcode ?? null : null;
       case "spc": return snapshot.spc ? createSPCStatus(snapshot.spc, id).kcode ?? null : null;
+      case "nsf": return snapshot.nsf ? createNSFStatus(snapshot.nsf, snapshot.nsfWave, id).kcode ?? null : null;
       default: return null;
     }
   } catch { return null; }

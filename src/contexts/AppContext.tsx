@@ -52,6 +52,7 @@ export type PianoRollColorModeMap = {
   psg: PianoRollColorMode;
   scc: PianoRollColorMode;
   spc: PianoRollColorMode;
+  nsf: PianoRollColorMode;
 };
 
 // How the flat pianoRollChannelColors[] array maps onto each device, matching
@@ -65,6 +66,8 @@ const channelColorGroups: { device: keyof PianoRollColorModeMap; base: number; c
   // voices are indexed 0-7 there; the shared colour array keeps them after the
   // KSS block so one stored palette covers both modes.
   { device: "spc", base: 25, count: 8 },
+  // Likewise the six NES channels, stored after the SPC block.
+  { device: "nsf", base: 33, count: 9 },
 ];
 
 function channelColorsToMap(colors: string[]): { [device: string]: string[] } {
@@ -182,7 +185,13 @@ const defaultContextData: AppContextData = {
   pianoRollMode: "2d",
   pianoRollParticleType: "off",
   pianoRollKeyboard: "line",
-  pianoRollColorMode: { opll: "voice", psg: "voice", scc: "voice", spc: "channel" },
+  pianoRollColorMode: {
+    opll: "voice",
+    psg: "voice",
+    scc: "voice",
+    spc: "channel",
+    nsf: "channel",
+  },
   pianoRollChannelColors: [...defaultChannelColors],
   pianoRollColorize: true,
   openMap: {},
@@ -524,7 +533,13 @@ export function AppContextProvider(props: PropsWithChildren) {
     setPianoRollMode("2d");
     setPianoRollParticleType("off");
     setPianoRollKeyboard("line");
-    setPianoRollColorMode({ opll: "voice", psg: "voice", scc: "voice", spc: "channel" });
+    setPianoRollColorMode({
+      opll: "voice",
+      psg: "voice",
+      scc: "voice",
+      spc: "channel",
+      nsf: "channel",
+    });
     setPianoRollChannelColors([...defaultChannelColors]);
     setPianoRollColorize(true);
     // Let the layout (channel/playlist collapse, widths, section order, view
@@ -666,6 +681,7 @@ export function AppContextProvider(props: PropsWithChildren) {
             // Absent from settings saved before SPC support; the S-DSP has no
             // voice numbers to colour by, so it defaults to "by channel".
             spc: pick(m?.spc, "channel"),
+            nsf: pick(m?.nsf, "channel"),
           },
           false
         );

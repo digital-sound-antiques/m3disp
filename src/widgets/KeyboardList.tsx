@@ -118,7 +118,12 @@ function DeviceCard(props: DeviceCardProps) {
     const info = props.small ? (
       <VolumeInfoPanel variant="horizontal" targets={channels} disabled={false} sx={{ width: "72px" }} />
     ) : (
-      <TrackInfoPanel title={`CH${i + 1}`} targets={channels} disabled={false} top={cols2} />
+      <TrackInfoPanel
+        title={channelLabel(props.device, target[0])}
+        targets={channels}
+        disabled={false}
+        top={cols2}
+      />
     );
 
     res.push(
@@ -218,7 +223,23 @@ export const DEVICE_CARDS: Record<
   // SPC mode's only section. The eight S-DSP voices are interchangeable — no
   // fixed roles, no shared slots — so each one is its own card.
   spc: { name: "S-DSP", device: "spc", targets: [0, 1, 2, 3, 4, 5, 6, 7] },
+  // NSF mode's only section. Six channels with fixed roles, one card each; the
+  // FDS card is present for every NSF and stays quiet on the files that have no
+  // FDS, the same way the SCC section does for an MSX file without one.
+  nsf: { name: "NES", device: "nsf", targets: [0, 1, 2, 3, 4, 5] },
+  // The VRC6 lives on the cartridge, so it gets its own section even though its
+  // channels are part of the same NSF channel list.
+  vrc6: { name: "VRC6", device: "nsf", targets: [6, 7, 8] },
 };
+
+/** Channels with fixed roles get named rather than numbered. */
+const FIXED_LABELS: Partial<Record<DeviceName, string[]>> = {
+  nsf: ["SQ1", "SQ2", "TRI", "NOI", "DMC", "FDS", "SQ1", "SQ2", "SAW"],
+};
+
+/** Row label for a channel: its role where it has one, else its number. */
+export const channelLabel = (device: DeviceName, index: number): string =>
+  FIXED_LABELS[device]?.[index] ?? `CH${index + 1}`;
 
 export function KeyboardList(props: {
   isSmall?: boolean | null;

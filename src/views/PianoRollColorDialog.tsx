@@ -2,7 +2,6 @@ import React, { useContext, useEffect, useRef, useState } from "react";
 import { AppContext, PianoRollColorModeMap } from "../contexts/AppContext";
 import { ColorBall } from "../widgets/ColorSelector";
 import { pianoRollColorDialogId } from "../widgets/PianoRollControl";
-import { PlayerContext } from "../contexts/PlayerContext";
 import { defaultChannelColors, type PianoRollColorMode } from "../widgets/piano-roll-painter";
 
 // Channel labels, aligned 1:1 with channelIds[] in piano-roll-painter.ts.
@@ -11,25 +10,32 @@ const oplRhythmLabels = ["BD", "SD", "TOM", "CYM", "HH"];
 const psgLabels = ["PSG1", "PSG2", "PSG3", "NOISE1", "NOISE2", "NOISE3"];
 const sccLabels = ["SCC1", "SCC2", "SCC3", "SCC4", "SCC5"];
 const spcLabels = ["CH1", "CH2", "CH3", "CH4", "CH5", "CH6", "CH7", "CH8"];
+const nesLabels = ["SQ1", "SQ2", "TRI", "NOI", "DMC", "FDS"];
+const vrc6Labels = ["SQ1", "SQ2", "SAW"];
 
 type ChannelGroup = {
+  /** Unique per tab. Two tabs can share a device - the NES and the VRC6 do -
+   *  so the device name is not enough to tell them apart. */
+  id: string;
   device: keyof PianoRollColorModeMap;
   name: string;
   labels: string[];
   base: number;
-  /** Only offered once the playlist actually holds an .spc. */
-  spcOnly?: boolean;
 };
 
 // base = starting index into channelIds[] / the channel color arrays.
 const channelGroups: ChannelGroup[] = [
-  { device: "opll", name: "OPLL", labels: [...oplFmLabels, ...oplRhythmLabels], base: 0 },
-  { device: "psg", name: "PSG", labels: psgLabels, base: 14 },
-  { device: "scc", name: "SCC", labels: sccLabels, base: 20 },
+  { id: "opll", device: "opll", name: "OPLL", labels: [...oplFmLabels, ...oplRhythmLabels], base: 0 },
+  { id: "psg", device: "psg", name: "PSG", labels: psgLabels, base: 14 },
+  { id: "scc", device: "scc", name: "SCC", labels: sccLabels, base: 20 },
   // SPC mode replaces the KSS channel list rather than extending it, so its
   // voices are indexed 0-7 while playing; the shared colour array keeps them
   // after the KSS block, which is the base used here.
-  { device: "spc", name: "SPC700", labels: spcLabels, base: 25, spcOnly: true },
+  { id: "spc", device: "spc", name: "SPC700", labels: spcLabels, base: 25 },
+  // The NES channels and the VRC6's are one device in the data model, so they
+  // share a colouring mode, but they are two chips and get a tab each.
+  { id: "nes", device: "nsf", name: "NES", labels: nesLabels, base: 33 },
+  { id: "vrc6", device: "nsf", name: "VRC6", labels: vrc6Labels, base: 39 },
 ];
 
 /** Normalize an arbitrary stored color into the #rrggbb form <input type="color"> requires. */
@@ -65,12 +71,7 @@ function ColorPickerBall(props: { color: string; disabled?: boolean; onChange: (
 
 function DialogBody(props: { id: string }) {
   const app = useContext(AppContext);
-  const { entries } = useContext(PlayerContext);
-  // The SPC tab would be dead weight for the MSX listener this app is built
-  // for, so it appears only once an .spc is in the playlist. Older entries
-  // predate the format flag, hence the filename fallback.
-  const hasSPC = entries.some((e) => e.format === "spc" || /\.spc$/i.test(e.filename));
-  const groups = channelGroups.filter((g) => !g.spcOnly || hasSPC);
+  const groups = channelGroups;
   const [tabIndex, setTab] = useState(0);
   const tab = Math.min(tabIndex, groups.length - 1);
 
@@ -117,7 +118,7 @@ function DialogBody(props: { id: string }) {
         <div className="crd-tabs">
           {groups.map((grp, i) => (
             <button
-              key={grp.device}
+              key={grp.id}
               className={`crd-tab${tab === i ? " active" : ""}`}
               onClick={() => setTab(i)}
             >
@@ -133,13 +134,13 @@ function DialogBody(props: { id: string }) {
             const gMode = mode[grp.device];
             const disabled = gMode === "voice"; // channel colors only apply "By Channel"
             return (
-              <div className={`crd-panel${tab === i ? " active" : ""}`} key={grp.device}>
+              <div className={`crd-panel${tab === i ? " active" : ""}`} key={grp.id}>
                 <div className="crd-section-label">Coloring Mode</div>
                 <div className="crd-radios">
                   <label className="crd-radio">
                     <input
                       type="radio"
-                      name={`crd-mode-${grp.device}`}
+                      name={`crd-mode-${grp.id}`}
                       checked={gMode === "voice"}
                       onChange={() => updateMode(grp.device, "voice")}
                     />
@@ -148,7 +149,7 @@ function DialogBody(props: { id: string }) {
                   <label className="crd-radio">
                     <input
                       type="radio"
-                      name={`crd-mode-${grp.device}`}
+                      name={`crd-mode-${grp.id}`}
                       checked={gMode === "channel"}
                       onChange={() => updateMode(grp.device, "channel")}
                     />
@@ -162,7 +163,7 @@ function DialogBody(props: { id: string }) {
                     {grp.labels.map((label, j) => {
                       const index = grp.base + j;
                       return (
-                        <div className="crd-cell" key={label}>
+                        <div className="crd-cell" key={index}>
                           <ColorPickerBall
                             color={channelColors[index]}
                             disabled={disabled}
