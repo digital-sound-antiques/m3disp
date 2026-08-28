@@ -92,7 +92,18 @@ const FILTER_SETTLE_FRAMES = 1024;
  * spans 12 LU against the MSX corpus's 7, which is the music rather than the
  * emulation.
  */
-const OUTPUT_SCALE = 0.5;
+const OUTPUT_SCALE = 0.25;
+
+/**
+ * Level of the per-channel traces the scope draws.
+ *
+ * Derived from the mix correction rather than set beside it, so the picture can
+ * never drift from what is heard: nsf-js captures per-channel at ±24000, and a
+ * quarter of the mix correction lands that on the ~3000 the scope is drawn
+ * against (see WaveGrid) when the correction is a half. Change OUTPUT_SCALE and
+ * the traces follow.
+ */
+const WAVE_SCALE = OUTPUT_SCALE / 4;
 
 /**
  * State keyframe spacing. Keyframes are small here, and rendering runs well
@@ -264,10 +275,9 @@ export class NSFEngine {
         for (let i = 0; i < step; i++) {
           const s = Math.min(captured - 1, i) * CHANNEL_COUNT;
           const d = i * WAVE_STRIDE;
-          // Scaled down for display: the capture spans ±24000, the scope is
-          // drawn against a full scale of ~3000 (see WaveGrid) — the level
-          // libkss's per-channel outputs sit at.
-          for (let c = 0; c < CHANNEL_COUNT; c++) perCh[d + c] = src[s + c] >> 3;
+          // Scaled for display by the same correction the mix gets, so a
+          // channel's trace is as tall as its share of what comes out.
+          for (let c = 0; c < CHANNEL_COUNT; c++) perCh[d + c] = (src[s + c] * WAVE_SCALE) | 0;
         }
       }
     }
