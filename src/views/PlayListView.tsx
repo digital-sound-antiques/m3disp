@@ -170,7 +170,7 @@ export function PlayListView() {
       >
         {entries.length == 0 ? (
           <div className="pl-empty">
-            <span className="pl-empty-hint">Drag &amp; drop MGS / KSS files here, or</span>
+            <span className="pl-empty-hint">Drag &amp; drop MGS/KSS/NSF/SPC files here, or</span>
             <div className="pl-empty-actions">
               <button onClick={onAddClick}>Open File…</button>
               <button onClick={() => app.openDialog("sample-dialog")}>Open Samples</button>
