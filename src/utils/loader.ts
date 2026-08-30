@@ -1,4 +1,5 @@
 import * as fflate from "fflate";
+import { is7zFile, un7z } from "./sevenzip/archive";
 import { KSS } from "libkss-js";
 import { MGSC, TextDecoderEncoding, detectEncoding } from "mgsc-js";
 import { PlayListEntry } from "../contexts/PlayerContext";
@@ -53,6 +54,11 @@ function isZipfile(data: Uint8Array) {
   return data[0] == 0x50 && data[1] == 0x4b && data[2] == 0x03 && data[3] == 0x04;
 }
 
+/** Either kind of archive this can open. */
+export function isArchive(data: Uint8Array) {
+  return isZipfile(data) || is7zFile(data);
+}
+
 /** What is worth taking out of an archive. */
 const ARCHIVE_MEMBER = /\.(mgs|bgm|opx|mpk|kss|mbm|spc|nsfe?|hes|m3u8?|pls)$/i;
 
@@ -63,10 +69,17 @@ function wantedMember(name: string): boolean {
   return ARCHIVE_MEMBER.test(name);
 }
 
+/** Unpack either kind of archive into its members, by name. */
 function _unzip(data: Uint8Array): { [key: string]: Uint8Array } {
+  if (is7zFile(data)) {
+    const out: { [key: string]: Uint8Array } = {};
+    for (const entry of un7z(data, wantedMember)) out[entry.name] = entry.data;
+    return out;
+  }
   return fflate.unzipSync(data, { filter: (file) => wantedMember(file.name) });
 }
 
+/** Unpack an archive - .zip or .7z - and load whatever music is inside it. */
 export async function loadEntriesFromZip(
   data: Uint8Array | Blob | ArrayBuffer,
   storage: BinaryDataStorage,
@@ -114,8 +127,8 @@ export async function loadEntriesFromUrl(
 
     console.log(contentType);
 
-    // zip file
-    if (isZipfile(u8a)) {
+    // an archive: .zip or .7z
+    if (isArchive(u8a)) {
       return loadEntriesFromZip(u8a, storage, progressCallback);
     }
 
@@ -526,7 +539,7 @@ export async function loadEntriesFromFileList(
     try {
       const data = await loadFromFile(file);
       if (data instanceof Uint8Array) {
-        if (isZipfile(data)) {
+        if (isArchive(data)) {
           const entries = await loadEntriesFromZip(data, storage, progressCallback);
           for (const entry of entries) {
             res.push(entry);
