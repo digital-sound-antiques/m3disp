@@ -26,7 +26,7 @@ import { ChannelId } from "../kss/channel-status";
 import { IconVolume, IconVolumeOff } from "../widgets/icons";
 import { setPianoRollHighlight } from "../widgets/piano-roll-highlight";
 
-type Dev = "opll" | "psg" | "scc" | "spc" | "nsf";
+type Dev = "opll" | "psg" | "scc" | "spc" | "nsf" | "hes";
 // A row may cover several channels (OPLL 7/8/9 double as rhythm). `maskBits` are
 // the device-mask bits it toggles together, `targets` the channels whose voice/
 // level it shows, `hi` the flat channelIds indices to spotlight (opll 0-13,
@@ -125,10 +125,23 @@ const SECTIONS: Section[] = [
     })),
     bits: 0x1c0,
   },
+  {
+    // HES mode's only section: six interchangeable PSG channels, one row each.
+    key: "hes",
+    dev: "hes",
+    label: "PCE",
+    rows: [0, 1, 2, 3, 4, 5].map((i) => ({
+      label: String(i + 1),
+      maskBits: [i],
+      targets: [{ device: "hes", index: i } as ChannelId],
+      hi: [i],
+    })),
+    bits: 0x3f,
+  },
 ];
 
-const ALL: KSSChannelMask = { opll: 0x3fff, psg: 0x7, scc: 0x1f, opl: 0, spc: 0xff, nsf: 0x1ff };
-const NONE: KSSChannelMask = { opll: 0, psg: 0, scc: 0, opl: 0, spc: 0, nsf: 0 };
+const ALL: KSSChannelMask = { opll: 0x3fff, psg: 0x7, scc: 0x1f, opl: 0, spc: 0xff, nsf: 0x1ff, hes: 0x3f };
+const NONE: KSSChannelMask = { opll: 0, psg: 0, scc: 0, opl: 0, spc: 0, nsf: 0, hes: 0 };
 const maskEq = (a: KSSChannelMask, b: KSSChannelMask) =>
   a.opll === b.opll && a.psg === b.psg && a.scc === b.scc && a.opl === b.opl && a.spc === b.spc;
 const soloMask = (dev: Dev, bits: number): KSSChannelMask => ({ ...ALL, [dev]: ALL[dev] & ~bits });

@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useRef, useState } from "react";
+import React, { useCallback, useContext, useEffect, useRef, useState } from "react";
 import { AppContext, PianoRollColorModeMap } from "../contexts/AppContext";
 import { ColorBall } from "../widgets/ColorSelector";
 import { pianoRollColorDialogId } from "../widgets/PianoRollControl";
@@ -12,6 +12,7 @@ const sccLabels = ["SCC1", "SCC2", "SCC3", "SCC4", "SCC5"];
 const spcLabels = ["CH1", "CH2", "CH3", "CH4", "CH5", "CH6", "CH7", "CH8"];
 const nesLabels = ["SQ1", "SQ2", "TRI", "NOI", "DMC", "FDS"];
 const vrc6Labels = ["SQ1", "SQ2", "SAW"];
+const hesLabels = ["CH1", "CH2", "CH3", "CH4", "CH5", "CH6"];
 
 type ChannelGroup = {
   /** Unique per tab. Two tabs can share a device - the NES and the VRC6 do -
@@ -36,6 +37,7 @@ const channelGroups: ChannelGroup[] = [
   // share a colouring mode, but they are two chips and get a tab each.
   { id: "nes", device: "nsf", name: "NES", labels: nesLabels, base: 33 },
   { id: "vrc6", device: "nsf", name: "VRC6", labels: vrc6Labels, base: 39 },
+  { id: "hes", device: "hes", name: "PCE", labels: hesLabels, base: 42 },
 ];
 
 /** Normalize an arbitrary stored color into the #rrggbb form <input type="color"> requires. */
@@ -66,6 +68,86 @@ function ColorPickerBall(props: { color: string; disabled?: boolean; onChange: (
         />
       )}
     </span>
+  );
+}
+
+/**
+ * The tab row, with arrows at its ends when it does not fit.
+ *
+ * The row has always scrolled, but a row that scrolls with no scrollbar looks
+ * like a row that is simply cut off - there is nothing to say the tabs beyond
+ * the edge exist. The arrows appear only when there is something past that
+ * edge, so a dialog whose tabs all fit shows none at all.
+ */
+function TabBar(props: { names: string[]; active: number; onSelect: (i: number) => void }) {
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [overflow, setOverflow] = useState({ left: false, right: false });
+
+  const measure = useCallback(() => {
+    const el = scrollRef.current;
+    if (el == null) return;
+    // A pixel of slack: fractional layout leaves a sub-pixel remainder at the
+    // ends, which would otherwise show an arrow that scrolls nowhere.
+    setOverflow({
+      left: el.scrollLeft > 1,
+      right: el.scrollLeft + el.clientWidth < el.scrollWidth - 1,
+    });
+  }, []);
+
+  useEffect(() => {
+    measure();
+    const el = scrollRef.current;
+    if (el == null) return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [measure, props.names.length]);
+
+  /** Scroll by most of a screenful, keeping a tab's worth of context. */
+  const nudge = (direction: -1 | 1) => {
+    const el = scrollRef.current;
+    if (el == null) return;
+    el.scrollBy({ left: direction * Math.max(80, el.clientWidth * 0.7), behavior: "smooth" });
+  };
+
+  // Selecting a tab off-screen (with the keyboard, say) should bring it into
+  // view rather than leave the selection somewhere the eye cannot follow.
+  useEffect(() => {
+    const el = scrollRef.current;
+    const tab = el?.children[props.active] as HTMLElement | undefined;
+    tab?.scrollIntoView({ block: "nearest", inline: "nearest", behavior: "smooth" });
+  }, [props.active]);
+
+  return (
+    <div className="crd-tabbar">
+      <button
+        className={`crd-tab-arrow${overflow.left ? "" : " hidden"}`}
+        onClick={() => nudge(-1)}
+        tabIndex={-1}
+        aria-label="Scroll tabs left"
+      >
+        ‹
+      </button>
+      <div className="crd-tabs" ref={scrollRef} onScroll={measure}>
+        {props.names.map((name, i) => (
+          <button
+            key={name}
+            className={`crd-tab${props.active === i ? " active" : ""}`}
+            onClick={() => props.onSelect(i)}
+          >
+            {name}
+          </button>
+        ))}
+      </div>
+      <button
+        className={`crd-tab-arrow${overflow.right ? "" : " hidden"}`}
+        onClick={() => nudge(1)}
+        tabIndex={-1}
+        aria-label="Scroll tabs right"
+      >
+        ›
+      </button>
+    </div>
   );
 }
 
@@ -115,17 +197,7 @@ function DialogBody(props: { id: string }) {
   return (
     <>
       <div className="crd-body">
-        <div className="crd-tabs">
-          {groups.map((grp, i) => (
-            <button
-              key={grp.id}
-              className={`crd-tab${tab === i ? " active" : ""}`}
-              onClick={() => setTab(i)}
-            >
-              {grp.name}
-            </button>
-          ))}
-        </div>
+        <TabBar names={groups.map((g) => g.name)} active={tab} onSelect={setTab} />
 
         {/* stack all device groups in one grid cell so switching tabs doesn't
             resize the dialog (height stays at the tallest group) */}

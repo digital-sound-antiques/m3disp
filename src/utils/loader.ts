@@ -6,6 +6,7 @@ import { BinaryDataStorage } from "./binary-data-storage";
 import { parseM3U } from "./m3u-parser";
 import { isSPCFile, parseSPC } from "spc700-js";
 import { isNSFFile, parseNSF, trackTitle } from "nsf-js";
+import { HESPlayer, isHESFile, parseHES } from "hes-js";
 
 /// Convert a given url to a download endpoint that allows CORS access.
 export function toDownloadEndpoint(url: string) {
@@ -52,16 +53,18 @@ function isZipfile(data: Uint8Array) {
   return data[0] == 0x50 && data[1] == 0x4b && data[2] == 0x03 && data[3] == 0x04;
 }
 
+/** What is worth taking out of an archive. */
+const ARCHIVE_MEMBER = /\.(mgs|bgm|opx|mpk|kss|mbm|spc|nsfe?|hes|m3u8?|pls)$/i;
+
+/** Skip the resource forks a Mac puts in a zip, and directory entries. */
+function wantedMember(name: string): boolean {
+  if (/__MACOSX\//.test(name)) return false;
+  if (name.endsWith("/")) return false;
+  return ARCHIVE_MEMBER.test(name);
+}
+
 function _unzip(data: Uint8Array): { [key: string]: Uint8Array } {
-  return fflate.unzipSync(data, {
-    filter: (file) => {
-      if (/__MACOSX\//.test(file.name)) {
-        return false;
-      }
-      console.log(`filter: ${file.name}`);
-      return /\.(mgs|bgm|opx|mpk|kss|mbm|spc|nsfe?|m3u8?|pls)$/i.test(file.name);
-    },
-  });
+  return fflate.unzipSync(data, { filter: (file) => wantedMember(file.name) });
 }
 
 export async function loadEntriesFromZip(
@@ -192,6 +195,50 @@ export const loadFilesFromUrls = async (
   return entries;
 };
 
+/** Track numbers a HES file could hold: the driver takes one byte. */
+const HES_TRACK_LIMIT = 256;
+
+/** Machine time each candidate track is given to start making a sound. */
+const HES_PROBE_SECONDS = 0.3;
+
+/**
+ * Find which track numbers a HES file actually plays.
+ *
+ * Unlike an NSF, a HES file states neither how many tracks it holds nor what
+ * they are numbered - its driver simply takes a byte and does whatever it does.
+ * Rips ship an .m3u naming them, and when one is loaded that is what is used;
+ * dropped on its own, the only way to know is to ask the driver. So each
+ * number is started and given a fraction of a second of machine time, and the
+ * ones that make a sound become entries.
+ *
+ * This finds more than an .m3u lists, because it finds the sound effects too.
+ * They are in the file, so they are offered.
+ */
+async function findHESTracks(data: Uint8Array): Promise<number[]> {
+  const found: number[] = [];
+  try {
+    const file = parseHES(data);
+    const frames = Math.floor(44100 * HES_PROBE_SECONDS);
+    for (let track = 0; track < HES_TRACK_LIMIT; track++) {
+      const player = new HESPlayer({ sampleRate: 44100 });
+      // The scanner's shortcut: no audio comes out of a probe, so there is no
+      // point settling the filters at the end of it.
+      player.filterPrimeOnSkip = false;
+      player.load(file, track);
+      player.skip(frames);
+      if (player.getChannelStatusArray().some((c) => c.active)) found.push(track);
+      // Let the page breathe: this is a second or two of work on the thread
+      // that draws.
+      if ((track & 0x0f) === 0x0f) await new Promise((r) => setTimeout(r, 0));
+    }
+  } catch (e) {
+    console.warn(e);
+  }
+  // A file whose driver answers nothing still gets its own entry, so it can be
+  // played and heard to be silent rather than vanishing.
+  return found.length > 0 ? found : [0];
+}
+
 /**
  * Turn one file into playlist entries.
  *
@@ -228,6 +275,18 @@ const createPlayListEntries = async (
       });
     }
     return entries;
+  }
+
+  if (formatOf(data) === "hes") {
+    const dataId = await storage.put(data);
+    const tracks = await findHESTracks(data);
+    return tracks.map((track) => ({
+      title: tracks.length > 1 ? `${filename} (Track $${track.toString(16).toUpperCase().padStart(2, "0")})` : filename,
+      filename,
+      dataId,
+      song: track,
+      format: "hes" as const,
+    }));
   }
 
   let title: string;
@@ -358,19 +417,42 @@ async function loadFromFile(blob: Blob): Promise<Uint8Array | string> {
   });
 }
 
+/**
+ * Store one file a playlist refers to, and take a title from it.
+ *
+ * Only KSS carries a title where libkss can read it. The other formats are
+ * handed to it too if it is asked, and it throws - which used to lose the file
+ * entirely, so an .m3u beside a .hes or a .nsf resolved to nothing. Their names
+ * come from the playlist anyway, so a title is not something to fail over.
+ */
+/** Which of the players a file belongs to, from its own contents. */
+function formatOf(data: Uint8Array): PlayListEntry["format"] {
+  if (isHESFile(data)) return "hes";
+  if (isNSFFile(data)) return "nsf";
+  if (isSPCFile(data)) return "spc";
+  return undefined;
+}
+
 const registerFile = async (
   storage: BinaryDataStorage,
   file: File
-): Promise<{ title: string; dataId: string }> => {
+): Promise<{ title: string; dataId: string; format: PlayListEntry["format"] }> => {
   const data = await loadFromFile(file);
-  if (data instanceof Uint8Array) {
-    const kss = new KSS(data, file.name);
-    const title = kss.getTitle();
-    kss.release();
-    const dataId = await storage.put(data);
-    return { title, dataId };
+  if (!(data instanceof Uint8Array)) throw new Error(`Can't load ${file.name}`);
+
+  const format = formatOf(data);
+  let title = "";
+  if (format == null) {
+    try {
+      const kss = new KSS(data, file.name);
+      title = kss.getTitle();
+      kss.release();
+    } catch {
+      // Not something libkss knows; the playlist names it instead.
+    }
   }
-  throw new Error(`Can't load ${file.name}`);
+  const dataId = await storage.put(data);
+  return { title, dataId, format };
 };
 
 export async function loadEntriesFromM3U(
@@ -391,10 +473,14 @@ export async function loadEntriesFromM3U(
     [key: string]: {
       dataId: string;
       title: string;
+      format: PlayListEntry["format"];
     };
   } = {};
 
-  const m3uRoot = getDirname(m3u.name);
+  // Lower case, because that is what the names are compared against below: a
+  // playlist inside a subdirectory otherwise matches nothing, its own
+  // directory being the one part of the path that kept its capitals.
+  const m3uRoot = getDirname(m3u.name).toLowerCase();
 
   const processed = new Set<string>();
 
@@ -419,9 +505,9 @@ export async function loadEntriesFromM3U(
 
   const res: PlayListEntry[] = [];
   for (const item of items) {
-    const { title, dataId } = dataMap[item.dataId] ?? {};
+    const { title, dataId, format } = dataMap[item.dataId] ?? {};
     if (dataId != null) {
-      res.push({ ...item, title: item.title ?? title, dataId });
+      res.push({ ...item, title: item.title ?? title, dataId, format });
     }
   }
 

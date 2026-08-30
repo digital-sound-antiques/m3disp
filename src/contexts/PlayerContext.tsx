@@ -14,6 +14,7 @@ import { SurroundEffect, SurroundMode } from "../utils/surround";
 import { OutputFilter } from "../utils/output-filter";
 import { isSPCFile } from "spc700-js";
 import { isNSFFile } from "nsf-js";
+import { isHESFile } from "hes-js";
 import { setPlayerMode } from "../player-mode";
 
 export type PlayListEntry = {
@@ -25,7 +26,7 @@ export type PlayListEntry = {
   song?: number | null; // sub song number
   /** Set for entries that are not KSS; drives the format-specific parts of the
    *  UI. */
-  format?: "spc" | "nsf" | null;
+  format?: "spc" | "nsf" | "hes" | null;
   loop?: number | null; // loop number
 };
 
@@ -112,6 +113,7 @@ const createDefaultContextState = () => {
       scc: 0,
       spc: 0,
       nsf: 0,
+      hes: 0,
     },
     unmute: async () => {
       unmuteAudio();
@@ -240,11 +242,12 @@ async function applyPlayStateChange(
     const { dataId, song, duration, fadeDuration } = entry;
     const data = await state.storage.get(dataId);
 
-    // The track's format decides the whole display mode: an SPC track shows
-    // only its 8 S-DSP voices, an NSF only its 6 NES channels, everything else
-    // only the MSX devices. Set it before play() so the views never render one
-    // mode's channels against another's data.
-    setPlayerMode(isSPCFile(data) ? "spc" : isNSFFile(data) ? "nsf" : "kss");
+    // The track's format decides the whole display mode: each shows only its
+    // own machine's channels. Set it before play() so the views never render
+    // one mode's channels against another's data.
+    setPlayerMode(
+      isSPCFile(data) ? "spc" : isNSFFile(data) ? "nsf" : isHESFile(data) ? "hes" : "kss"
+    );
 
     const options: KSSDecoderStartOptions = {
       channelMask,

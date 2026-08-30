@@ -26,7 +26,7 @@ const defaultContextState: SettingsContextState = {
   defaultDuration: 300 * 1000,
   autoAdvanceGap: 0,
   cpuSpeed: 0,
-  channelMask: { psg: 0, scc: 0, opll: 0, opl: 0, spc: 0, nsf: 0 },
+  channelMask: { psg: 0, scc: 0, opll: 0, opl: 0, spc: 0, nsf: 0, hes: 0 },
   setDefaultLoopCount: noop,
   setDefaultDuration: noop,
   setAutoAdvanceGap: noop,

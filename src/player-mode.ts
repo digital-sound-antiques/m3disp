@@ -10,7 +10,7 @@
 import { useSyncExternalStore } from "react";
 import type { ChannelId } from "./kss/channel-status";
 
-export type PlayerMode = "kss" | "spc" | "nsf";
+export type PlayerMode = "kss" | "spc" | "nsf" | "hes";
 
 export const KSS_CHANNEL_IDS: ChannelId[] = [
   { device: "opll", index: 0 },
@@ -70,9 +70,22 @@ export const NSF_CHANNEL_IDS: ChannelId[] = [
   { device: "nsf", index: 8 },
 ];
 
+/** The PC Engine's six PSG channels, all alike: any of them can play a
+ *  waveform, the last two can make noise, the second can be spent on modulating
+ *  the first. */
+export const HES_CHANNEL_IDS: ChannelId[] = [
+  { device: "hes", index: 0 },
+  { device: "hes", index: 1 },
+  { device: "hes", index: 2 },
+  { device: "hes", index: 3 },
+  { device: "hes", index: 4 },
+  { device: "hes", index: 5 },
+];
+
 export const KSS_SECTION_KEYS = ["opll", "psg", "scc"];
 export const SPC_SECTION_KEYS = ["spc"];
 export const NSF_SECTION_KEYS = ["nsf", "vrc6"];
+export const HES_SECTION_KEYS = ["hes"];
 
 /** Eight hues spread evenly around the wheel at the same perceptual lightness
  *  and chroma as the KSS palette, so the two modes read as one design. */
@@ -91,6 +104,17 @@ export const SPC_CHANNEL_COLORS: string[] = [
  *  lightness and chroma, so every mode reads as one design. The two pulses take
  *  neighbouring hues because they are a pair; noise and the DMC — the percussion
  *  pair — take the far side. */
+/** Six hues from the same wheel, evenly spread: the PSG's channels have no
+ *  fixed roles, so nothing here should suggest one is the bass or the lead. */
+export const HES_CHANNEL_COLORS: string[] = [
+  "#e18516", // orange
+  "#b99c1c", // yellow
+  "#47b95f", // green
+  "#1fb3ba", // cyan
+  "#968efa", // violet
+  "#dd72c2", // pink
+];
+
 export const NSF_CHANNEL_COLORS: string[] = [
   "#e18516", // pulse 1     orange
   "#b99c1c", // pulse 2     yellow
@@ -107,6 +131,7 @@ const MODES: Record<PlayerMode, { channels: ChannelId[]; sections: string[] }> =
   kss: { channels: KSS_CHANNEL_IDS, sections: KSS_SECTION_KEYS },
   spc: { channels: SPC_CHANNEL_IDS, sections: SPC_SECTION_KEYS },
   nsf: { channels: NSF_CHANNEL_IDS, sections: NSF_SECTION_KEYS },
+  hes: { channels: HES_CHANNEL_IDS, sections: HES_SECTION_KEYS },
 };
 
 let mode: PlayerMode = "kss";

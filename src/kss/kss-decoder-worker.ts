@@ -3,6 +3,7 @@ import { AudioDecoderWorker } from "webaudio-stream-player";
 import { KSSChannelMask } from "./kss-device";
 import { SPCEngine, isSPCFile } from "../spc/spc-engine";
 import { NSFEngine, isNSFFile } from "../nsf/nsf-engine";
+import { HESEngine, isHESFile } from "../hes/hes-engine";
 
 export type KSSDecoderStartOptions = {
   data: Uint8Array | ArrayBuffer | ArrayBufferLike | ArrayLike<number>;
@@ -44,6 +45,10 @@ export type KSSDecoderDeviceSnapshot = {
   nsf?: Int16Array | null;
   /** NSF mode only: the FDS wavetable as signed bytes, when the file has one. */
   nsfWave?: Uint8Array | null;
+  /** HES mode only: 6 channels x HES_CH_FIELDS int16s. */
+  hes?: Int16Array | null;
+  /** HES mode only: the waveform of whichever channel is sounding. */
+  hesWave?: Uint8Array | null;
   /**
    * Channels keyed ON during this frame. Counted from the rising edges alone —
    * `keyKeepFrames` is reset by a key-off too, so it cannot tell the two apart —
@@ -105,6 +110,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
             this._waveEnabled = d.waveEnabled;
             this._spc?.setWaveEnabled(d.waveEnabled);
             this._nsf?.setWaveEnabled(d.waveEnabled);
+            this._hes?.setWaveEnabled(d.waveEnabled);
           }
           return;
         case "setChannelMask":
@@ -114,6 +120,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
           this._applyChannelMask(this._keyframer);
           this._spc?.setVoiceMask(this._channelMask.spc ?? 0);
           this._nsf?.setChannelMask(this._channelMask.nsf ?? 0);
+          this._hes?.setChannelMask(this._channelMask.hes ?? 0);
           return;
         default:
           // The base abort awaits the in-flight process(); set our flag here so
@@ -129,6 +136,8 @@ class KSSDecoderWorker extends AudioDecoderWorker {
   private _spc: SPCEngine | null = null;
   /** Non-null while an .nsf track is loaded; likewise. */
   private _nsf: NSFEngine | null = null;
+  /** Non-null while a .hes track is loaded; likewise. */
+  private _hes: HESEngine | null = null;
   // Audible engine, kept ~lookaheadMs ahead of the play head.
   private _player: KSSPlay | null = null;
   // State-save engine: runs ahead (calcSilent), captures keyframes every
@@ -168,7 +177,15 @@ class KSSDecoderWorker extends AudioDecoderWorker {
   private _fadeInRemaining = 0; // samples of start-fade left to apply
   // current per-device channel mute mask; applied to both engines and re-applied
   // after every loadState/reset so a keyframe's mask never overrides the live one
-  private _channelMask: KSSChannelMask = { psg: 0, scc: 0, opll: 0, opl: 0, spc: 0, nsf: 0 };
+  private _channelMask: KSSChannelMask = {
+    psg: 0,
+    scc: 0,
+    opll: 0,
+    opl: 0,
+    spc: 0,
+    nsf: 0,
+    hes: 0,
+  };
 
   private get _keyframeFrames() {
     return KEYFRAME_SECONDS * this.sampleRate;
@@ -238,16 +255,25 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     // before any track — and therefore any format — is known.
     if (u8raw != null && isSPCFile(u8raw)) {
       this._disposeNSF();
+      this._disposeHES();
       await this._startSPC(u8raw, args, startFrame);
       return;
     }
     if (u8raw != null && isNSFFile(u8raw)) {
       this._disposeSPC();
+      this._disposeHES();
       await this._startNSF(u8raw, args, startFrame);
+      return;
+    }
+    if (u8raw != null && isHESFile(u8raw)) {
+      this._disposeSPC();
+      this._disposeNSF();
+      await this._startHES(u8raw, args, startFrame);
       return;
     }
     this._disposeSPC();
     this._disposeNSF();
+    this._disposeHES();
 
     const inSong =
       args.seek === true &&
@@ -281,6 +307,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
         opl: args.channelMask?.opl ?? 0,
         spc: args.channelMask?.spc ?? 0,
         nsf: args.channelMask?.nsf ?? 0,
+        hes: args.channelMask?.hes ?? 0,
       };
 
       this._configureEngine(this._player!, args);
@@ -339,6 +366,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
         opl: args.channelMask?.opl ?? 0,
         spc: args.channelMask?.spc ?? 0,
         nsf: args.channelMask?.nsf ?? 0,
+        hes: args.channelMask?.hes ?? 0,
       };
       this._spc.setVoiceMask(this._channelMask.spc);
       this._spc.load(u8, {
@@ -439,6 +467,132 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     this._nsf = null;
   }
 
+  private _disposeHES(): void {
+    if (this._hes == null) return;
+    this._hes.dispose();
+    this._hes = null;
+  }
+
+  /** Start (or seek within) a .hes track. */
+  private async _startHES(
+    u8: Uint8Array,
+    args: KSSDecoderStartOptions,
+    startFrame: number
+  ): Promise<void> {
+    const inSong =
+      args.seek === true &&
+      args.songToken != null &&
+      args.songToken === this._loadedToken &&
+      this._hes != null;
+
+    if (!inSong) {
+      this._hes?.dispose();
+      this._hes = new HESEngine(this.sampleRate);
+      this._hes.setWaveEnabled(this._waveEnabled);
+      this._channelMask = {
+        psg: args.channelMask?.psg ?? 0,
+        scc: args.channelMask?.scc ?? 0,
+        opll: args.channelMask?.opll ?? 0,
+        opl: args.channelMask?.opl ?? 0,
+        spc: args.channelMask?.spc ?? 0,
+        nsf: args.channelMask?.nsf ?? 0,
+        hes: args.channelMask?.hes ?? 0,
+      };
+      this._hes.setChannelMask(this._channelMask.hes);
+      this._hes.load(u8, {
+        // The track number is the file's own, as its .m3u names it.
+        track: args.song ?? undefined,
+        defaultPlaySeconds: (args.duration ?? args.defaultDuration ?? defaultDuration) / 1000,
+        defaultFadeSeconds: (args.fadeDuration ?? defaultFadeDuration) / 1000,
+      });
+      this._loadedToken = args.songToken ?? -1;
+      this._bufferedHWM = 0;
+      this._endFrame = 0;
+      this._endIsFadeOut = false;
+      this._reportDuration(this._hes.totalFrames, false);
+    }
+
+    const hes = this._hes!;
+    if (startFrame > 0 || inSong) {
+      hes.seekAudibleTo(startFrame);
+      if (hes.scannerFrames < startFrame) hes.seekScannerTo(startFrame);
+    }
+    this._bufferedHWM = Math.max(this._bufferedHWM, hes.bufferedFrame);
+    this._postBuffered();
+  }
+
+  /** Decode one chunk of the loaded .hes, feeding the look-ahead as it goes. */
+  private async _processHES(): Promise<Array<Int16Array> | null> {
+    const hes = this._hes;
+    if (hes == null) return null;
+
+    if (hes.totalFrames > 0 && hes.audibleFrames >= hes.totalFrames) return null;
+
+    const limit = (this._lookaheadMs / 1000) * this.sampleRate;
+    let waits = 0;
+    while (
+      !this._aborted &&
+      this._playhead > 0 &&
+      hes.audibleFrames - this._playhead > limit &&
+      waits < 200
+    ) {
+      hes.advanceScanner(hes.scannerFrames + this.sampleRate);
+      this._flushHESSnapshots();
+      await sleep(15);
+      waits++;
+    }
+    if (this._aborted || this._hes == null) return null;
+
+    let step = Math.floor(this.sampleRate / 8);
+    if (hes.totalFrames > 0) step = Math.min(step, hes.totalFrames - hes.audibleFrames);
+    if (step <= 0) return null;
+
+    const { left, right, perCh } = hes.render(step);
+    const chunkStart = hes.audibleFrames - step;
+
+    hes.advanceScanner(
+      this._playhead + SCAN_AHEAD_SECONDS * this.sampleRate,
+      NSF_SCAN_BUDGET_SECONDS * this.sampleRate
+    );
+    this._flushHESSnapshots();
+
+    // Same restart ramp the other paths use.
+    if (this._fadeInRemaining > 0) {
+      const total = Math.floor(this.sampleRate * FADE_IN_SEC);
+      for (let i = 0; i < left.length && this._fadeInRemaining > 0; i++, this._fadeInRemaining--) {
+        const gain = (total - this._fadeInRemaining) / total;
+        left[i] = Math.round(left[i] * gain);
+        right[i] = Math.round(right[i] * gain);
+      }
+    }
+
+    if (perCh != null) {
+      this.worker.postMessage(
+        { type: "wave", frame: chunkStart, data: perCh, token: this._loadedToken },
+        [perCh.buffer]
+      );
+    }
+
+    return [left, right];
+  }
+
+  /** Post whatever channel snapshots the scanner produced, and the buffer mark. */
+  private _flushHESSnapshots(): void {
+    const hes = this._hes;
+    if (hes == null) return;
+    const snapshots = hes.takeSnapshots();
+    if (snapshots.length > 0) {
+      this.worker.postMessage({ type: "snapshots", data: snapshots, token: this._loadedToken });
+    }
+    if (hes.endDetected && hes.totalFrames !== this._endFrame) {
+      this._reportDuration(hes.totalFrames, true);
+    }
+    if (hes.bufferedFrame > this._bufferedHWM) {
+      this._bufferedHWM = hes.bufferedFrame;
+      this._postBuffered();
+    }
+  }
+
   /** Start (or seek within) an .nsf track. */
   private async _startNSF(
     u8: Uint8Array,
@@ -462,6 +616,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
         opl: args.channelMask?.opl ?? 0,
         spc: args.channelMask?.spc ?? 0,
         nsf: args.channelMask?.nsf ?? 0,
+        hes: args.channelMask?.hes ?? 0,
       };
       this._nsf.setChannelMask(this._channelMask.nsf);
       this._nsf.load(u8, {
@@ -947,6 +1102,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
   async process(): Promise<Array<Int16Array> | null> {
     if (this._spc != null) return this._processSPC();
     if (this._nsf != null) return this._processNSF();
+    if (this._hes != null) return this._processHES();
 
     const player = this._player;
     if (player == null) return null;
@@ -1081,6 +1237,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
   async dispose(): Promise<void> {
     this._disposeSPC();
     this._disposeNSF();
+    this._disposeHES();
     this._player?.release();
     this._keyframer?.release();
     this._player = null;

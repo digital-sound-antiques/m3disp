@@ -79,7 +79,7 @@ export function setChannelsHidden(flatIndices: number[], hide: boolean): void {
 }
 
 export function resetChannelVisibility(): void {
-  for (const suffix of ["", ".spc", ".nsf"]) localStorage.removeItem(`${KEY}${suffix}`);
+  for (const suffix of ["", ".spc", ".nsf", ".hes"]) localStorage.removeItem(`${KEY}${suffix}`);
   if (hidden.size) {
     hidden = new Set();
     commit();

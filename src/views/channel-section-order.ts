@@ -93,7 +93,7 @@ export function toggleSectionCollapsed(key: string) {
 export function resetSections() {
   order = [...sectionKeys];
   collapsed = [];
-  for (const suffix of ["", ".spc", ".nsf"]) {
+  for (const suffix of ["", ".spc", ".nsf", ".hes"]) {
     localStorage.removeItem(`${ORDER_KEY}${suffix}`);
     localStorage.removeItem(`${COLLAPSED_KEY}${suffix}`);
   }

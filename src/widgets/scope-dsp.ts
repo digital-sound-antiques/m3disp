@@ -25,9 +25,10 @@ const OPLL_RHYTHM_WAVE: Record<number, number> = { 9: 9, 10: 11, 11: 12, 12: 13,
 
 // per-channel wave-buffer int16 offset for a device-local channel index
 export const waveOffset = (device: DeviceName, index: number) => {
-  // The S-DSP voices and the NES channels each sit at the front of the shared
-  // per-channel layout; neither mode shares it with the KSS devices.
-  if (device === "spc" || device === "nsf") return index;
+  // The S-DSP voices, the NES channels and the PC Engine's PSG each sit at the
+  // front of the shared per-channel layout; none of those modes shares it with
+  // the KSS devices.
+  if (device === "spc" || device === "nsf" || device === "hes") return index;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const base = (PerChLayout as any)[device].offset as number;
   if (device === "opll" && index >= 9) return base + OPLL_RHYTHM_WAVE[index];

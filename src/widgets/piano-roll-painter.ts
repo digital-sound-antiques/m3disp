@@ -9,6 +9,7 @@ import type { KSSChannelMask, DeviceName } from "../kss/kss-device";
 import {
   channelIds,
   getPlayerMode,
+  HES_CHANNEL_IDS,
   KSS_CHANNEL_IDS,
   NSF_CHANNEL_IDS,
   SPC_CHANNEL_IDS,
@@ -75,6 +76,8 @@ export const defaultChannelColors: string[] = [
   // VRC6's three follow, in the blues.
   "#e18516", "#b99c1c", "#47b95f", "#968efa", "#dd72c2", "#1fb3ba",
   "#20ace5", "#4fa1fb", "#1db98d",
+  // PC Engine PSG: six hues evenly spread, since its channels have no roles.
+  "#e18516", "#b99c1c", "#47b95f", "#1fb3ba", "#968efa", "#dd72c2",
 ];
 
 export const colorMap = [
@@ -99,6 +102,12 @@ const nsfColorMap = [
   Colors.lightBlue, Colors.blue, Colors.teal,
 ];
 
+/** Fallback families for the PC Engine's six PSG channels. */
+const hesColorMap = [
+  Colors.orange, Colors.amber, Colors.green,
+  Colors.cyan, Colors.deepPurple, Colors.pink,
+];
+
 /** Family table for the active mode (drives the per-channel fallback color). */
 const activeColorMap = () => {
   switch (getPlayerMode()) {
@@ -106,6 +115,8 @@ const activeColorMap = () => {
       return spcColorMap;
     case "nsf":
       return nsfColorMap;
+    case "hes":
+      return hesColorMap;
     default:
       return colorMap;
   }
@@ -120,6 +131,8 @@ export function colorIndexOf(ch: number): number {
       return KSS_CHANNEL_IDS.length + ch;
     case "nsf":
       return KSS_CHANNEL_IDS.length + SPC_CHANNEL_IDS.length + ch;
+    case "hes":
+      return KSS_CHANNEL_IDS.length + SPC_CHANNEL_IDS.length + NSF_CHANNEL_IDS.length + ch;
     default:
       return ch;
   }
@@ -142,7 +155,14 @@ export type PianoRollColorConfig = {
 };
 
 const defaultColorConfig: PianoRollColorConfig = {
-  mode: { opll: "voice", psg: "voice", scc: "voice", spc: "channel", nsf: "channel" },
+  mode: {
+    opll: "voice",
+    psg: "voice",
+    scc: "voice",
+    spc: "channel",
+    nsf: "channel",
+    hes: "voice",
+  },
   channelColors: defaultChannelColors,
   voiceColors: defaultVoiceColors,
 };
@@ -161,11 +181,15 @@ export function monoColorConfig(color: string): PianoRollColorConfig {
         scc: "channel",
         spc: "channel",
         nsf: "channel",
+        hes: "channel",
       },
       // Long enough for any mode: the SPC voices and the NES channels live past
       // the KSS block.
       channelColors: new Array(
-        KSS_CHANNEL_IDS.length + SPC_CHANNEL_IDS.length + NSF_CHANNEL_IDS.length
+        KSS_CHANNEL_IDS.length +
+          SPC_CHANNEL_IDS.length +
+          NSF_CHANNEL_IDS.length +
+          HES_CHANNEL_IDS.length
       ).fill(color),
       voiceColors: defaultVoiceColors,
     };

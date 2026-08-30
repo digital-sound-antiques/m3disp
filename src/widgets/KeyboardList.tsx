@@ -230,6 +230,9 @@ export const DEVICE_CARDS: Record<
   // The VRC6 lives on the cartridge, so it gets its own section even though its
   // channels are part of the same NSF channel list.
   vrc6: { name: "VRC6", device: "nsf", targets: [6, 7, 8] },
+  // HES mode's only section. The six PSG channels are interchangeable, so each
+  // one is its own card.
+  hes: { name: "PCE", device: "hes", targets: [0, 1, 2, 3, 4, 5] },
 };
 
 /** Channels with fixed roles get named rather than numbered. */

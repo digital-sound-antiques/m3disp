@@ -53,6 +53,7 @@ export type PianoRollColorModeMap = {
   scc: PianoRollColorMode;
   spc: PianoRollColorMode;
   nsf: PianoRollColorMode;
+  hes: PianoRollColorMode;
 };
 
 // How the flat pianoRollChannelColors[] array maps onto each device, matching
@@ -68,6 +69,8 @@ const channelColorGroups: { device: keyof PianoRollColorModeMap; base: number; c
   { device: "spc", base: 25, count: 8 },
   // Likewise the six NES channels, stored after the SPC block.
   { device: "nsf", base: 33, count: 9 },
+  // And the PC Engine's six, after those.
+  { device: "hes", base: 42, count: 6 },
 ];
 
 function channelColorsToMap(colors: string[]): { [device: string]: string[] } {
@@ -191,6 +194,7 @@ const defaultContextData: AppContextData = {
     scc: "voice",
     spc: "channel",
     nsf: "channel",
+    hes: "voice",
   },
   pianoRollChannelColors: [...defaultChannelColors],
   pianoRollColorize: true,
@@ -539,6 +543,7 @@ export function AppContextProvider(props: PropsWithChildren) {
       scc: "voice",
       spc: "channel",
       nsf: "channel",
+      hes: "voice",
     });
     setPianoRollChannelColors([...defaultChannelColors]);
     setPianoRollColorize(true);
@@ -682,6 +687,7 @@ export function AppContextProvider(props: PropsWithChildren) {
             // voice numbers to colour by, so it defaults to "by channel".
             spc: pick(m?.spc, "channel"),
             nsf: pick(m?.nsf, "channel"),
+            hes: pick(m?.hes, "voice"),
           },
           false
         );

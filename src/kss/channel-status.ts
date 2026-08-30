@@ -3,6 +3,12 @@ import { DeviceName } from "./kss-device";
 import type { KSSDecoderDeviceSnapshot } from "./kss-decoder-worker";
 import { SPC_VOICE_FIELDS, SPC_FLAG_NOISE, SPC_FLAG_ECHO, SPC_FLAG_PMOD } from "../spc/spc-engine";
 import { NSF_CH_FIELDS, NSF_FLAG_SHORT } from "../nsf/nsf-engine";
+import {
+  HES_CH_FIELDS,
+  HES_FLAG_DDA,
+  HES_FLAG_LFO,
+  HES_FLAG_NOISE,
+} from "../hes/hes-engine";
 
 export type ChannelStatus = {
   id: ChannelId;
@@ -216,6 +222,8 @@ export function getChannelStatus(player: KSSPlayer, id: ChannelId): ChannelStatu
       return snapshot.spc ? createSPCStatus(snapshot.spc, id) : null;
     case "nsf":
       return snapshot.nsf ? createNSFStatus(snapshot.nsf, snapshot.nsfWave, id) : null;
+    case "hes":
+      return snapshot.hes ? createHESStatus(snapshot.hes, snapshot.hesWave, id) : null;
     default:
       throw new Error(`Uknown device: ${id.device}`);
   }
@@ -257,6 +265,9 @@ export function getChannelStatusArray(
         break;
       case "nsf":
         res.push(snapshot.nsf ? createNSFStatus(snapshot.nsf, snapshot.nsfWave, id) : null);
+        break;
+      case "hes":
+        res.push(snapshot.hes ? createHESStatus(snapshot.hes, snapshot.hesWave, id) : null);
         break;
       default:
         res.push(null);
@@ -380,6 +391,42 @@ function createNSFStatus(
   }
 }
 
+/**
+ * One PC Engine PSG channel, decoded from the packed snapshot the HES engine
+ * posts.
+ *
+ * The six channels are alike, so what distinguishes them is what each is doing
+ * at the moment: playing its waveform, playing written samples, making noise,
+ * or spent on modulating its neighbour. The waveform is handed over as the
+ * voice in the same shape the SCC channels use, so the display works unchanged.
+ */
+function createHESStatus(
+  hes: Int16Array,
+  wave: Uint8Array | null | undefined,
+  id: ChannelId
+): ChannelStatus {
+  const o = id.index * HES_CH_FIELDS;
+  const kcode = hes[o];
+  const vol = hes[o + 1];
+  const keyKeepFrames = hes[o + 2];
+  const vnum = hes[o + 3];
+  const flags = hes[o + 4];
+
+  const base = {
+    id,
+    freq: kcode >= 0 ? 440 * Math.pow(2, (kcode - 57) / 12) : 0,
+    kcode: kcode >= 0 ? kcode : null,
+    vol,
+    vnum,
+    keyKeepFrames,
+  };
+
+  if (flags & HES_FLAG_LFO) return { ...base, kcode: null, vol: 0, voice: "LFO", mode: "lfo" };
+  if (flags & HES_FLAG_NOISE) return { ...base, kcode: null, mode: "noise", voice: "Noise" };
+  if (flags & HES_FLAG_DDA) return { ...base, mode: "pcm", voice: "DDA" };
+  return { ...base, voice: wave ?? null };
+}
+
 /** Extract full ChannelStatus from a single snapshot (for incremental caching) */
 export function getStatusFromSnapshot(
   snapshot: KSSDecoderDeviceSnapshot | null | undefined,
@@ -393,6 +440,7 @@ export function getStatusFromSnapshot(
       case "opll": return snapshot.opll ? createOPLLStatus(snapshot.opll, id, snapshot.opllKeyKeepFrames ?? []) : null;
       case "spc": return snapshot.spc ? createSPCStatus(snapshot.spc, id) : null;
       case "nsf": return snapshot.nsf ? createNSFStatus(snapshot.nsf, snapshot.nsfWave, id) : null;
+      case "hes": return snapshot.hes ? createHESStatus(snapshot.hes, snapshot.hesWave, id) : null;
       default: return null;
     }
   } catch { return null; }
@@ -411,6 +459,7 @@ export function getKcodeAt(
       case "opll": return snapshot.opll ? createOPLLStatus(snapshot.opll, id, snapshot.opllKeyKeepFrames ?? [])?.kcode ?? null : null;
       case "spc": return snapshot.spc ? createSPCStatus(snapshot.spc, id).kcode ?? null : null;
       case "nsf": return snapshot.nsf ? createNSFStatus(snapshot.nsf, snapshot.nsfWave, id).kcode ?? null : null;
+      case "hes": return snapshot.hes ? createHESStatus(snapshot.hes, snapshot.hesWave, id).kcode ?? null : null;
       default: return null;
     }
   } catch { return null; }
