@@ -1,7 +1,7 @@
 {
   "name": "m3disp",
   "private": true,
-  "version": "3.1.0",
+  "version": "3.1.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -18,7 +18,7 @@
     "@mui/material": "^5.14.20",
     "@types/sha1": "^1.1.5",
     "hes-js": "github:digital-sound-antiques/hes-js#d143821f199cf45dcddd91ea65ba8bea92d7ee74",
-    "libkss-js": "^3.0.0-dev.3",
+    "libkss-js": "^3.0.0-dev.4",
     "md5": "^2.3.0",
     "mgsc-js": "^2.0.0",
     "mgsrc-js": "^2.0.0",
@@ -26,7 +26,7 @@
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
     "react-file-drop": "^3.1.6",
-    "spc700-js": "github:digital-sound-antiques/spc700-js#000a28bf7c732fc5ed03740232371b5b75959080",
+    "spc700-js": "github:digital-sound-antiques/spc700-js#2d9ce62c2e3ea719e0ba804f91880d8ec8c23da7",
     "webaudio-stream-player": "^1.2.3-dev"
   },
   "devDependencies": {
