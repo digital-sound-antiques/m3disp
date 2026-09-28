@@ -72,8 +72,8 @@ const SCAN_AHEAD_SECONDS = 16;
 /**
  * Seconds of look-ahead the NSF scanner may cover in one decode step.
  *
- * The NSF scanner runs the whole machine — there is no cheap silent mode like
- * the KSS keyframer's calcSilent, and no shortcut like the SPC path's DSP-rate
+ * The NSF scanner runs the whole machine — there is no silent mode like the KSS
+ * keyframer's calcSilentAccurate, and no shortcut like the SPC path's DSP-rate
  * skip — so letting it catch up in one unbounded pass blocks this worker for
  * around 700 ms. That is longer than the audio buffer holds, and it is heard as
  * every channel cutting out at once just after playback starts. Bounded, each
@@ -140,7 +140,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
   private _hes: HESEngine | null = null;
   // Audible engine, kept ~lookaheadMs ahead of the play head.
   private _player: KSSPlay | null = null;
-  // State-save engine: runs ahead (calcSilent), captures keyframes every
+  // State-save engine: runs ahead (calcSilentAccurate), captures keyframes every
   // KEYFRAME_SECONDS and posts device-register snapshots for the piano roll.
   private _keyframer: KSSPlay | null = null;
 
@@ -152,7 +152,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
   private _nextKeyframeFrame = 0; // next scheduled capture frame
   // Canonical keyframes captured from the AUDIBLE player during real synthesis
   // (calc), keyed by 2s-grid index. Unlike the keyframer's states (built with
-  // calcSilent, so device DSP internals like envelopes can be stale), these have
+  // calcSilentAccurate, which leaves the SCC waveform phase unadvanced), these have
   // fully-synthesised internal state, so a seek into an already-heard region can
   // restore an accurate state. Only populated up to the play head.
   private _playerKeyframes = new Map<number, Keyframe>();
@@ -325,7 +325,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
       if (this._hasDebugMarker) {
         const skipped = this._skipToDebugMarker(this._player!);
         this._playerFrames = skipped;
-        this._keyframer!.calcSilent(skipped);
+        this._keyframer!.calcSilentAccurate(skipped);
         this._keyframerFrames = skipped;
       }
       // seed the keyframe schedule at the (post-skip) origin so a rewind there is instant
@@ -728,7 +728,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     const player = this._player!;
     // Prefer the player's own canonical state when it is at least as close as the
     // keyframer's: player states were built with real synthesis (accurate device
-    // internals), the keyframer's with calcSilent (envelopes etc. can be stale).
+    // internals), the keyframer's with calcSilentAccurate (SCC phase not advanced).
     const kk = this._nearestKeyframe(target);
     const pk = this._nearestPlayerKeyframe(target);
     // Use the canonical (player) state as long as it's within one grid step of
@@ -753,7 +753,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
       target
     );
     // Resume canonical capture at the next grid boundary. The span just fast-
-    // forwarded used calcSilent (provisional), so don't capture the landing frame.
+    // forwarded used calcSilentAccurate (provisional), so don't capture the landing frame.
     this._nextPlayerKeyframeFrame =
       (Math.floor(this._playerFrames / this._keyframeFrames) + 1) * this._keyframeFrames;
   }
@@ -794,7 +794,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     while (!this._aborted && getFrame() < target) {
       const before = getFrame();
       const n = Math.min(chunk, target - before);
-      kssplay.calcSilent(n);
+      kssplay.calcSilentAccurate(n);
       setFrame(before + n);
       if (!reporting && performance.now() - t0 > 120) reporting = true;
       if (reporting) {
@@ -833,7 +833,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
 
   /** Capture the audible player's canonical state at its current position, keyed
    *  by the 2s grid cell (so re-crossing a cell after a rewind just refreshes it).
-   *  Called from process() during real synthesis only — never during a calcSilent
+   *  Called from process() during real synthesis only — never during a calcSilentAccurate
    *  fast-forward, so a provisional state can't overwrite a canonical one. */
   private _capturePlayerKeyframe() {
     const g = Math.floor(this._playerFrames / this._keyframeFrames);
@@ -977,7 +977,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
     const maxTick = (this.sampleRate * this._duration) / 1000;
     let tick = 0;
     while (tick <= maxTick) {
-      kssplay.calcSilent(interval);
+      kssplay.calcSilentAccurate(interval);
       tick += interval;
       if (kssplay.getMGSJumpCount() != 0) {
         break;
@@ -1039,7 +1039,7 @@ class KSSDecoderWorker extends AudioDecoderWorker {
       kf.getStopFlag() == 0 &&
       guard++ < 4096
     ) {
-      kf.calcSilent(step);
+      kf.calcSilentAccurate(step);
       this._updateKeyOnFrames(step);
       this._keyframerFrames += step;
       // Determine the actual song length: the driver fades once it has looped
