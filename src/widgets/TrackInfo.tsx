@@ -248,7 +248,9 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
 
   let voiceNode = null;
 
-  if (props.targets[0].device != "scc") {
+  // A waveform where the channel hands one over (SCC, FDS, N163, PC Engine), the
+  // voice's name otherwise.
+  if (!(status?.voice instanceof Uint8Array)) {
     if (typeof status?.voice == "string") {
       voiceNode = (
         <Box
