@@ -48,7 +48,7 @@ function parseSongNumber(value: string): number {
 }
 
 export function parseNEZplugM3U(lines: string[]): PlayListEntry[] {
-  const extendedPattern = /^(file[0-9]+=)?([^:]+)(::(kss|msx))?/i;
+  const extendedPattern = /^(file[0-9]+=)?([^:]+)(::([a-z0-9]+))?/i;
   const m3uPattern = /^.+\.[a-z0-9_\-]+$/i;
 
   const res: PlayListEntry[] = [];
@@ -73,9 +73,11 @@ export function parseNEZplugM3U(lines: string[]): PlayListEntry[] {
     title = title?.replaceAll("\t", ",");
 
     let filename;
+    let type: string | undefined;
     let m = head.match(extendedPattern);
     if (m != null) {
       filename = m[2];
+      type = m[4]?.toLowerCase();
     } else {
       let m = head.match(m3uPattern);
       if (m != null) {
@@ -90,6 +92,9 @@ export function parseNEZplugM3U(lines: string[]): PlayListEntry[] {
       song = null;
     } else {
       song = parseSongNumber(id);
+      // NEZplug numbers NSF tracks from 1, as the NSF header itself does; every
+      // other type, and the player, count from 0.
+      if (type === "nsf") song = Math.max(0, song - 1);
     }
 
     let mainDurationInMs = parseDuration(mainDuration);
