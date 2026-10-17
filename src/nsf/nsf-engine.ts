@@ -22,6 +22,7 @@ import {
   CH_VRC6_PULSE2,
   CH_VRC6_SAW,
   CH_VRC7,
+  CH_N163,
   type NSFFile,
   type NSFPlayerState,
 } from "nsf-js";
@@ -47,6 +48,10 @@ export const NSF_FLAG_ACTIVE = 1;
 export const NSF_FLAG_SHORT = 2;
 /** FDS channel is being pitch-modulated. */
 export const NSF_FLAG_MOD = 4;
+
+/** Points each N163 wavetable is drawn with. Its waves run from 4 to 256
+ *  samples; the display needs one fixed size. */
+export const N163_WAVE_POINTS = 64;
 
 /** m3disp's key codes put A4 at 57; MIDI puts it at 69. */
 const KCODE_FROM_MIDI = -12;
@@ -125,6 +130,9 @@ export type NSFSnapshot = {
   nsf: Int16Array;
   /** FDS wavetable as signed bytes, for the waveform display; null otherwise. */
   nsfWave: Uint8Array | null;
+  /** The N163's eight wavetables, N163_WAVE_POINTS signed bytes each; null
+   *  without one. */
+  n163Wave: Uint8Array | null;
   /** Channels keyed on during this frame, as the beat estimator's onset weight. */
   keyOns: number;
 };
@@ -231,8 +239,8 @@ export class NSFEngine {
     this.heardAudio = false;
     this.endFrame = 0;
     this.endDetected = false;
-    const { mmc5, n163, s5b } = file.chips;
-    this.silenceDetection = !(mmc5 || n163 || s5b);
+    const { mmc5, s5b } = file.chips;
+    this.silenceDetection = !(mmc5 || s5b);
     this.totalFrames = Math.round(this.audible.totalSeconds * this.sampleRate);
   }
 
@@ -359,6 +367,20 @@ export class NSFEngine {
           // The instrument, so the roll colours FM by voice as the OPLL's does.
           vnum = s.detail & 0x0f;
           break;
+        case CH_N163 + 0:
+        case CH_N163 + 1:
+        case CH_N163 + 2:
+        case CH_N163 + 3:
+        case CH_N163 + 4:
+        case CH_N163 + 5:
+        case CH_N163 + 6:
+        case CH_N163 + 7: {
+          // The same digest the FDS and SCC use, so a change of wave shows as a
+          // change of colour.
+          const wave = this.scanner.n163Wave(c - CH_N163);
+          vnum = wave != null && wave.length > 0 ? (wave[0] + wave[wave.length >> 1]) & 0x0f : 0;
+          break;
+        }
         case CH_FDS: {
           const wave = this.scanner.fdsWave;
           // Same trick the SCC channels use: a cheap digest of the waveform, so
@@ -383,6 +405,22 @@ export class NSFEngine {
     }
 
     return { nsf: out, keyOns };
+  }
+
+  /** The N163's wavetables, each stretched or squeezed to N163_WAVE_POINTS
+   *  signed bytes for the waveform display. */
+  private encodeN163Waves(): Uint8Array | null {
+    if (this.scanner.n163Wave(0) == null) return null;
+    const out = new Uint8Array(8 * N163_WAVE_POINTS);
+    for (let ch = 0; ch < 8; ch++) {
+      const wave = this.scanner.n163Wave(ch)!;
+      for (let i = 0; i < N163_WAVE_POINTS; i++) {
+        const s = wave[Math.floor((i * wave.length) / N163_WAVE_POINTS)];
+        // Four bits unsigned around a centre of 8, drawn as signed bytes.
+        out[ch * N163_WAVE_POINTS + i] = ((s - 8) * 16) & 0xff;
+      }
+    }
+    return out;
   }
 
   /** The FDS wavetable as signed bytes for the waveform display. */
@@ -420,6 +458,7 @@ export class NSFEngine {
         frame: this.scannerFrames,
         nsf,
         nsfWave: this.encodeFdsWave(),
+        n163Wave: this.encodeN163Waves(),
         keyOns,
       });
       this.trackSilence(nsf, grid);

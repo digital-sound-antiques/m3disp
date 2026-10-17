@@ -224,13 +224,15 @@ export const DEVICE_CARDS: Record<
   // fixed roles, no shared slots — so each one is its own card.
   spc: { name: "S-DSP", device: "spc", targets: [0, 1, 2, 3, 4, 5, 6, 7] },
   // The NES section: six channels with fixed roles, one card each. The FDS card,
-  // like the VRC6 and VRC7 sections, only appears for a file that has the chip.
+  // like the expansion chips' sections, only appears for a file that has the chip.
   nsf: { name: "NES", device: "nsf", targets: [0, 1, 2, 3, 4, 5] },
   // The VRC6 lives on the cartridge, so it gets its own section even though its
   // channels are part of the same NSF channel list.
   vrc6: { name: "VRC6", device: "nsf", targets: [6, 7, 8] },
   // Likewise the VRC7's six FM channels.
   vrc7: { name: "VRC7", device: "nsf", targets: [9, 10, 11, 12, 13, 14] },
+  // And the N163's eight wavetable channels.
+  n163: { name: "N163", device: "nsf", targets: [15, 16, 17, 18, 19, 20, 21, 22] },
   // HES mode's only section. The six PSG channels are interchangeable, so each
   // one is its own card.
   hes: { name: "PCE", device: "hes", targets: [0, 1, 2, 3, 4, 5] },
@@ -242,6 +244,7 @@ const FIXED_LABELS: Partial<Record<DeviceName, string[]>> = {
     "SQ1", "SQ2", "TRI", "NOI", "DMC", "FDS",
     "SQ1", "SQ2", "SAW",
     "FM1", "FM2", "FM3", "FM4", "FM5", "FM6",
+    "CH1", "CH2", "CH3", "CH4", "CH5", "CH6", "CH7", "CH8",
   ],
 };
 

@@ -81,6 +81,7 @@ const channelColorGroups: {
   // after everything else - and under a key of their own, so the NES group's
   // stored length stays what earlier saves have.
   { device: "nsf", key: "vrc7", base: 48, count: 6 },
+  { device: "nsf", key: "n163", base: 54, count: 8 },
 ];
 
 function channelColorsToMap(colors: string[]): { [device: string]: string[] } {

@@ -13,6 +13,7 @@ const spcLabels = ["CH1", "CH2", "CH3", "CH4", "CH5", "CH6", "CH7", "CH8"];
 const nesLabels = ["SQ1", "SQ2", "TRI", "NOI", "DMC", "FDS"];
 const vrc6Labels = ["SQ1", "SQ2", "SAW"];
 const vrc7Labels = ["FM1", "FM2", "FM3", "FM4", "FM5", "FM6"];
+const n163Labels = ["CH1", "CH2", "CH3", "CH4", "CH5", "CH6", "CH7", "CH8"];
 const hesLabels = ["CH1", "CH2", "CH3", "CH4", "CH5", "CH6"];
 
 type ChannelGroup = {
@@ -39,6 +40,7 @@ const channelGroups: ChannelGroup[] = [
   { id: "nes", device: "nsf", name: "NES", labels: nesLabels, base: 33 },
   { id: "vrc6", device: "nsf", name: "VRC6", labels: vrc6Labels, base: 39 },
   { id: "vrc7", device: "nsf", name: "VRC7", labels: vrc7Labels, base: 48 },
+  { id: "n163", device: "nsf", name: "N163", labels: n163Labels, base: 54 },
   { id: "hes", device: "hes", name: "PCE", labels: hesLabels, base: 42 },
 ];
 

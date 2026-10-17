@@ -2,7 +2,7 @@ import { KSSPlayer } from "./kss-player";
 import { DeviceName } from "./kss-device";
 import type { KSSDecoderDeviceSnapshot } from "./kss-decoder-worker";
 import { SPC_VOICE_FIELDS, SPC_FLAG_NOISE, SPC_FLAG_ECHO, SPC_FLAG_PMOD } from "../spc/spc-engine";
-import { NSF_CH_FIELDS, NSF_FLAG_SHORT } from "../nsf/nsf-engine";
+import { N163_WAVE_POINTS, NSF_CH_FIELDS, NSF_FLAG_SHORT } from "../nsf/nsf-engine";
 import {
   HES_CH_FIELDS,
   HES_FLAG_DDA,
@@ -221,7 +221,7 @@ export function getChannelStatus(player: KSSPlayer, id: ChannelId): ChannelStatu
     case "spc":
       return snapshot.spc ? createSPCStatus(snapshot.spc, id) : null;
     case "nsf":
-      return snapshot.nsf ? createNSFStatus(snapshot.nsf, snapshot.nsfWave, id) : null;
+      return snapshot.nsf ? createNSFStatus(snapshot.nsf, snapshot.nsfWave, id, snapshot.n163Wave) : null;
     case "hes":
       return snapshot.hes ? createHESStatus(snapshot.hes, snapshot.hesWave, id) : null;
     default:
@@ -264,7 +264,7 @@ export function getChannelStatusArray(
         res.push(snapshot.spc ? createSPCStatus(snapshot.spc, id) : null);
         break;
       case "nsf":
-        res.push(snapshot.nsf ? createNSFStatus(snapshot.nsf, snapshot.nsfWave, id) : null);
+        res.push(snapshot.nsf ? createNSFStatus(snapshot.nsf, snapshot.nsfWave, id, snapshot.n163Wave) : null);
         break;
       case "hes":
         res.push(snapshot.hes ? createHESStatus(snapshot.hes, snapshot.hesWave, id) : null);
@@ -365,7 +365,8 @@ const VRC7_VOICE_NAMES = [
 function createNSFStatus(
   nsf: Int16Array,
   wave: Uint8Array | null | undefined,
-  id: ChannelId
+  id: ChannelId,
+  n163Wave?: Uint8Array | null
 ): ChannelStatus {
   const o = id.index * NSF_CH_FIELDS;
   const kcode = nsf[o];
@@ -411,9 +412,13 @@ function createNSFStatus(
       return { ...base, voice: vnum > 7 ? "DAC" : `Pulse ${VRC6_DUTY_NAMES[vnum & 7]}` };
     case 8:
       return { ...base, voice: "Sawtooth" };
-    default:
-      return { ...base, voice: VRC7_VOICE_NAMES[vnum & 0x0f] };
   }
+  if (id.index >= 15) {
+    // An N163 channel hands over its own wavetable, as the FDS does.
+    const at = (id.index - 15) * N163_WAVE_POINTS;
+    return { ...base, voice: n163Wave ? n163Wave.subarray(at, at + N163_WAVE_POINTS) : null };
+  }
+  return { ...base, voice: VRC7_VOICE_NAMES[vnum & 0x0f] };
 }
 
 /**
@@ -464,7 +469,7 @@ export function getStatusFromSnapshot(
       case "scc": return snapshot.scc ? createSCCStatus(snapshot.scc, id, snapshot.sccKeyKeepFrames ?? []) : null;
       case "opll": return snapshot.opll ? createOPLLStatus(snapshot.opll, id, snapshot.opllKeyKeepFrames ?? []) : null;
       case "spc": return snapshot.spc ? createSPCStatus(snapshot.spc, id) : null;
-      case "nsf": return snapshot.nsf ? createNSFStatus(snapshot.nsf, snapshot.nsfWave, id) : null;
+      case "nsf": return snapshot.nsf ? createNSFStatus(snapshot.nsf, snapshot.nsfWave, id, snapshot.n163Wave) : null;
       case "hes": return snapshot.hes ? createHESStatus(snapshot.hes, snapshot.hesWave, id) : null;
       default: return null;
     }
@@ -483,7 +488,7 @@ export function getKcodeAt(
       case "scc": return snapshot.scc ? createSCCStatus(snapshot.scc, id, snapshot.sccKeyKeepFrames ?? [])?.kcode ?? null : null;
       case "opll": return snapshot.opll ? createOPLLStatus(snapshot.opll, id, snapshot.opllKeyKeepFrames ?? [])?.kcode ?? null : null;
       case "spc": return snapshot.spc ? createSPCStatus(snapshot.spc, id).kcode ?? null : null;
-      case "nsf": return snapshot.nsf ? createNSFStatus(snapshot.nsf, snapshot.nsfWave, id).kcode ?? null : null;
+      case "nsf": return snapshot.nsf ? createNSFStatus(snapshot.nsf, snapshot.nsfWave, id, snapshot.n163Wave).kcode ?? null : null;
       case "hes": return snapshot.hes ? createHESStatus(snapshot.hes, snapshot.hesWave, id).kcode ?? null : null;
       default: return null;
     }

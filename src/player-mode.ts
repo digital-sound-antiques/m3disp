@@ -53,7 +53,7 @@ export const SPC_CHANNEL_IDS: ChannelId[] = [
 
 /**
  * The NES sound unit, in the order the hardware's registers run, followed by the
- * VRC6 and VRC7 channels a cartridge may add.
+ * VRC6, VRC7 and N163 channels a cartridge may add.
  *
  * The list is fixed, but the channels of chips a file does not declare are
  * marked absent per track (see setAbsentChannels), and the views leave them out.
@@ -74,6 +74,14 @@ export const NSF_CHANNEL_IDS: ChannelId[] = [
   { device: "nsf", index: 12 },
   { device: "nsf", index: 13 },
   { device: "nsf", index: 14 },
+  { device: "nsf", index: 15 },
+  { device: "nsf", index: 16 },
+  { device: "nsf", index: 17 },
+  { device: "nsf", index: 18 },
+  { device: "nsf", index: 19 },
+  { device: "nsf", index: 20 },
+  { device: "nsf", index: 21 },
+  { device: "nsf", index: 22 },
 ];
 
 /** The PC Engine's six PSG channels, all alike: any of them can play a
@@ -90,7 +98,7 @@ export const HES_CHANNEL_IDS: ChannelId[] = [
 
 export const KSS_SECTION_KEYS = ["opll", "psg", "scc"];
 export const SPC_SECTION_KEYS = ["spc"];
-export const NSF_SECTION_KEYS = ["nsf", "vrc6", "vrc7"];
+export const NSF_SECTION_KEYS = ["nsf", "vrc6", "vrc7", "n163"];
 export const HES_SECTION_KEYS = ["hes"];
 
 /** Eight hues spread evenly around the wheel at the same perceptual lightness
@@ -139,6 +147,16 @@ export const NSF_CHANNEL_COLORS: string[] = [
   "#968efa", // vrc7 fm4
   "#e18516", // vrc7 fm5
   "#1fb3ba", // vrc7 fm6
+  // The N163's eight are interchangeable wavetable channels, so they take the
+  // S-DSP's eight hues, spread evenly around the wheel.
+  "#e18516", // n163 ch1
+  "#b99c1c", // n163 ch2
+  "#47b95f", // n163 ch3
+  "#1db98d", // n163 ch4
+  "#1fbb6f", // n163 ch5
+  "#20ace5", // n163 ch6
+  "#968efa", // n163 ch7
+  "#dd72c2", // n163 ch8
 ];
 
 const MODES: Record<PlayerMode, { channels: ChannelId[]; sections: string[] }> = {

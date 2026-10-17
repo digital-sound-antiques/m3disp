@@ -45,6 +45,8 @@ export type KSSDecoderDeviceSnapshot = {
   nsf?: Int16Array | null;
   /** NSF mode only: the FDS wavetable as signed bytes, when the file has one. */
   nsfWave?: Uint8Array | null;
+  /** NSF mode only: the N163's eight wavetables, when the file has one. */
+  n163Wave?: Uint8Array | null;
   /** HES mode only: 6 channels x HES_CH_FIELDS int16s. */
   hes?: Int16Array | null;
   /** HES mode only: the waveform of whichever channel is sounding. */
