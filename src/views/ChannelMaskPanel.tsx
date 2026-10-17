@@ -126,6 +126,19 @@ const SECTIONS: Section[] = [
     bits: 0x1c0,
   },
   {
+    // The VRC7's six FM channels, after the VRC6's in the same NSF list.
+    key: "vrc7",
+    dev: "nsf",
+    label: "VRC7",
+    rows: [0, 1, 2, 3, 4, 5].map((i) => ({
+      label: `FM${i + 1}`,
+      maskBits: [9 + i],
+      targets: [{ device: "nsf", index: 9 + i } as ChannelId],
+      hi: [9 + i],
+    })),
+    bits: 0x7e00,
+  },
+  {
     // HES mode's only section: six interchangeable PSG channels, one row each.
     key: "hes",
     dev: "hes",
@@ -140,10 +153,16 @@ const SECTIONS: Section[] = [
   },
 ];
 
-const ALL: KSSChannelMask = { opll: 0x3fff, psg: 0x7, scc: 0x1f, opl: 0, spc: 0xff, nsf: 0x1ff, hes: 0x3f };
+const ALL: KSSChannelMask = { opll: 0x3fff, psg: 0x7, scc: 0x1f, opl: 0, spc: 0xff, nsf: 0x7fff, hes: 0x3f };
 const NONE: KSSChannelMask = { opll: 0, psg: 0, scc: 0, opl: 0, spc: 0, nsf: 0, hes: 0 };
 const maskEq = (a: KSSChannelMask, b: KSSChannelMask) =>
-  a.opll === b.opll && a.psg === b.psg && a.scc === b.scc && a.opl === b.opl && a.spc === b.spc;
+  a.opll === b.opll &&
+  a.psg === b.psg &&
+  a.scc === b.scc &&
+  a.opl === b.opl &&
+  a.spc === b.spc &&
+  a.nsf === b.nsf &&
+  a.hes === b.hes;
 const soloMask = (dev: Dev, bits: number): KSSChannelMask => ({ ...ALL, [dev]: ALL[dev] & ~bits });
 const bitsOf = (arr: number[]) => arr.reduce((m, b) => m | (1 << b), 0);
 

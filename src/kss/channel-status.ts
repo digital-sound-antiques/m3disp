@@ -332,6 +332,29 @@ const VRC6_DUTY_NAMES = [
 ];
 
 /**
+ * The VRC7's fifteen ROM instruments, by the names trackers have settled on.
+ * 0 is the user-defined instrument.
+ */
+const VRC7_VOICE_NAMES = [
+  "User",
+  "Bell",
+  "Guitar",
+  "Piano",
+  "Flute",
+  "Clarinet",
+  "Rattling Bell",
+  "Trumpet",
+  "Reed Organ",
+  "Soft Bell",
+  "Xylophone",
+  "Vibraphone",
+  "Brass",
+  "Bass Guitar",
+  "Synthesizer",
+  "Chorus",
+];
+
+/**
  * One NES channel, decoded from the packed snapshot the NSF engine posts.
  *
  * The two percussion channels carry a non-null `mode` so the keyboard treats
@@ -386,8 +409,10 @@ function createNSFStatus(
       // A VRC6 pulse in mode 1 is a bare DAC rather than a duty generator, which
       // the engine flags by handing over a voice number past the eight duties.
       return { ...base, voice: vnum > 7 ? "DAC" : `Pulse ${VRC6_DUTY_NAMES[vnum & 7]}` };
-    default:
+    case 8:
       return { ...base, voice: "Sawtooth" };
+    default:
+      return { ...base, voice: VRC7_VOICE_NAMES[vnum & 0x0f] };
   }
 }
 

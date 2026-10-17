@@ -78,6 +78,9 @@ export const defaultChannelColors: string[] = [
   "#20ace5", "#4fa1fb", "#1db98d",
   // PC Engine PSG: six hues evenly spread, since its channels have no roles.
   "#e18516", "#b99c1c", "#47b95f", "#1fb3ba", "#968efa", "#dd72c2",
+  // VRC7 FM 1-6, stored after the PC Engine's because they came later: the
+  // OPLL's first six, since it is the same family of chip.
+  "#b99c1c", "#20ace5", "#47b95f", "#968efa", "#e18516", "#1fb3ba",
 ];
 
 export const colorMap = [
@@ -95,11 +98,13 @@ const spcColorMap = [
   Colors.cyan, Colors.blue, Colors.deepPurple, Colors.pink,
 ];
 
-/** Fallback families for the six NES channels and the VRC6's three. */
+/** Fallback families for the six NES channels, the VRC6's three and the
+ *  VRC7's six. */
 const nsfColorMap = [
   Colors.orange, Colors.amber, Colors.green,
   Colors.deepPurple, Colors.pink, Colors.cyan,
   Colors.lightBlue, Colors.blue, Colors.teal,
+  Colors.teal, Colors.teal, Colors.teal, Colors.teal, Colors.teal, Colors.teal,
 ];
 
 /** Fallback families for the PC Engine's six PSG channels. */
@@ -122,6 +127,11 @@ const activeColorMap = () => {
   }
 };
 
+/** NSF channels stored ahead of the PC Engine's block: the NES six and the
+ *  VRC6's three. The VRC7's, added later, are stored after it. */
+const NSF_STORED_BEFORE_HES = 9;
+const HES_BASE = KSS_CHANNEL_IDS.length + SPC_CHANNEL_IDS.length + NSF_STORED_BEFORE_HES;
+
 /** Index into the shared colour array for a flat channel index. The SPC and NSF
  *  modes replace the KSS channel list rather than extending it, so their
  *  channels count from 0 while playing but are stored after the KSS block. */
@@ -130,9 +140,13 @@ export function colorIndexOf(ch: number): number {
     case "spc":
       return KSS_CHANNEL_IDS.length + ch;
     case "nsf":
-      return KSS_CHANNEL_IDS.length + SPC_CHANNEL_IDS.length + ch;
+      // The VRC7's channels were added after the PC Engine's block, so they
+      // are stored past it rather than beside the rest of the NSF list.
+      return ch < NSF_STORED_BEFORE_HES
+        ? KSS_CHANNEL_IDS.length + SPC_CHANNEL_IDS.length + ch
+        : HES_BASE + HES_CHANNEL_IDS.length + (ch - NSF_STORED_BEFORE_HES);
     case "hes":
-      return KSS_CHANNEL_IDS.length + SPC_CHANNEL_IDS.length + NSF_CHANNEL_IDS.length + ch;
+      return HES_BASE + ch;
     default:
       return ch;
   }

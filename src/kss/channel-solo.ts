@@ -1,7 +1,7 @@
 import { KSSChannelMask, DeviceName } from "./kss-device";
 
 // A "solo" mutes every channel across all chips except the target's bits.
-const ALL: KSSChannelMask = { opll: 0x3fff, psg: 0x7, scc: 0x1f, opl: 0, spc: 0xff, nsf: 0x1ff, hes: 0x3f };
+const ALL: KSSChannelMask = { opll: 0x3fff, psg: 0x7, scc: 0x1f, opl: 0, spc: 0xff, nsf: 0x7fff, hes: 0x3f };
 const NONE: KSSChannelMask = { opll: 0, psg: 0, scc: 0, opl: 0, spc: 0, nsf: 0, hes: 0 };
 const maskEq = (a: KSSChannelMask, b: KSSChannelMask) =>
   a.opll === b.opll &&

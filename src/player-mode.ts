@@ -53,9 +53,9 @@ export const SPC_CHANNEL_IDS: ChannelId[] = [
 
 /**
  * The NES sound unit, in the order the hardware's registers run, followed by the
- * VRC6 channels a cartridge may add.
+ * VRC6 and VRC7 channels a cartridge may add.
  *
- * Every NSF track shows all nine, whether or not its file has those chips - the
+ * Every NSF track shows all fifteen, whether or not its file has those chips - the
  * same way an MSX file without an SCC still shows the SCC section.
  */
 export const NSF_CHANNEL_IDS: ChannelId[] = [
@@ -68,6 +68,12 @@ export const NSF_CHANNEL_IDS: ChannelId[] = [
   { device: "nsf", index: 6 },
   { device: "nsf", index: 7 },
   { device: "nsf", index: 8 },
+  { device: "nsf", index: 9 },
+  { device: "nsf", index: 10 },
+  { device: "nsf", index: 11 },
+  { device: "nsf", index: 12 },
+  { device: "nsf", index: 13 },
+  { device: "nsf", index: 14 },
 ];
 
 /** The PC Engine's six PSG channels, all alike: any of them can play a
@@ -84,7 +90,7 @@ export const HES_CHANNEL_IDS: ChannelId[] = [
 
 export const KSS_SECTION_KEYS = ["opll", "psg", "scc"];
 export const SPC_SECTION_KEYS = ["spc"];
-export const NSF_SECTION_KEYS = ["nsf", "vrc6"];
+export const NSF_SECTION_KEYS = ["nsf", "vrc6", "vrc7"];
 export const HES_SECTION_KEYS = ["hes"];
 
 /** Eight hues spread evenly around the wheel at the same perceptual lightness
@@ -125,6 +131,14 @@ export const NSF_CHANNEL_COLORS: string[] = [
   "#20ace5", // vrc6 pulse1 blue
   "#4fa1fb", // vrc6 pulse2 light blue
   "#1db98d", // vrc6 saw    teal
+  // The VRC7's six are interchangeable FM channels, so they take the OPLL's
+  // first six colours: the same chip family, shown the same way.
+  "#b99c1c", // vrc7 fm1
+  "#20ace5", // vrc7 fm2
+  "#47b95f", // vrc7 fm3
+  "#968efa", // vrc7 fm4
+  "#e18516", // vrc7 fm5
+  "#1fb3ba", // vrc7 fm6
 ];
 
 const MODES: Record<PlayerMode, { channels: ChannelId[]; sections: string[] }> = {

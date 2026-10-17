@@ -59,7 +59,13 @@ export type PianoRollColorModeMap = {
 // How the flat pianoRollChannelColors[] array maps onto each device, matching
 // the channelIds[] layout in piano-roll-painter.ts. Used to persist channel
 // colors grouped by device (e.g. {"opll":[...], "psg":[...], "scc":[...]}).
-const channelColorGroups: { device: keyof PianoRollColorModeMap; base: number; count: number }[] = [
+const channelColorGroups: {
+  device: keyof PianoRollColorModeMap;
+  /** Storage key, where it is not the device: one device can span two groups. */
+  key?: string;
+  base: number;
+  count: number;
+}[] = [
   { device: "opll", base: 0, count: 14 },
   { device: "psg", base: 14, count: 6 },
   { device: "scc", base: 20, count: 5 },
@@ -71,12 +77,16 @@ const channelColorGroups: { device: keyof PianoRollColorModeMap; base: number; c
   { device: "nsf", base: 33, count: 9 },
   // And the PC Engine's six, after those.
   { device: "hes", base: 42, count: 6 },
+  // The VRC7's six belong to the NSF list but came later, so they are stored
+  // after everything else - and under a key of their own, so the NES group's
+  // stored length stays what earlier saves have.
+  { device: "nsf", key: "vrc7", base: 48, count: 6 },
 ];
 
 function channelColorsToMap(colors: string[]): { [device: string]: string[] } {
   const map: { [device: string]: string[] } = {};
   for (const g of channelColorGroups) {
-    map[g.device] = colors.slice(g.base, g.base + g.count);
+    map[g.key ?? g.device] = colors.slice(g.base, g.base + g.count);
   }
   return map;
 }
@@ -87,7 +97,7 @@ function channelColorsFromMap(obj: unknown, fallback: string[]): string[] | null
   const map = obj as { [device: string]: unknown };
   const result = fallback.slice();
   for (const g of channelColorGroups) {
-    const arr = map[g.device];
+    const arr = map[g.key ?? g.device];
     // A group added after the settings were last saved is simply absent; keep
     // its defaults rather than discarding the whole stored palette.
     if (arr === undefined) continue;

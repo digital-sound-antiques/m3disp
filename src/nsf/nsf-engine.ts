@@ -21,6 +21,7 @@ import {
   CH_VRC6_PULSE1,
   CH_VRC6_PULSE2,
   CH_VRC6_SAW,
+  CH_VRC7,
   type NSFFile,
   type NSFPlayerState,
 } from "nsf-js";
@@ -224,13 +225,13 @@ export class NSFEngine {
     this.heardAudio = false;
     this.endFrame = 0;
     this.endDetected = false;
-    const { vrc7, mmc5, n163, s5b } = file.chips;
-    this.silenceDetection = !(vrc7 || mmc5 || n163 || s5b);
+    const { mmc5, n163, s5b } = file.chips;
+    this.silenceDetection = !(mmc5 || n163 || s5b);
     this.totalFrames = Math.round(this.audible.totalSeconds * this.sampleRate);
   }
 
   setChannelMask(mask: number): void {
-    this.channelMask = mask & 0x3f;
+    this.channelMask = mask & ((1 << CHANNEL_COUNT) - 1);
     this.applyChannelMask();
   }
 
@@ -342,6 +343,15 @@ export class NSFEngine {
           break;
         case CH_VRC6_SAW:
           vnum = 9;
+          break;
+        case CH_VRC7 + 0:
+        case CH_VRC7 + 1:
+        case CH_VRC7 + 2:
+        case CH_VRC7 + 3:
+        case CH_VRC7 + 4:
+        case CH_VRC7 + 5:
+          // The instrument, so the roll colours FM by voice as the OPLL's does.
+          vnum = s.detail & 0x0f;
           break;
         case CH_FDS: {
           const wave = this.scanner.fdsWave;
