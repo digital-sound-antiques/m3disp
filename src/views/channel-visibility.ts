@@ -53,14 +53,36 @@ export function getHiddenChannels(): number[] {
   return snapshot;
 }
 
+/**
+ * Channels of chips the current file does not have. Not the user's choice and
+ * not persisted: the loader sets it per track, and the views drop these
+ * channels exactly as they drop hidden ones - so a chip with no channels left
+ * loses its section, header and all.
+ */
+let absent = new Set<number>();
+
+export function setAbsentChannels(flatIndices: number[]): void {
+  const next = new Set(flatIndices);
+  if (next.size === absent.size && [...next].every((i) => absent.has(i))) return;
+  absent = next;
+  // A fresh snapshot, so the views that memoise on it recompute their layout.
+  snapshot = [...hidden].sort((a, b) => a - b);
+  for (const l of listeners) l();
+}
+
+/** True for a channel of a chip the current file does not have. */
+export function isChannelAbsent(flatIndex: number): boolean {
+  return absent.has(flatIndex);
+}
+
 export function isChannelHidden(flatIndex: number): boolean {
-  return hidden.has(flatIndex);
+  return hidden.has(flatIndex) || absent.has(flatIndex);
 }
 
 /** True when every given flat index is hidden (a cell/row/section is "hidden"
  *  only when all of its channels are). Empty input → not hidden. */
 export function areChannelsHidden(flatIndices: number[]): boolean {
-  return flatIndices.length > 0 && flatIndices.every((i) => hidden.has(i));
+  return flatIndices.length > 0 && flatIndices.every((i) => isChannelHidden(i));
 }
 
 export function setChannelsHidden(flatIndices: number[], hide: boolean): void {

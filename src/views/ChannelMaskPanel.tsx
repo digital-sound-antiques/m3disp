@@ -17,6 +17,7 @@ import {
 import {
   areChannelsHidden,
   getHiddenChannels,
+  isChannelAbsent,
   isChannelHidden,
   setChannelsHidden,
   subscribeChannelVisibility,
@@ -229,18 +230,27 @@ export function ChannelMaskPanel() {
   // re-render checkboxes when any channel's visibility changes
   useSyncExternalStore(subscribeChannelVisibility, getHiddenChannels);
 
+  // Rows for chips the file does not have are left out, and a section left
+  // with none drops out entirely.
   const orderedSections = order
     .map((k) => SECTIONS.find((s) => s.key === k))
-    .filter((s): s is Section => s != null);
+    .filter((s): s is Section => s != null)
+    .map((s) => ({ ...s, rows: s.rows.filter((r) => !r.hi.every(isChannelAbsent)) }))
+    .filter((s) => s.rows.length > 0);
 
   const toggleCollapse = (key: string) => toggleSectionCollapsed(key);
 
   const onSecDragEnd = (result: DropResult) => {
     const { source, destination } = result;
     if (!destination || destination.index === source.index) return;
+    // Indices are into the shown sections, which can be fewer than the stored
+    // order holds, so the move is made by key.
+    const movedKey = orderedSections[source.index].key;
+    const destKey = orderedSections[destination.index].key;
     const next = [...getSectionOrder()];
-    const [moved] = next.splice(source.index, 1);
-    next.splice(destination.index, 0, moved);
+    next.splice(next.indexOf(movedKey), 1);
+    const at = next.indexOf(destKey);
+    next.splice(destination.index > source.index ? at + 1 : at, 0, movedKey);
     setSectionOrder(next);
   };
 

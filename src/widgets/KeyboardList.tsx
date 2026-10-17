@@ -223,9 +223,8 @@ export const DEVICE_CARDS: Record<
   // SPC mode's only section. The eight S-DSP voices are interchangeable — no
   // fixed roles, no shared slots — so each one is its own card.
   spc: { name: "S-DSP", device: "spc", targets: [0, 1, 2, 3, 4, 5, 6, 7] },
-  // NSF mode's only section. Six channels with fixed roles, one card each; the
-  // FDS card is present for every NSF and stays quiet on the files that have no
-  // FDS, the same way the SCC section does for an MSX file without one.
+  // The NES section: six channels with fixed roles, one card each. The FDS card,
+  // like the VRC6 and VRC7 sections, only appears for a file that has the chip.
   nsf: { name: "NES", device: "nsf", targets: [0, 1, 2, 3, 4, 5] },
   // The VRC6 lives on the cartridge, so it gets its own section even though its
   // channels are part of the same NSF channel list.

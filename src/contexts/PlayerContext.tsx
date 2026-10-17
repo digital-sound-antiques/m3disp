@@ -13,9 +13,26 @@ import { KSSDecoderStartOptions } from "../kss/kss-decoder-worker";
 import { SurroundEffect, SurroundMode } from "../utils/surround";
 import { OutputFilter } from "../utils/output-filter";
 import { isSPCFile } from "spc700-js";
-import { isNSFFile } from "nsf-js";
+import { isNSFFile, parseNSF } from "nsf-js";
 import { isHESFile } from "hes-js";
 import { setPlayerMode } from "../player-mode";
+import { setAbsentChannels } from "../views/channel-visibility";
+
+/** NSF channels of the expansion chips a file does not declare. The 2A03's own
+ *  five are always there. */
+function absentNSFChannels(data: Uint8Array): number[] {
+  let chips;
+  try {
+    chips = parseNSF(data).chips;
+  } catch {
+    return [];
+  }
+  const out: number[] = [];
+  if (!chips.fds) out.push(5);
+  if (!chips.vrc6) out.push(6, 7, 8);
+  if (!chips.vrc7) out.push(9, 10, 11, 12, 13, 14);
+  return out;
+}
 
 export type PlayListEntry = {
   title?: string | null;
@@ -248,6 +265,8 @@ async function applyPlayStateChange(
     setPlayerMode(
       isSPCFile(data) ? "spc" : isNSFFile(data) ? "nsf" : isHESFile(data) ? "hes" : "kss"
     );
+    // Only the chips the file actually has are shown.
+    setAbsentChannels(isNSFFile(data) ? absentNSFChannels(data) : []);
 
     const options: KSSDecoderStartOptions = {
       channelMask,

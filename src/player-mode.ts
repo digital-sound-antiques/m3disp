@@ -55,8 +55,8 @@ export const SPC_CHANNEL_IDS: ChannelId[] = [
  * The NES sound unit, in the order the hardware's registers run, followed by the
  * VRC6 and VRC7 channels a cartridge may add.
  *
- * Every NSF track shows all fifteen, whether or not its file has those chips - the
- * same way an MSX file without an SCC still shows the SCC section.
+ * The list is fixed, but the channels of chips a file does not declare are
+ * marked absent per track (see setAbsentChannels), and the views leave them out.
  */
 export const NSF_CHANNEL_IDS: ChannelId[] = [
   { device: "nsf", index: 0 },
