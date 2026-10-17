@@ -75,7 +75,7 @@ const EMPTY_TRACK_SECONDS = 10;
 const DETECTED_FADE_SECONDS = 1;
 
 /** Frames of run-up a seek leaves for the player's filters to settle. */
-const FILTER_SETTLE_FRAMES = 1024;
+const FILTER_SETTLE_FRAMES = 2048;
 
 /**
  * Level correction from nsf-js's own full scale to the one the app's master gain
@@ -92,19 +92,25 @@ const FILTER_SETTLE_FRAMES = 1024;
  * Some NSF tracks will still be louder than a typical MSX one: that corpus
  * spans 12 LU against the MSX corpus's 7, which is the music rather than the
  * emulation.
+ *
+ * nsf-js has since moved to the Famicom's analogue response, a lone 37 Hz high
+ * pass in place of the NES's 90 Hz and 440 Hz pair, which keeps the bass and
+ * puts 4.9 LU on the median track; it took its master level down 2.5 dB to keep
+ * the peaks clear. The rest comes off here, so the loudness the KSS path was
+ * matched to is unchanged.
  */
-const OUTPUT_SCALE = 0.25;
+const OUTPUT_SCALE = 0.19;
 
 /**
  * Level of the per-channel traces the scope draws.
  *
- * Derived from the mix correction rather than set beside it, so the picture can
- * never drift from what is heard: nsf-js captures per-channel at ±24000, and a
- * quarter of the mix correction lands that on the ~3000 the scope is drawn
- * against (see WaveGrid) when the correction is a half. Change OUTPUT_SCALE and
- * the traces follow.
+ * nsf-js captures each channel at ±24000 regardless of its master level or its
+ * console filter, so the traces keep the size they were drawn at: ~1500 against
+ * the scope's scale (see WaveGrid), for a channel at full level. Not derived
+ * from OUTPUT_SCALE - that now also absorbs the filter change, which the
+ * per-channel capture never saw.
  */
-const WAVE_SCALE = OUTPUT_SCALE / 4;
+const WAVE_SCALE = 1 / 16;
 
 /**
  * State keyframe spacing. Keyframes are small here, and rendering runs well
