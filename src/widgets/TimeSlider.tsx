@@ -29,19 +29,14 @@ export function TimeSlider() {
     setSeekingTo(null);
   }, [entry]);
 
-  // While the real length is still being measured, a target beyond the scanned
-  // (buffered) region may lie past the actual end of the track; such a seek is
-  // rejected (mirroring KSSPlayer.seek), so snap the thumb back instead of
-  // pinning the preview on a position playback will never reach.
+  // A seek goes no further than the keyframer has scanned (the light-gray
+  // region), as KSSPlayer.seek has it, so the thumb lands at the edge of that
+  // rather than on a position playback will not start from.
   const commitSeek = (sec: number) => {
     // During the auto-advance gap the new track isn't loaded yet (the player
     // still holds the previous one), so a seek would replay the previous track.
     if (inGap) return;
-    if (measuring && sec > bufferedSec) {
-      setSeekingTo(null);
-      return;
-    }
-    const target = Math.min(sec, totalSec);
+    const target = Math.min(sec, totalSec, bufferedSec);
     setSeekingTo(target);
     context.player.seek(target);
   };

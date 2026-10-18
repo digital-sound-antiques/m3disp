@@ -174,14 +174,12 @@ export class KSSPlayer extends AudioPlayer {
     if (this._lastArgs == null) return;
     const rate = this.audioContext?.sampleRate ?? 44100;
     let startFrame = Math.max(0, Math.round(sec * rate));
-    if (this._totalFrame > 0) {
-      startFrame = Math.min(startFrame, this._totalFrame);
-    } else if (startFrame > this._buffered) {
-      // The real length is not known yet: a target beyond the scanned region
-      // may lie past the actual end of the track, where the decoder would kill
-      // playback the moment the end is discovered. Treat such a seek as invalid.
-      return;
-    }
+    if (this._totalFrame > 0) startFrame = Math.min(startFrame, this._totalFrame);
+    // No further than the keyframer has scanned. Beyond it there is no keyframe
+    // to start from, so the decoder would have to run the whole way there before
+    // a sample came out - which reads as a hang - and, while the real length is
+    // still unknown, the target may even lie past the end of the track.
+    startFrame = Math.min(startFrame, this._buffered);
     if (this.state === "paused") this._seekWhilePaused = true;
     await this._runPlay({
       ...this._lastArgs,
