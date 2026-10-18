@@ -84,6 +84,8 @@ export const defaultChannelColors: string[] = [
   // N163 1-8, after those: the S-DSP's eight evenly spread hues, since its
   // channels are as interchangeable as the S-DSP's voices.
   "#e18516", "#b99c1c", "#47b95f", "#1db98d", "#1fbb6f", "#20ace5", "#968efa", "#dd72c2",
+  // MMC5 pulse 1, pulse 2, PCM: the APU pulses' hues and the DMC's.
+  "#e18516", "#b99c1c", "#dd72c2",
 ];
 
 export const colorMap = [
@@ -102,7 +104,7 @@ const spcColorMap = [
 ];
 
 /** Fallback families for the six NES channels, the VRC6's three, the VRC7's
- *  six and the N163's eight. */
+ *  six, the N163's eight and the MMC5's three. */
 const nsfColorMap = [
   Colors.orange, Colors.amber, Colors.green,
   Colors.deepPurple, Colors.pink, Colors.cyan,
@@ -110,6 +112,7 @@ const nsfColorMap = [
   Colors.teal, Colors.teal, Colors.teal, Colors.teal, Colors.teal, Colors.teal,
   Colors.orange, Colors.amber, Colors.green, Colors.teal,
   Colors.cyan, Colors.blue, Colors.deepPurple, Colors.pink,
+  Colors.orange, Colors.amber, Colors.pink,
 ];
 
 /** Fallback families for the PC Engine's six PSG channels. */
@@ -133,8 +136,8 @@ const activeColorMap = () => {
 };
 
 /** NSF channels stored ahead of the PC Engine's block: the NES six and the
- *  VRC6's three. The VRC7's and N163's, added later, are stored after it, in
- *  that order. */
+ *  VRC6's three. The VRC7's, N163's and MMC5's, added later, are stored after
+ *  it, in that order. */
 const NSF_STORED_BEFORE_HES = 9;
 const HES_BASE = KSS_CHANNEL_IDS.length + SPC_CHANNEL_IDS.length + NSF_STORED_BEFORE_HES;
 

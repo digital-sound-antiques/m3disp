@@ -23,6 +23,9 @@ import {
   CH_VRC6_SAW,
   CH_VRC7,
   CH_N163,
+  CH_MMC5_PULSE1,
+  CH_MMC5_PULSE2,
+  CH_MMC5_PCM,
   type NSFFile,
   type NSFPlayerState,
 } from "nsf-js";
@@ -239,8 +242,7 @@ export class NSFEngine {
     this.heardAudio = false;
     this.endFrame = 0;
     this.endDetected = false;
-    const { mmc5, s5b } = file.chips;
-    this.silenceDetection = !(mmc5 || s5b);
+    this.silenceDetection = !file.chips.s5b;
     this.totalFrames = Math.round(this.audible.totalSeconds * this.sampleRate);
   }
 
@@ -366,6 +368,13 @@ export class NSFEngine {
         case CH_VRC7 + 5:
           // The instrument, so the roll colours FM by voice as the OPLL's does.
           vnum = s.detail & 0x0f;
+          break;
+        case CH_MMC5_PULSE1:
+        case CH_MMC5_PULSE2:
+          vnum = s.detail & 3; // duty, as the APU's pulses
+          break;
+        case CH_MMC5_PCM:
+          vnum = 8;
           break;
         case CH_N163 + 0:
         case CH_N163 + 1:

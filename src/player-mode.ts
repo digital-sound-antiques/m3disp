@@ -53,7 +53,7 @@ export const SPC_CHANNEL_IDS: ChannelId[] = [
 
 /**
  * The NES sound unit, in the order the hardware's registers run, followed by the
- * VRC6, VRC7 and N163 channels a cartridge may add.
+ * VRC6, VRC7, N163 and MMC5 channels a cartridge may add.
  *
  * The list is fixed, but the channels of chips a file does not declare are
  * marked absent per track (see setAbsentChannels), and the views leave them out.
@@ -82,6 +82,9 @@ export const NSF_CHANNEL_IDS: ChannelId[] = [
   { device: "nsf", index: 20 },
   { device: "nsf", index: 21 },
   { device: "nsf", index: 22 },
+  { device: "nsf", index: 23 },
+  { device: "nsf", index: 24 },
+  { device: "nsf", index: 25 },
 ];
 
 /** The PC Engine's six PSG channels, all alike: any of them can play a
@@ -98,7 +101,7 @@ export const HES_CHANNEL_IDS: ChannelId[] = [
 
 export const KSS_SECTION_KEYS = ["opll", "psg", "scc"];
 export const SPC_SECTION_KEYS = ["spc"];
-export const NSF_SECTION_KEYS = ["nsf", "vrc6", "vrc7", "n163"];
+export const NSF_SECTION_KEYS = ["nsf", "vrc6", "vrc7", "n163", "mmc5"];
 export const HES_SECTION_KEYS = ["hes"];
 
 /** Eight hues spread evenly around the wheel at the same perceptual lightness
@@ -157,6 +160,11 @@ export const NSF_CHANNEL_COLORS: string[] = [
   "#20ace5", // n163 ch6
   "#968efa", // n163 ch7
   "#dd72c2", // n163 ch8
+  // The MMC5's pulses are the APU's own, so they take the APU pulses' pair of
+  // hues; its PCM channel, the DMC's.
+  "#e18516", // mmc5 pulse1
+  "#b99c1c", // mmc5 pulse2
+  "#dd72c2", // mmc5 pcm
 ];
 
 const MODES: Record<PlayerMode, { channels: ChannelId[]; sections: string[] }> = {

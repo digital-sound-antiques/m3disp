@@ -153,6 +153,19 @@ const SECTIONS: Section[] = [
     bits: 0x7f8000,
   },
   {
+    // The MMC5's two pulses and its PCM channel, after the N163's.
+    key: "mmc5",
+    dev: "nsf",
+    label: "MMC5",
+    rows: ["SQ1", "SQ2", "PCM"].map((label, i) => ({
+      label,
+      maskBits: [23 + i],
+      targets: [{ device: "nsf", index: 23 + i } as ChannelId],
+      hi: [23 + i],
+    })),
+    bits: 0x3800000,
+  },
+  {
     // HES mode's only section: six interchangeable PSG channels, one row each.
     key: "hes",
     dev: "hes",
@@ -167,7 +180,7 @@ const SECTIONS: Section[] = [
   },
 ];
 
-const ALL: KSSChannelMask = { opll: 0x3fff, psg: 0x7, scc: 0x1f, opl: 0, spc: 0xff, nsf: 0x7fffff, hes: 0x3f };
+const ALL: KSSChannelMask = { opll: 0x3fff, psg: 0x7, scc: 0x1f, opl: 0, spc: 0xff, nsf: 0x3ffffff, hes: 0x3f };
 const NONE: KSSChannelMask = { opll: 0, psg: 0, scc: 0, opl: 0, spc: 0, nsf: 0, hes: 0 };
 const maskEq = (a: KSSChannelMask, b: KSSChannelMask) =>
   a.opll === b.opll &&

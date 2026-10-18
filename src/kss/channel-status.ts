@@ -413,6 +413,11 @@ function createNSFStatus(
     case 8:
       return { ...base, voice: "Sawtooth" };
   }
+  if (id.index === 23 || id.index === 24) {
+    // The MMC5's pulses: the APU's own, so the APU's duty names.
+    return { ...base, voice: `Pulse ${NSF_DUTY_NAMES[vnum & 3]}` };
+  }
+  if (id.index === 25) return { ...base, mode: "pcm", voice: "PCM" };
   if (id.index >= 15) {
     // An N163 channel hands over its own wavetable, as the FDS does.
     const at = (id.index - 15) * N163_WAVE_POINTS;

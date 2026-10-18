@@ -32,6 +32,7 @@ function absentNSFChannels(data: Uint8Array): number[] {
   if (!chips.vrc6) out.push(6, 7, 8);
   if (!chips.vrc7) out.push(9, 10, 11, 12, 13, 14);
   if (!chips.n163) out.push(15, 16, 17, 18, 19, 20, 21, 22);
+  if (!chips.mmc5) out.push(23, 24, 25);
   return out;
 }
 
