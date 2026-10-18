@@ -28,6 +28,10 @@ export function isChannelMuted(mask: KSSChannelMask, id: ChannelId): boolean {
       return (mask.scc & (1 << id.index)) !== 0;
     case "spc":
       return (mask.spc & (1 << id.index)) !== 0;
+    case "nsf":
+      return (mask.nsf & (1 << id.index)) !== 0;
+    case "hes":
+      return (mask.hes & (1 << id.index)) !== 0;
     default:
       return false;
   }
