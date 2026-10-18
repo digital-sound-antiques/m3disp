@@ -653,6 +653,13 @@ const slotOf = (height: number) => height / (N_WHITE + BOTTOM_PAD);
 const slotTopOf = (height: number, s: number) =>
   height - (s + 1 + BOTTOM_PAD) * slotOf(height);
 
+/**
+ * A black key's thickness as a share of one white-key slot: the Keyboard tab's
+ * proportion (72% of a white key that leaves 8% of its slot as the gap), so the
+ * roll's keyboard reads as the same instrument.
+ */
+const BLACK_KEY_RATIO = 0.72 * (1 - 0.08);
+
 // Vertical placement of a note on a roll of the given height: top y and height
 // (device px). Parameterized by height so the per-channel grid cells can reuse
 // the same diatonic layout at any cell size.
@@ -667,7 +674,7 @@ function noteGeomIn(height: number, kcode: number) {
   }
   const s = BLACK_AFTER[k]! + oct * 7; // black key sits above white slot s
   const boundary = slotTopOf(height, s);
-  const h = slot * 0.6;
+  const h = slot * BLACK_KEY_RATIO;
   return { yTop: boundary - h / 2, h, black: true };
 }
 function noteGeom(canvas: HTMLCanvasElement, kcode: number) {
@@ -742,7 +749,7 @@ export function paintBlackKeyboard(canvas: HTMLCanvasElement, flip: boolean) {
   const g = kbGeom(canvas);
   const dx = g.dx + (flip ? g.flip : 0);
   const slot = slotOf(canvas.height);
-  const bkh = Math.max(1, Math.round(slot * 0.6));
+  const bkh = Math.max(1, Math.round(slot * BLACK_KEY_RATIO));
   const r = Math.max(1, Math.min(g.bw * 0.12, bkh * 0.25));
   // glossy at the play-head front → black at the back tip
   const body = ctx.createLinearGradient(flip ? dx + g.bw : dx, 0, flip ? dx : dx + g.bw, 0);
