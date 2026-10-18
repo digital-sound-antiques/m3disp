@@ -1,5 +1,11 @@
 import { useContext } from "react";
-import { PlayerContext } from "../contexts/PlayerContext";
+import {
+  MASTER_GAIN_MAX_DB,
+  MASTER_GAIN_MIN_DB,
+  PlayerContext,
+  masterGainFromDb,
+  masterGainToDb,
+} from "../contexts/PlayerContext";
 import { SurroundSound, VolumeDown } from "@mui/icons-material";
 import { SurroundMode } from "../utils/surround";
 
@@ -38,11 +44,12 @@ export function VolumeControl() {
       <VolumeDown sx={{ fontSize: "18px" }} />
       <input
         type="range"
-        min={0.0}
-        max={7.0}
-        step={0.25}
-        value={context.masterGain}
-        onChange={(e) => context.reducer.setMasterGain(Number(e.target.value))}
+        min={MASTER_GAIN_MIN_DB}
+        max={MASTER_GAIN_MAX_DB}
+        step={0.5}
+        value={masterGainToDb(context.masterGain)}
+        title={context.masterGain > 0 ? `${masterGainToDb(context.masterGain).toFixed(1)} dB` : "Mute"}
+        onChange={(e) => context.reducer.setMasterGain(masterGainFromDb(Number(e.target.value)))}
       />
     </div>
   );

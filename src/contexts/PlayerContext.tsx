@@ -91,6 +91,26 @@ function autoResumeAudioContext(audioContext: AudioContext) {
 }
 
 export const DEFAULT_MASTER_GAIN = 4.0;
+
+/**
+ * The volume slider's range, in dB relative to DEFAULT_MASTER_GAIN. The ear
+ * hears ratios, so the slider moves in dB; its bottom stop is silence rather
+ * than -48 dB.
+ */
+export const MASTER_GAIN_MIN_DB = -48;
+export const MASTER_GAIN_MAX_DB = 6;
+
+/** Slider position (dB) to gain, with the bottom stop as silence. */
+export function masterGainFromDb(db: number): number {
+  return db <= MASTER_GAIN_MIN_DB ? 0 : DEFAULT_MASTER_GAIN * Math.pow(10, db / 20);
+}
+
+/** Gain to slider position (dB), clamped to the slider's range. */
+export function masterGainToDb(gain: number): number {
+  if (!(gain > 0)) return MASTER_GAIN_MIN_DB;
+  const db = 20 * Math.log10(gain / DEFAULT_MASTER_GAIN);
+  return Math.min(MASTER_GAIN_MAX_DB, Math.max(MASTER_GAIN_MIN_DB, db));
+}
 export const DEFAULT_SURROUND_MODE: SurroundMode = "off";
 export const DEFAULT_REPEAT_MODE: RepeatMode = "none";
 export const DEFAULT_LOOP_COUNT = 2;
@@ -157,9 +177,13 @@ const createDefaultContextState = () => {
     const pls = localStorage.getItem("m3disp.entries");
     const entries = pls != null ? JSON.parse(pls) : [];
     state.entries = entries;
-    // clamp against the current slider range: a value persisted under an older,
-    // wider range (was 1.0–7.0) could otherwise land out of bounds
-    state.masterGain = Math.min(7.0, Math.max(0.0, json.masterGain ?? state.masterGain));
+    // Clamped to the slider's range: a value persisted under an older one could
+    // otherwise land out of bounds. The gain itself is what is stored, so
+    // settings saved by the earlier linear slider carry over unchanged.
+    state.masterGain = Math.min(
+      masterGainFromDb(MASTER_GAIN_MAX_DB),
+      Math.max(0.0, json.masterGain ?? state.masterGain)
+    );
     state.gainNode.gain.value = state.masterGain;
     state.repeatMode = json.repeatMode ?? state.repeatMode;
     state.surroundMode = json.surroundMode ?? state.surroundMode;
