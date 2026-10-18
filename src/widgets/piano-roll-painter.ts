@@ -1036,7 +1036,7 @@ export function paintPianoRoll(
         playingDraws.push({ r: pr, color: seg.color, nowX, noteAge: nowIdx - seg.start, vol });
       } else {
         fillSocket(ctx, pr); // still rising back after release
-        ctx.fillStyle = seg.color + "bb"; // dimmer when not sounding (alpha 0.73)
+        ctx.fillStyle = seg.color; // opaque; the sounding note stands out by its brightness lift
         ctx.fillRect(x, y, w, h);
       }
     }
@@ -1215,7 +1215,7 @@ export function paintCellRoll(
             if (count > 0) spawnParticles(nowIdx * step, y + h / 2, seg.color, count, 1, particleType, H / 140, store);
           }
         } else {
-          ctx.fillStyle = seg.color + "99";
+          ctx.fillStyle = seg.color;
           ctx.fillRect(x, y, w, h);
         }
       }
