@@ -2,7 +2,7 @@ import { KSSPlayer } from "./kss-player";
 import { DeviceName } from "./kss-device";
 import type { KSSDecoderDeviceSnapshot } from "./kss-decoder-worker";
 import { SPC_VOICE_FIELDS, SPC_FLAG_NOISE, SPC_FLAG_ECHO, SPC_FLAG_PMOD } from "../spc/spc-engine";
-import { N163_WAVE_POINTS, NSF_CH_FIELDS, NSF_FLAG_SHORT } from "../nsf/nsf-engine";
+import { N163_WAVE_POINTS, NSF_CH_FIELDS, NSF_FLAG_NOISE, NSF_FLAG_SHORT } from "../nsf/nsf-engine";
 import {
   HES_CH_FIELDS,
   HES_FLAG_DDA,
@@ -418,6 +418,11 @@ function createNSFStatus(
     return { ...base, voice: `Pulse ${NSF_DUTY_NAMES[vnum & 3]}` };
   }
   if (id.index === 25) return { ...base, mode: "pcm", voice: "PCM" };
+  if (id.index >= 26) {
+    // The Sunsoft 5B: the PSG's channels, named the way the PSG's are.
+    const voice = createPSGVoiceName((vnum & 1) !== 0, (vnum & 2) !== 0, vnum & 4 ? 1 : null);
+    return flags & NSF_FLAG_NOISE ? { ...base, mode: "noise", voice } : { ...base, voice };
+  }
   if (id.index >= 15) {
     // An N163 channel hands over its own wavetable, as the FDS does.
     const at = (id.index - 15) * N163_WAVE_POINTS;

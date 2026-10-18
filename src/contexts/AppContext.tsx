@@ -83,6 +83,7 @@ const channelColorGroups: {
   { device: "nsf", key: "vrc7", base: 48, count: 6 },
   { device: "nsf", key: "n163", base: 54, count: 8 },
   { device: "nsf", key: "mmc5", base: 62, count: 3 },
+  { device: "nsf", key: "s5b", base: 65, count: 3 },
 ];
 
 function channelColorsToMap(colors: string[]): { [device: string]: string[] } {

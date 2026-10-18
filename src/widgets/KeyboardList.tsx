@@ -235,6 +235,8 @@ export const DEVICE_CARDS: Record<
   n163: { name: "N163", device: "nsf", targets: [15, 16, 17, 18, 19, 20, 21, 22] },
   // And the MMC5's two pulses and PCM channel.
   mmc5: { name: "MMC5", device: "nsf", targets: [23, 24, 25] },
+  // And the Sunsoft 5B's three PSG channels.
+  s5b: { name: "5B", device: "nsf", targets: [26, 27, 28] },
   // HES mode's only section. The six PSG channels are interchangeable, so each
   // one is its own card.
   hes: { name: "PCE", device: "hes", targets: [0, 1, 2, 3, 4, 5] },
@@ -248,6 +250,7 @@ const FIXED_LABELS: Partial<Record<DeviceName, string[]>> = {
     "FM1", "FM2", "FM3", "FM4", "FM5", "FM6",
     "CH1", "CH2", "CH3", "CH4", "CH5", "CH6", "CH7", "CH8",
     "SQ1", "SQ2", "PCM",
+    "CH1", "CH2", "CH3",
   ],
 };
 

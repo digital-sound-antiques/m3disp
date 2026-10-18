@@ -26,6 +26,7 @@ import {
   CH_MMC5_PULSE1,
   CH_MMC5_PULSE2,
   CH_MMC5_PCM,
+  CH_S5B,
   type NSFFile,
   type NSFPlayerState,
 } from "nsf-js";
@@ -49,6 +50,8 @@ const F_PERIOD = 5;
 export const NSF_FLAG_ACTIVE = 1;
 /** Noise channel is in its short, pitched mode. */
 export const NSF_FLAG_SHORT = 2;
+/** A Sunsoft 5B channel is playing noise with its tone off: no pitch to show. */
+export const NSF_FLAG_NOISE = 8;
 /** FDS channel is being pitch-modulated. */
 export const NSF_FLAG_MOD = 4;
 
@@ -183,9 +186,6 @@ export class NSFEngine {
    *  it, not the value, says whether the question has been settled. */
   endFrame = 0;
   endDetected = false;
-  /** False when the file uses a chip this player does not have, in which case
-   *  silence proves nothing: the missing channels may be carrying the tune. */
-  private silenceDetection = true;
 
   /** Key-on counters seen at the previous snapshot, and the frames since each
    *  channel last started a note. The player counts retriggers; turning that
@@ -242,7 +242,6 @@ export class NSFEngine {
     this.heardAudio = false;
     this.endFrame = 0;
     this.endDetected = false;
-    this.silenceDetection = !file.chips.s5b;
     this.totalFrames = Math.round(this.audible.totalSeconds * this.sampleRate);
   }
 
@@ -376,6 +375,14 @@ export class NSFEngine {
         case CH_MMC5_PCM:
           vnum = 8;
           break;
+        case CH_S5B + 0:
+        case CH_S5B + 1:
+        case CH_S5B + 2:
+          // Tone, noise and envelope bits, so a change of what the channel is
+          // doing shows as a change of colour.
+          vnum = s.detail & 7;
+          if (!(s.detail & 1) && s.detail & 2) flags |= NSF_FLAG_NOISE;
+          break;
         case CH_N163 + 0:
         case CH_N163 + 1:
         case CH_N163 + 2:
@@ -486,7 +493,7 @@ export class NSFEngine {
    * show. Once found, the audible player's fade is moved to land there.
    */
   private trackSilence(nsf: Int16Array, grid: number): void {
-    if (this.endDetected || !this.silenceDetection) return;
+    if (this.endDetected) return;
 
     let sounding = false;
     for (let c = 0; c < CHANNEL_COUNT; c++) {
