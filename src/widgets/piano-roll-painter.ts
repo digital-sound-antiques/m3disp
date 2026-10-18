@@ -955,12 +955,13 @@ export function paintPianoRoll(
 
   // Note geometry is the same for every channel: a uniform thickness centered on
   // the note's own slot/boundary center, so black and white notes read as the
-  // same weight and line up with the keyboard. Capped at half a slot because the
-  // pitch axis is diatonic — a black note sits ON the boundary between two white
-  // slots, so semitone neighbours are only slot/2 apart and the nominal 0.7·slot
-  // thickness would have them overlap by 0.2·slot. The 1px keeps a hairline gap.
+  // same weight and line up with the keyboard. The pitch axis is diatonic - a
+  // black note sits ON the boundary between two white slots - so semitone
+  // neighbours are only slot/2 apart, and anything thicker than that overlaps
+  // them a little. That only shows when two channels clash a semitone apart, so
+  // the weight a capture reads at wins over keeping them apart.
   const slot = slotOf(canvas.height);
-  const noteH = Math.max(1, Math.min(slot * 0.7 - 2, slot * 0.5 - 1));
+  const noteH = Math.max(1, slot * 0.50 - 1);
 
   // Pass 1: build segments per channel, draw non-playing ones immediately
   const mask = playerContext.channelMask;
