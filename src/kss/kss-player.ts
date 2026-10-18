@@ -104,6 +104,8 @@ export class KSSPlayer extends AudioPlayer {
   private _lastArgs: KSSDecoderStartOptions | null = null;
   private _pendingArgs: KSSDecoderStartOptions | null = null;
   private _busy = false;
+  /** A seek made while paused: the restart it needs must not resume playback. */
+  private _seekWhilePaused = false;
 
   get seekBaseFrame(): number {
     return this.baseFrame;
@@ -141,13 +143,20 @@ export class KSSPlayer extends AudioPlayer {
           this._waveEnd = 0;
         }
         await super.play(a);
+        // A seek restarts the stream, which leaves the renderer playing. Paused
+        // is what the app still believes, so put the renderer back: otherwise the
+        // next press of the pause button only "resumes" what is already playing.
+        if (a.seek && this._seekWhilePaused) await this.pause();
       }
     } finally {
       this._busy = false;
+      this._seekWhilePaused = false;
     }
   }
 
   override async play(args: KSSDecoderStartOptions) {
+    // A new track starts playing whatever state the last one was left in.
+    this._seekWhilePaused = false;
     this._currentToken += 1;
     const a: KSSDecoderStartOptions = {
       ...args,
@@ -173,6 +182,7 @@ export class KSSPlayer extends AudioPlayer {
       // playback the moment the end is discovered. Treat such a seek as invalid.
       return;
     }
+    if (this.state === "paused") this._seekWhilePaused = true;
     await this._runPlay({
       ...this._lastArgs,
       startFrame,
