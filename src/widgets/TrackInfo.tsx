@@ -22,6 +22,20 @@ type VolumeIndicatorProps = {
   variant: "vertical" | "horizontal";
 };
 
+function meterLevel(volume: number, kcode?: number | null, keyKeepFrames?: number | null) {
+  if (keyKeepFrames == null) return volume;
+  const decayCycle = kcode != null ? 90 : 30;
+  const elapsedCycle = Math.min(keyKeepFrames / 735, decayCycle);
+  return Math.round((volume * (decayCycle - elapsedCycle)) / decayCycle);
+}
+
+function sameVoice(a: string | Uint8Array | null, b: string | Uint8Array | null) {
+  if (a === b) return true;
+  if (!(a instanceof Uint8Array) || !(b instanceof Uint8Array) || a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
 export function VolumeIndicator(props: VolumeIndicatorProps) {
   const boxRef = useRef<HTMLCanvasElement>(null);
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -58,15 +72,7 @@ export function VolumeIndicator(props: VolumeIndicatorProps) {
     context.fillRect(0, 0, canvas.width, canvas.height);
     context.beginPath();
 
-    let v;
-    if (props.keyKeepFrames != null) {
-      const decayCycle = props.kcode != null ? 90 : 30;
-      const elapsedCycle = Math.min(props.keyKeepFrames / 735, decayCycle);
-      const att = (decayCycle - elapsedCycle) / decayCycle;
-      v = Math.round(props.volume * att);
-    } else {
-      v = props.volume;
-    }
+    const v = meterLevel(props.volume, props.kcode, props.keyKeepFrames);
 
     if (props.variant == "horizontal") {
       const step = canvas.width / 15;
@@ -215,34 +221,37 @@ export function TrackInfoPanel(props: TrackInfoPanelProps) {
   const theme = useTheme();
   const context = useContext(PlayerContext);
 
-  const [status, setStatus] = useState<ChannelStatus | null>(null);
-
+  // Only the voice is shown; keep it in state and update it only when it
+  // actually changes (a per-frame setState re-rendered the whole MUI subtree).
+  const [voice, setVoice] = useState<string | Uint8Array | null>(null);
   const rootRef = useRef(null);
-  const disabledRef = useRef(props.disabled);
-
-  const renderFrame = () => {
-    if (rootRef.current != null) {
-      requestAnimationFrame(renderFrame);
-      if (
-        !disabledRef.current &&
-        (context.player.state == "playing" || context.player.state == "paused")
-      ) {
-        for (const target of props.targets) {
-          const newStatus = context.player.getChannelStatus(target);
-          if (newStatus != null) {
-            setStatus(newStatus);
-          }
-        }
-      } else {
-        setStatus(null);
-      }
-    }
-  };
+  const propsRef = useRef(props);
+  propsRef.current = props;
 
   useEffect(() => {
-    requestAnimationFrame(renderFrame);
-    disabledRef.current = props.disabled;
-  }, [props.disabled]);
+    let raf = 0;
+    let last: string | Uint8Array | null = null;
+    const frame = () => {
+      raf = requestAnimationFrame(frame);
+      const p = propsRef.current;
+      const pl = context.player;
+      let next: string | Uint8Array | null = null;
+      if (!p.disabled && (pl.state == "playing" || pl.state == "paused")) {
+        for (const target of p.targets) {
+          const st = pl.getChannelStatus(target);
+          if (st != null) next = st.voice ?? null;
+        }
+      }
+      if (!sameVoice(last, next)) {
+        // SCC voices are views into the snapshot registers: keep a copy
+        last = next instanceof Uint8Array ? next.slice() : next;
+        setVoice(last);
+      }
+    };
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, [context.player]);
+  const status = voice != null ? { voice } : null;
 
   const voiceNameBoxRef = useRef<HTMLDivElement>(null);
 
@@ -414,41 +423,38 @@ export function VolumeInfoPanel(props: VolumeInfoPanelProps) {
 
   const [status, setStatus] = useState<ChannelStatus | null>(null);
   const rootRef = useRef(null);
-  const disabledRef = useRef(props.disabled);
-
-  const renderFrame = () => {
-    if (rootRef.current != null) {
-      requestAnimationFrame(renderFrame);
-      if (!disabledRef.current) {
-        if (props.targets.length > 0) {
-          let nextStatus: ChannelStatus;
-          for (const target of props.targets) {
-            nextStatus = { id: target, freq: 0, vol: 0 };
-            const newStatus = context.player.getChannelStatus(target);
-            if (newStatus != null) {
-              if (nextStatus.vol < newStatus.vol) {
-                nextStatus.vol = newStatus.vol;
-              }
-              if (
-                nextStatus.keyKeepFrames == null ||
-                nextStatus.keyKeepFrames > (newStatus.keyKeepFrames ?? 0)
-              ) {
-                nextStatus.keyKeepFrames = newStatus.keyKeepFrames ?? 0;
-              }
-            }
-          }
-          setStatus(nextStatus!);
-        }
-      } else {
-        setStatus(null);
-      }
-    }
-  };
+  const propsRef = useRef(props);
+  propsRef.current = props;
 
   useEffect(() => {
-    requestAnimationFrame(renderFrame);
-    disabledRef.current = props.disabled;
-  }, [props.disabled]);
+    let raf = 0;
+    let lastKey = "";
+    const frame = () => {
+      raf = requestAnimationFrame(frame);
+      const p = propsRef.current;
+      let next: ChannelStatus | null = null;
+      if (!p.disabled && p.targets.length > 0) {
+        for (const target of p.targets) {
+          next = { id: target, freq: 0, vol: 0 };
+          const st = context.player.getChannelStatus(target);
+          if (st != null) {
+            if (next.vol < st.vol) next.vol = st.vol;
+            if (next.keyKeepFrames == null || next.keyKeepFrames > (st.keyKeepFrames ?? 0)) {
+              next.keyKeepFrames = st.keyKeepFrames ?? 0;
+            }
+          }
+        }
+      }
+      // keyKeepFrames ticks every frame; re-render only when the drawn bar changes
+      const key = next == null ? "" : `${next.vol}:${meterLevel(next.vol, next.kcode, next.keyKeepFrames)}`;
+      if (key !== lastKey) {
+        lastKey = key;
+        setStatus(next);
+      }
+    };
+    raf = requestAnimationFrame(frame);
+    return () => cancelAnimationFrame(raf);
+  }, [context.player]);
 
   return (
     <Box

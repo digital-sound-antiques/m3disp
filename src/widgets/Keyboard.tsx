@@ -236,6 +236,8 @@ function WhiteKeysOverlay(props: {
   });
 
   useEffect(() => {
+    let lastKey = "";
+    let lastPainter: KeyboardPainter | null = null;
     const renderFrame = () => {
       const canvas = canvasRef.current!;
       if (canvas != null) {
@@ -249,6 +251,12 @@ function WhiteKeysOverlay(props: {
             colors.push(propsRef.current.color);
           }
         }
+        // repaint only when the lit keys, colors, size or painter change
+        const p = propsRef.current;
+        const key = `${canvas.width}x${canvas.height}:${p.color}:${kcodes.join(",")}`;
+        if (key === lastKey && p.painter === lastPainter) return;
+        lastKey = key;
+        lastPainter = p.painter;
         propsRef.current.painter.paintWhiteKeysOverlay(canvas, kcodes, colors);
       }
     };
@@ -301,6 +309,8 @@ function BlackKeysOverlay(props: {
   });
 
   useEffect(() => {
+    let lastKey = "";
+    let lastPainter: KeyboardPainter | null = null;
     const renderFrame = () => {
       const canvas = canvasRef.current!;
       if (canvas != null) {
@@ -314,6 +324,12 @@ function BlackKeysOverlay(props: {
             colors.push(propsRef.current.color);
           }
         }
+        // repaint only when the lit keys, colors, size or painter change
+        const p = propsRef.current;
+        const key = `${canvas.width}x${canvas.height}:${p.color}:${p.whiteKeyColor}:${kcodes.join(",")}`;
+        if (key === lastKey && p.painter === lastPainter) return;
+        lastKey = key;
+        lastPainter = p.painter;
         propsRef.current.painter.paintBlackKeysOverlay(
           canvas,
           kcodes,

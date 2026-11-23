@@ -79,6 +79,9 @@ function HighlightCanvas(props: {
   }, [props.width, props.height, rx, ry]);
 
   useEffect(() => {
+    // repaint only when the lit keys, canvas size or painter change
+    let lastKey = "";
+    let lastPainter: typeof painterRef.current | null = null;
     const renderFrame = () => {
       const canvas = canvasRef.current;
       if (canvas != null) {
@@ -90,6 +93,10 @@ function HighlightCanvas(props: {
           const status = player.getChannelStatus(id);
           if (status?.kcode != null) keys.push(status.kcode);
         }
+        const key = `${canvas.width}x${canvas.height}:${keys.join(",")}`;
+        if (key === lastKey && painterRef.current === lastPainter) return;
+        lastKey = key;
+        lastPainter = painterRef.current;
         painterRef.current(canvas, keys);
       }
     };
