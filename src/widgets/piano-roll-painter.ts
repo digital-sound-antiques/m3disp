@@ -822,17 +822,49 @@ export function paintKeyboardEdgeLine(canvas: HTMLCanvasElement) {
   ctx.stroke();
 }
 
-// Latency-corrected current NTSC frame (absolute song frame / 735), clamped to
-// the decoded snapshot range. Shared by the main roll and the per-channel grid.
-function currentNtscFrame(playerContext: PlayerContextState): number {
-  const audioFrame =
-    playerContext.player.seekBaseFrame + (playerContext.player.progress?.renderer?.currentFrame ?? 0);
-  const latency = playerContext.player.outputLatencyOverride ?? playerContext.player.outputLatency ?? 0;
-  const latencySamples = latency * (playerContext.player.audioContext?.sampleRate ?? 44100);
-  let ntsc = Math.floor(Math.max(0, audioFrame - latencySamples) / 735);
+// Smoothed play head for the scrolling rolls. The raw position only moves when
+// a worklet progress message lands (bursty, 128-sample quanta), so sampling it
+// per paint made the roll advance 0/1/2 NTSC frames unevenly — visible judder,
+// worse in screen captures. Extrapolate by wall clock and pull gently toward the
+// raw position; snap on seeks/stalls and follow it directly when not playing.
+const playClock = { pos: 0, t: 0, valid: false };
+const CLOCK_PULL = 0.05; // fraction of the raw-vs-extrapolated error corrected per paint
+const CLOCK_SNAP_SEC = 0.1; // errors beyond this are a seek/stall: jump, don't glide
+
+function smoothSongFrame(player: PlayerContextState["player"]): number {
+  const rate = player.audioContext?.sampleRate ?? 44100;
+  const latency = player.outputLatencyOverride ?? player.outputLatency ?? 0;
+  const raw = player.seekBaseFrame + (player.progress?.renderer?.currentFrame ?? 0) - latency * rate;
+  const now = performance.now();
+  if (player.state !== "playing") {
+    playClock.valid = false;
+    return raw;
+  }
+  if (!playClock.valid) {
+    playClock.pos = raw;
+    playClock.t = now;
+    playClock.valid = true;
+    return raw;
+  }
+  if (now === playClock.t) return playClock.pos;
+  let pos = playClock.pos + ((now - playClock.t) * rate) / 1000;
+  const err = raw - pos;
+  pos = Math.abs(err) > rate * CLOCK_SNAP_SEC ? raw : pos + err * CLOCK_PULL;
+  playClock.pos = pos;
+  playClock.t = now;
+  return pos;
+}
+
+// Current play head in (fractional) NTSC frames, clamped to the decoded snapshot
+// range. Shared by the main roll and the per-channel grid.
+function currentNtscPos(playerContext: PlayerContextState): number {
+  const pos = Math.max(0, smoothSongFrame(playerContext.player)) / 735;
   const decodedLen = playerContext.player._snapshots.length;
-  if (decodedLen > 0 && ntsc >= decodedLen) ntsc = decodedLen - 1;
-  return ntsc;
+  return decodedLen > 0 && pos >= decodedLen - 1 ? decodedLen - 1 : pos;
+}
+
+function currentNtscFrame(playerContext: PlayerContextState): number {
+  return Math.floor(currentNtscPos(playerContext));
 }
 
 // Note segments of one channel over [windowStart, windowStart+frames). Statuses
@@ -938,15 +970,18 @@ export function paintPianoRoll(
   // Reset the status cache if the song changed (snapshot array replaced).
   resetCacheIfSongChanged(playerContext.player);
 
-  // latency-corrected current NTSC frame, shared across channels
-  const currentNtsc = currentNtscFrame(playerContext);
+  // latency-corrected play head, shared across channels. Notes are laid out on
+  // whole NTSC frames and the whole roll is shifted left by the fraction.
+  const ntscPos = currentNtscPos(playerContext);
+  const currentNtsc = Math.floor(ntscPos);
+  const frac = ntscPos - currentNtsc;
 
   // Beat rules first, so every note sits on top of them. Laid out on the
   // unlayered time axis: the per-channel offset `layered` adds is a look, not a
   // different clock, and the rules have to agree with the roll as a whole.
   if (beatLines) {
     const frames = Math.round(60 * rangeInSec);
-    paintBeatLines(ctx, canvas, currentNtsc - Math.floor(frames * lpos), frames, canvas.width / frames);
+    paintBeatLines(ctx, canvas, ntscPos - Math.floor(frames * lpos), frames, canvas.width / frames);
   }
 
   // Deferred draws for currently-playing segments so they always sit on top,
@@ -987,6 +1022,7 @@ export function paintPianoRoll(
     const step = canvas.width / frames;
     const nowIdx = Math.floor(frames * lpos);
     const nowX = nowIdx * step;
+    const shift = frac * step;
     const baseColor: string = (activeColorMap()[ch] as any)["A200"];
     const channelMode = colorConfig.mode[channelIds[ch].device] ?? "voice";
 
@@ -996,7 +1032,8 @@ export function paintPianoRoll(
     // Build segments (split on key-on edge even for the same note)
     const segments: Seg[] = [];
     let cur: Seg | null = null;
-    for (let i = 0; i < frames; i++) {
+    // one extra frame fills the right edge the sub-frame shift uncovers
+    for (let i = 0; i <= frames; i++) {
       const idx = windowStart + i;
       const s = getStatusCached(playerContext.player, ch, idx);
       const note = s?.kcode ?? null;
@@ -1031,7 +1068,7 @@ export function paintPianoRoll(
       // press while sounding (see pressAmount / pressRect): the block, its
       // spotlight frame and its particle origin all move together
       const pr = pressRect(
-        seg.start * step + g,
+        seg.start * step + g - shift,
         ng.yTop + ng.h / 2 - noteH / 2,
         Math.max(1, (seg.end - seg.start + 1) * step - g),
         noteH,
@@ -1153,9 +1190,12 @@ export function paintCellRoll(
   const frames = Math.round(60 * rangeInSec);
   const nowIdx = Math.floor(frames * lpos);
   let windowStart = 0;
+  let frac = 0;
   if (active) {
     resetCacheIfSongChanged(playerContext.player);
-    windowStart = currentNtscFrame(playerContext) - nowIdx;
+    const pos = currentNtscPos(playerContext);
+    windowStart = Math.floor(pos) - nowIdx;
+    frac = pos - Math.floor(pos);
   }
 
   const mask = playerContext.channelMask;
@@ -1176,6 +1216,7 @@ export function paintCellRoll(
 
   if (active) {
     const step = W / frames;
+    const shift = frac * step; // sub-frame scroll (see currentNtscPos)
     const slot = slotOf(H);
     // note thickness scales with the cell's aspect ratio: 2× a pitch slot when
     // wider than 2:1, 1× when taller than 16:9, linearly interpolated between.
@@ -1202,13 +1243,13 @@ export function paintCellRoll(
               : baseColor;
         noteLabels.push({ text: noteName(now.kcode), color });
       }
-      const segments = buildSegments(playerContext.player, ch, windowStart, frames, channelMode, colorConfig);
+      const segments = buildSegments(playerContext.player, ch, windowStart, frames + 1, channelMode, colorConfig);
       for (const seg of segments) {
         const g = seg.gap ? GAP : 0;
         const ng = noteGeomIn(H, seg.note);
         // uniform thickness, centered on the note's slot; sinks while sounding
         const { x, y, w, h } = pressRect(
-          seg.start * step + g,
+          seg.start * step + g - shift,
           ng.yTop + ng.h / 2 - noteH / 2,
           Math.max(1, (seg.end - seg.start + 1) * step - g),
           noteH,
